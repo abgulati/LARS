@@ -1,0 +1,4545 @@
+from flask import Flask, render_template, request, redirect, url_for, Response, stream_with_context
+from flask import send_from_directory
+from flask import jsonify
+
+from pdfminer.high_level import extract_text
+from werkzeug.utils import secure_filename
+
+from whoosh.fields import Schema, TEXT, ID, NUMERIC
+from whoosh.qparser import MultifieldParser
+from whoosh.qparser import QueryParser
+from whoosh.index import create_in
+from whoosh.index import open_dir
+
+from transformers import TrOCRProcessor, VisionEncoderDecoderModel
+
+from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
+from langchain_community.embeddings import HuggingFaceBgeEmbeddings
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain.memory import ConversationSummaryBufferMemory
+from langchain.embeddings import HuggingFaceEmbeddings
+from langchain.embeddings import OpenAIEmbeddings
+from langchain.document_loaders import TextLoader
+from langchain.prompts import PromptTemplate
+from langchain.vectorstores import Chroma
+from langchain.chains import RetrievalQA
+from langchain.chains import ConversationChain
+from langchain.llms import CTransformers
+
+from langchain.chat_models import AzureChatOpenAI
+from langchain.schema import HumanMessage
+
+from pdf2image import convert_from_path
+from PIL import Image
+import pytesseract
+
+import fitz # PyMuPDF
+
+from urllib.parse import unquote
+from threading import Thread
+import subprocess
+import threading
+import traceback
+import platform
+import tempfile
+import datetime
+import requests
+import logging
+import sqlite3
+import signal
+import PyPDF2
+import base64
+import queue
+import uuid
+import json
+import time
+import nltk
+import zlib
+import ast
+import sys
+import os
+import io
+import re
+
+from logging.handlers import RotatingFileHandler
+from nltk.corpus import stopwords
+
+
+
+app = Flask(__name__)
+
+# Route for the home page, rendering the initial model selection form (legacy)
+@app.route('/')
+def index():
+    return render_template('chat.html')
+
+# model_selection.html triggers window.location.href to '/chat', which triggers this route, which loads the chat.html template at the end!
+@app.route('/chat')
+def chat():
+    return render_template('chat.html')
+
+# Route to display the file loading form
+@app.route('/load_file')
+def load_file():
+    return render_template('model_selection.html', show_file_form=True)
+
+@app.route('/download/<filename>')
+def download_file(filename):
+    # return send_from_directory(app.config['UPLOAD_FOLDER'], filename, as_attachment=True)
+    return send_from_directory(app.config['DOWNLOAD_FOLDER'], filename, as_attachment=False, mimetype='application/pdf')
+
+@app.route('/pdf/<filename>')
+def pdf_viewer(filename):
+    return send_from_directory(app.config['DOWNLOAD_FOLDER'], filename)
+
+
+
+#########################------------------GLOBALS!----------------------###############################
+LLAMA_CPP_PROCESS = None
+LLM = None
+CHAT_ID = None
+SEQUENCE_ID = None
+LOADED_UP = False
+LLM_LOADED_UP = False
+VECTORDB_LOADED_UP = False
+LLM_CHANGE_RELOAD_TRIGGER_SET = False
+VECTORDB_CHANGE_RELOAD_TRIGGER_SET = False
+VECTOR_STORE = None
+HF_BGE_EMBEDDINGS = None
+AZURE_OPENAI_EMBEDDINGS = None
+HISTORY_MEMORY_WITH_BUFFER = None   #Init in load_model_and_vectordb(); reset in load_chat_history() when old chats loaded, and in load_model_and_vectordb() when 'New Chat' selected; used for non-RAG convChain init in stream, and for saving context in stream for RAG chains and lastly, for setting HISTORY_SUMMARY in stream() via load_memory_variables({})
+HISTORY_SUMMARY = {}    #Set in stream() via HISTORY_MEMORY_WITH_BUFFER.load_memory_variables({}), and in load_chat_history() from chat_history DB; cleared in load_model_and_vectordb() when 'New Chat' selected; used to init prompt templates in stream() and lastly, for storage to chat_history DB in stream() and get_references()
+
+# Dict for user queries:  queries[session_id] = user_input
+QUERIES = {}
+#########################------------------------------------------------###############################
+
+
+
+#########################------------Setup & Handle Logging-------------###############################
+try:
+    # 1 - Create a logger
+    logger = logging.getLogger('my_logger')
+    logger.setLevel(logging.ERROR)
+
+    # 2 - Create a RotatingFileHandler
+    # maxBytes: max file size of log file after which a new file is created; set to 1024 * 1024 * 5 for 5MB: 1024x1024 is 1MB, then a multiplyer for the number of MB
+    # backupCount: number of backup files to keep specifying how many old log files to keep
+    handler = RotatingFileHandler('server_log.log', maxBytes=1024*1024*5, backupCount=2)
+    handler.setLevel(logging.ERROR)
+
+    # 3 - Create a formatter and set it for the handler
+    formatter = logging.Formatter('%(asctime)s:%(levelname)s:%(message)s')
+    handler.setFormatter(formatter)
+
+    # 4 - Add the handler to the logger
+    logger.addHandler(handler)
+    # Logger ready! Usage: logger.error(f"This is an error message with error {e}")
+except Exception as e:
+    print(f"\n\nCould not establish logger, encountered error: {e}")
+
+
+def handle_api_error(message, exception=None):
+    error_message = f"{message} {str(exception) if exception else '; No exception info.'}".strip()
+    #traceback_details = traceback.format_exc()
+    #full_message = f"\n\n{error_message}\n\nTraceback: {traceback_details}\n\n"
+    full_message = f"\n\n{error_message}\n\n"
+
+    if logger:
+        logger.error(full_message)
+        print(full_message)
+    else:
+        print(full_message)
+    return jsonify(success=False, error=error_message), 500 #internal server error
+
+
+def handle_local_error(message, exception=None):
+    error_message = f"{message} {str(exception) if exception else '; No exception info.'}".strip()
+    #traceback_details = traceback.format_exc()
+    full_message = f"\n\n{error_message}\n\n"
+    if logger:
+        logger.error(full_message)
+        print(full_message)
+    else:
+        print(full_message)
+    raise Exception(exception)
+
+
+def handle_error_no_return(message, exception=None):
+    error_message = f"{message} {str(exception) if exception else '; No exception info.'}".strip()
+    #traceback_details = traceback.format_exc()
+    full_message = f"\n\n{error_message}\n\n"
+    if logger:
+        logger.error(full_message)
+        print(full_message)
+    else:
+        print(full_message)
+
+#########################-------------------------------------###############################
+
+
+
+if not os.path.exists('config.json'):
+    try:
+        with open('config.json', 'w') as file:
+            json.dump({}, file)
+    except Exception as e:
+        handle_error_no_return("Could not init config.json. Multiple app restarts may be required to get the app to init correctly. Printing error and proceeding: ", e)
+
+
+
+# Method to write to config.json | input- dict of key:values to be written to config.json
+def write_config(config_updates, filename='config.json'):
+
+    # Open config file to read-in all current params:
+    try:
+        with open(filename, 'r') as file:
+            config = json.load(file)
+    except Exception as e:
+        config = {}     #init emply config dict
+        handle_error_no_return("Could not read config.json when attempting to write, encountered error: ", e)
+        
+    restart_required = False
+    if LLM_LOADED_UP:
+        llm_trigger_keys_for_app_restart = ['use_local_llm', 'use_azure_open_ai', 'use_gpu', 'model_choice', 'local_llm_chat_template_format', 'local_llm_context_length', 'local_llm_max_new_tokens', 'local_llm_gpu_layers', 'base_template']
+                
+        for key in llm_trigger_keys_for_app_restart:
+            if key in config_updates and config_updates[key] != config.get(key):
+                global LLM_CHANGE_RELOAD_TRIGGER_SET
+                LLM_CHANGE_RELOAD_TRIGGER_SET = True
+                restart_required = True
+                break
+    
+    if VECTORDB_LOADED_UP:
+        vectordb_trigger_keys_for_app_restart = ['embedding_model_choice']
+
+        for key in vectordb_trigger_keys_for_app_restart:
+            if key in config_updates and config_updates[key] != config.get(key):
+                global VECTORDB_CHANGE_RELOAD_TRIGGER_SET
+                VECTORDB_CHANGE_RELOAD_TRIGGER_SET = True
+                restart_required = True
+                break
+
+    config.update(config_updates)
+
+    # Write updated config.json:
+    try:
+        with open(filename, 'w') as file:
+            json.dump(config, file, indent=4)
+    except Exception as e:
+        handle_local_error("Could not update config.json, encountered error: ", e)
+     
+    return {'success': True, 'restart_required':restart_required}
+            
+
+# Method to read from config.json | input- list of keys to be read from config.json; output- dict of key:value pairs; MANAGE DEFAULTS HERE!
+def read_config(keys, default_value=None, filename='config.json'):
+    
+    # Open config file to read-in all current params:
+    try:
+        with open(filename, 'r') as file:
+            config = json.load(file)
+    except Exception as e:
+        handle_error_no_return("Could not read config.json, encountered error: ", e)
+        return {key: default_value for key in keys}     #because a read scenario wherein config.json does not exist shouldn't occur!
+    
+    return_dict = {}
+    update_config_dict = {}
+    base_directory = config.get('base_directory', '/app/storage')   # specifying default if not found
+
+    for key in keys:
+        if key in config:
+            return_dict[key] = config[key]
+        else:
+            default_value = {
+                'windows_base_directory':'C:/web_app_storage',
+                'unix_and_docker_base_directory':'/app/storage',
+                'mac_base_directory':'app',
+                'upload_folder':base_directory + '/uploaded_pdfs',
+                'vectordb_sbert_folder':base_directory + '/chroma_db_250_sbert_embeddings',
+                'vectordb_openai_folder':base_directory + '/chroma_db_openai_embeddings',
+                'vectordb_bge_large_folder':base_directory + '/chroma_db_bge_large_embeddings',
+                'vectordb_bge_base_folder':base_directory + '/chroma_db_bge_base_embeddings',
+                'index_dir':base_directory + '/indexdir_main',
+                'sqlite_images_db':base_directory + '/images_database_main.db',
+                'sqlite_history_db':base_directory + '/chat_history.db',
+                'sqlite_docs_loaded_db':base_directory + '/docs_loaded.db',
+                'model_dir':base_directory + '/models',
+                'highlighted_docs':base_directory + '/highlighted_pdfs',
+                'ocr_pdfs':base_directory + '/ocr_pdfs',
+                'pdfs_to_txts':base_directory + '/pdfs_to_txts',
+                'model_choice':'Meta-Llama-3-8B-Instruct.f16.gguf',
+                'do_rag':True,
+                'force_enable_rag':False,
+                'force_disable_rag':False,
+                'use_local_llm':True,
+                'use_gpu':True,
+                'use_gpu_for_embeddings':False,
+                'use_azure_open_ai':False,
+                'use_openai_embeddings':False,
+                'azure_openai_api_type':'azure',
+                'azure_openai_api_version':'2023-05-15',
+                'azure_openai_max_tokens':4096,
+                'azure_openai_temperature':0.7,
+                'use_bge_large_embeddings':False,
+                'use_bge_base_embeddings':False,
+                'use_sbert_embeddings':True,
+                'embedding_model_choice':'sbert_mpnet_base_v2',
+                'use_ocr':False,
+                'ocr_service_choice':'None',
+                'local_llm_model_type':'llama',
+                'local_llm_chat_template_format':'llama3',
+                'local_llm_context_length':8192,
+                'local_llm_max_new_tokens':2048,
+                'local_llm_gpu_layers':47,
+                'local_llm_temperature':0.8,
+                'local_llm_top_k':40,
+                'local_llm_top_p':0.95,
+                'local_llm_min_p':0.05,
+                'local_llm_n_keep':0,
+                'server_timeout_seconds':10,
+                'server_retry_attempts':3,
+                'base_template':"Answer the user's question in as much detail as possible.",
+            }.get(key, 'undefined')
+
+            if default_value == 'undefined':
+                raise KeyError(f"Key \'{key}\' not found in config.json and no default value has been defined either.\n")
+            
+            return_dict[key] = default_value
+            update_config_dict[key] = default_value
+
+    if update_config_dict:
+        # Write Defaults
+        try:
+            write_config(update_config_dict)
+        except Exception as e:
+            handle_error_no_return("Could not write defaults to config.json. Encountered error: ", e)
+    
+    ##print(f"return_dict: {return_dict}")
+
+    return return_dict
+
+
+# Method for API route to read from config.json
+# Deviates from typical RESTful principals to use a POST call to fetch values but practical & justifyable because we:
+# 1. Do not want to make the URL huge with a ever-growing list of query-params 2. Do not wish to expose values via query-params
+@app.route('/config_reader_api', methods=['POST'])
+def config_reader_api():
+    # keys = request.args.getlist('keys') # Assuming keys are passed as query parameters
+    
+    try:
+        keys = request.json.get('keys', []) # Could also do keys = request.json['keys'] but this way we can provide a default list should 'keys' be missing!
+    except Exception as e:
+        handle_api_error("Server-side error - could not read keys for config_reader_api request. Encountered error:", e)
+
+    try:
+        values = read_config(keys)  # send list of keys, get dict of key:values
+    except Exception as e:
+        handle_api_error("Server-side error - could not read keys from config.json. Encountered error: ", e)
+    
+    return jsonify(success=True, values=values)
+
+
+# Method for API route to write to config.json
+@app.route('/config_writer_api', methods=['POST'])
+def config_writer_api():
+
+    try:
+        config_updates = request.json['config_updates']
+        print(f"config_updates for config_writer_api: {config_updates}")
+    except Exception as e:
+        handle_api_error("Server-side error - could not read values for config_writer_api request. Encountered error: ", e)
+    
+    try:
+        write_return = write_config(config_updates)
+    except Exception as e:
+        handle_api_error("Server-side error - could not write keys to config.json. Encountered error: ", e)
+    
+    return jsonify({"success": write_return['success'], "restart_required": write_return['restart_required']})
+
+
+
+#########################------------Setup Directories-------------###############################
+BASE_DIRECTORY = ""
+
+if platform.system() == 'Windows':
+    from azure.cognitiveservices.vision.computervision import ComputerVisionClient
+    from msrest.authentication import CognitiveServicesCredentials
+    from azure.ai.formrecognizer import DocumentAnalysisClient
+    from azure.core.credentials import AzureKeyCredential
+    import azure.ai.vision as sdk
+    
+    #BASE_DIRECTORY = 'C:/temp_web_app_storage'
+    try:
+        read_return = read_config(['windows_base_directory'])   #passing list of values to read
+        BASE_DIRECTORY = str(read_return['windows_base_directory']) #received dict of key:values
+    except Exception as e:
+        handle_local_error("Could not read windows_base_directory on boot, encountered error: ", e)
+
+elif platform.system() == 'Linux':
+    from azure.cognitiveservices.vision.computervision import ComputerVisionClient
+    from msrest.authentication import CognitiveServicesCredentials
+    from azure.ai.formrecognizer import DocumentAnalysisClient
+    from azure.core.credentials import AzureKeyCredential
+    import azure.ai.vision as sdk
+    
+    #BASE_DIRECTORY = '/app/storage'
+    try:
+        read_return = read_config(['unix_and_docker_base_directory'])
+        BASE_DIRECTORY = str(read_return['unix_and_docker_base_directory'])
+    except Exception as e:
+        handle_local_error("Could not read unix_and_docker_base_directory on boot, encountered error: ", e)
+
+else:   #Likely 'Darwin' and hence MacOS
+    #BASE_DIRECTORY = 'app'
+    try:
+        read_return = read_config(['mac_base_directory'])
+        BASE_DIRECTORY = str(read_return['mac_base_directory'])
+    except Exception as e:
+        handle_local_error("Could not read mac_base_directory on boot, encountered error: ", e)
+
+try:
+    write_config({'base_directory':BASE_DIRECTORY})
+except Exception as e:
+    handle_local_error("Could not write OS BASE_DIRECTORY on boot, encountered error: ", e)
+
+
+###---Notes on the above workflow:---###
+# 1. Everytime the app runs, the OS platform is detected
+# 2. Following which the apporpriate base directory is requested as above
+# 3. If this is the very first run:
+#   a. read_config does not find the directory data in config.json
+#   b. the else clause is triggered and defaults set for both, write_config and return
+# 4. If this isn't the very first run:
+#   a. read_config simply returns the OS specific directory - this allows the user to update the directory via config.json!
+# 4. On return, BASE_DIRECTORY is set and write_config has os specific directories set (windows_base_directory, unix_and_docker_base_directory, and mac_base_directory)
+# 5. write_config is invoked for BASE_DIRECTORY
+# 6. write_config detects a write-attempt for BASE_DIRECTORY and updates all related app directories too, which can be subsequently read as required
+# 7. This ensures that directories are set correctly at each run while also allowing the user to set their preferred directory via config.json
+
+
+# Having set the values for the directories above, proceed to actually create them on disk IF they don't alread exist!
+if not os.path.exists(BASE_DIRECTORY):
+
+    # Create a directory for app storage 
+    try:
+        os.mkdir(BASE_DIRECTORY)
+    except Exception as e:
+        handle_local_error("Failed to create Base App Directory, encountered error: ", e)
+        
+try:
+    read_return = read_config(['model_dir', 'highlighted_docs', 'upload_folder', 'ocr_pdfs', 'pdfs_to_txts', 'index_dir'])
+    model_dir = read_return['model_dir']
+    highlighted_docs = read_return['highlighted_docs']
+    upload_folder = read_return['upload_folder']
+    ocr_pdfs = read_return['ocr_pdfs']
+    pdfs_to_txts = read_return['pdfs_to_txts']
+    index_dir = read_return['index_dir']
+except Exception as e:
+    handle_local_error("Could not read paths for app directories (model_dir, highlighted_docs, upload_folder) from config.json on boot, encountered error: ", e)
+
+
+# If the base directory does not currently exist...
+if not os.path.exists(model_dir):
+
+    # Create a directory for app storage
+    try:
+        os.mkdir(model_dir)
+    except Exception as e:
+        handle_local_error("Failed to create Model Directory (model_dir), encountered error: ", e)
+
+
+# If the highlighted_docs directory does not currently exist...
+if not os.path.exists(highlighted_docs):
+
+    # Create a directory for app storage
+    try:
+        os.mkdir(highlighted_docs)
+    except Exception as e:
+        handle_local_error("Failed to create Highlighted Docs Directory (highlighted_docs), encountered error: ", e)
+
+
+# If the upload_folder directory does not currently exist...
+if not os.path.exists(upload_folder):
+
+    # Create a directory for app storage
+    try:
+        os.mkdir(upload_folder)
+    except Exception as e:
+        handle_local_error("Failed to create Uploaded Docs Directory (upload_folder), encountered error: ", e)
+        
+
+# If the ocr_pdfs directory does not currently exist...
+if not os.path.exists(ocr_pdfs):
+
+    # Create a directory for app storage
+    try:
+        os.mkdir(ocr_pdfs)
+    except Exception as e:
+        handle_local_error("Failed to create OCR'ed Docs Directory (ocr_pdfs), encountered error: ", e)
+
+
+# If the pdfs_to_txts directory does not currently exist...
+if not os.path.exists(pdfs_to_txts):
+
+    # Create a directory for app storage
+    try:
+        os.mkdir(pdfs_to_txts)
+    except Exception as e:
+        handle_local_error("Failed to create txt-docs Directory (pdfs_to_txts), encountered error: ", e)
+
+
+# If the index does not currently exist...
+if not os.path.exists(index_dir):
+
+    # Define the Index schema: what fields it contains
+    schema = Schema(title=ID(unique=True, stored=True), content=TEXT(stored=True), pagenumber=NUMERIC(stored=True))
+    
+    # Create a directory for persistent storage of the index to disk
+    try:
+        os.mkdir(index_dir)
+    except Exception as e:
+        handle_local_error("Failed to create directory for the Whoosh Index, encountered error: ", e)
+
+    # Create the index based on the schema definted above
+    try:
+        create_in(index_dir, schema)
+    except Exception as e:
+        handle_local_error("Failed to create Whoosh Index, encountered error: ", e)
+
+
+app.config['UPLOAD_FOLDER'] = upload_folder
+app.config['DOWNLOAD_FOLDER'] = highlighted_docs
+
+
+
+
+def preprocess_string(s):
+    """
+    This function removes all non-alphanumeric characters from the string, 
+    converts it to lowercase, and trims whitespace.
+    It's not used in the current implementation of LARS.
+    """
+    return re.sub(r'[^a-zA-Z0-9]', '', s).lower()
+
+
+def clean_text_string(text_to_be_cleaned):
+    
+    # Clean text
+    # text_to_be_cleaned = text_to_be_cleaned.replace("►", "").replace("■", "").replace("▼", "")
+    # text_to_be_cleaned = text_to_be_cleaned.replace("Confidential Copy \n            for \n         DKPPU", "")
+    #clean_text = re.sub(r'\n(?=[a-z.])', ' ', text)     # replaces newline chars immediately followed by a small-letter or dot with a space as they're likely to be the same sentence split-up across lines.
+    clean_text = re.sub(r'\n+', '\n', text_to_be_cleaned)
+
+    # This regex substitutes anything that is not a word character or whitespace with an empty string.
+    clean_text = re.sub(r'[^\w\s]', ' ', clean_text)
+
+    # This regex substitutes any sequence of whitespace characters with a single space.
+    clean_text = re.sub(r'\s+', ' ', clean_text).strip()
+
+    return clean_text
+
+def whoosh_indexer(pdf_data):
+
+    print("\n\nIndexing File\n\n")
+
+    try:
+        read_return = read_config(['index_dir'])
+        index_dir = read_return['index_dir']
+    except Exception as e:
+        handle_local_error("Missing index_dir in config.json for whoosh_indexer. Error: ", e)
+
+    # Define the Index schema: what fields it contains
+    schema = Schema(title=ID(unique=True, stored=True), content=TEXT(stored=True), pagenumber=NUMERIC(stored=True))
+
+    # If the index does not currently exist...
+    if not os.path.exists(index_dir):
+        
+        # Create a directory for persistent storage of the index to disk
+        try:
+            os.mkdir(index_dir)
+        except Exception as e:
+            handle_local_error("Failed to create directory for the Whoosh Index, encountered error: ", e)
+
+        # Create the index based on the schema definted above
+        try:
+            ix = create_in(index_dir, schema)
+        except Exception as e:
+            handle_local_error("Failed to create Whoosh Index, encountered error: ", e)
+            
+    else:
+        try:
+            ix = open_dir(index_dir)
+        except Exception as e:
+            handle_local_error("Failed to open Whoosh Index, encountered error: ", e)
+        
+    # init writer and write to the index:
+    try:
+        writer = ix.writer()
+        #searcher = ix.searcher()
+
+        for doc in pdf_data:
+            # query = QueryParser("title", ix.schema).parse(doc["title"])
+            # results = searcher.search(query)
+            # print("\nAlready indexed page content, skipping\n")
+
+            #if not results:
+            writer.add_document(title=doc["title"], content=doc["content"], pagenumber=doc["pagenumber"])
+
+        writer.commit()
+        #searcher.close()
+        
+    except Exception as e:
+        handle_local_error("Failed to write to Whoosh Index, encountered error: ", e)
+
+
+#Local OCR using PyTesseract - Not used in LARS
+def PDFtoOCRTXT(input_filepath):
+    
+    print("\n\nProcessing Document - PDF to OCR TXT\n\n")
+
+    try:
+        read_return = read_config(['base_directory'])
+        app_base_directory = read_return['base_directory']
+    except Exception as e:
+        handle_local_error("Missing base_directory in config.json for PDFtoOCRTXT. Error: ", e)
+
+    try:
+        source_filename = os.path.basename(input_filepath)
+    except Exception as e:
+        handle_local_error("Could not extract filename, encountered error: ", e)
+
+    # Convert PDF to  a list of images
+    try:
+        print("\n\nConverting PDF to a list of Images\n\n")
+        pages = convert_from_path(input_filepath, 300) # 300dpi - good balance between quality and performance
+    except Exception as e:
+        handle_local_error("Could not image PDF file, encountered error: ", e)
+    
+    # Set output path
+    output_text_file_path = input_filepath.replace(".pdf","_ocr_300.txt") 
+
+    # Init list for Whoosh indexing
+    pdf_data = []
+
+    # Initialize text output
+    try:
+        output_text_file = open(output_text_file_path, 'w', encoding='utf-8')
+    except Exception as e:
+        handle_local_error("Could not initialize/access output text file, encountered error: ", e)
+    
+    # Iterate over each page and apply OCR:
+    print("\n\nBeginning image to Text OCR\n\n")
+    for page_number, page_image in enumerate(pages, start=1):
+
+        try:
+            custom_config = r'--oem 3 --psm 3 -c tessedit_char_whitelist=0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ '
+            text = pytesseract.image_to_string(page_image, config='--psm 3')    # Page Segmentation Mode (PSM) 3 - Default; Fully Automatic Page Segmentation & OCR, but no Orientation and Script Detection (OSD). PSM 3,4 & 6 are common for docs. For a full list of PSMs, ask ChatGPT "Can you give me a walkthrough of all the different Page Segmentation Modes in Python's PyTesseract?" 
+            #text = pytesseract.image_to_string(page_image, config=custom_config)
+        except Exception as e:
+            handle_error_no_return("Could not OCR text from page, encountered error: ", e)
+            
+        # Optionally save image for review
+        try:
+            ocr_img_directory = app_base_directory + '/OCR_IMAGES'
+            if not os.path.exists(ocr_img_directory):
+                os.makedirs(ocr_img_directory)
+            ocr_img_filename = f'{ocr_img_directory}/{source_filename}_page_{page_number}.jpg'
+            page_image.save(ocr_img_filename)
+        except Exception as e:
+            error_message = f"Could not save OCR image for {source_filename}_page_{page_number}, encountered error: "
+            handle_error_no_return(error_message, e)
+
+        # clean_text = text
+        # Clean text
+        clean_text = clean_text_string(text)
+        
+        # Optionally, you can include page numbers in the text file
+        # output_text_file.write(f'\n\n--- Page {page_num + 1} ---\n\n')
+        
+        # Write the extracted text to the file
+        try:
+            output_text_file.write(clean_text + '\n')
+        except Exception as e:
+            handle_local_error("Could not write to output text file, encountered error: ", e)
+
+        # Whoosh prep
+        #whoosh_clean_text = preprocess_string(clean_text)
+        whoosh_page_dict_entry = {"title": source_filename, "content": clean_text, "pagenumber":page_number+1}
+        pdf_data.append(whoosh_page_dict_entry)
+
+    # Close all files
+    output_text_file.close()
+
+    # Create Whoosh Index; if error, log exception and proceed to returning output_text_file_path
+    try:
+        whoosh_indexer(pdf_data)
+    except Exception as e:
+        handle_error_no_return("Could not index file, encountered error: ", e)
+
+    return output_text_file_path
+
+
+def PDFtoMSTrOCR(input_filepath):
+    
+    print("\n\nProcessing Document - PDF to MS TrOCR TXT\n\n")
+
+    try:
+        read_return = read_config(['model_dir'])
+        model_directory = read_return['model_dir']
+    except Exception as e:
+        handle_local_error("Missing model_dir in config.json for PDFtoMSTrOCR. Error: ", e)
+
+    try:
+        source_filename = os.path.basename(input_filepath)
+    except Exception as e:
+        handle_local_error("Could not extract filename, encountered error: ", e)
+
+    # Convert PDF to  a list of images
+    try:
+        print("\n\nConverting PDF to a list of Images\n\n")
+        pages = convert_from_path(input_filepath, 300) # 300dpi - good balance between quality and performance
+    except Exception as e:
+        handle_local_error("Could not image PDF file, encountered error: ", e)
+    
+    # Set output path
+    output_text_file_path = input_filepath.replace(".pdf","_ms_tr_ocr_cleaned.txt") 
+    raw_output_text_file_path = input_filepath.replace(".pdf","_ms_tr_ocr_raw.txt") 
+
+    # Init list for Whoosh indexing
+    pdf_data = []
+
+    # Initialize text output
+    try:
+        output_text_file = open(output_text_file_path, 'w', encoding='utf-8')
+        raw_output_text_file = open(raw_output_text_file_path, 'w', encoding='utf-8')
+    except Exception as e:
+        handle_local_error("Could not initialize/access output text file, encountered error: ", e)
+    
+    # Setting up Cleaner LLM:
+    llm_name = 'openhermes-2.5-mistral-7b.Q8_0.gguf'
+    llm_dir = model_directory + '/' + llm_name
+    config = {'context_length': 8192, 'max_new_tokens': 8192, 'gpu_layers':50}
+    cleaner_llm = CTransformers(model=llm_dir, model_type="llama", config=config)
+    # cleanup_template = PromptTemplate(template="Correct the following text for any gramatical and formatting errors, otherwise leaving it unchanged: {input}", input_variables=["input"])
+    conv_chain = ConversationChain(llm = cleaner_llm)
+
+    #Load OCR TrOCR model:
+    processor = TrOCRProcessor.from_pretrained('microsoft/trocr-large-handwritten')
+    model = VisionEncoderDecoderModel.from_pretrained('microsoft/trocr-large-handwritten')
+    
+    # Iterate over each page and apply OCR:
+    print("\n\nBeginning image to MS TrOCR\n\n")
+    for page_number, page_image in enumerate(pages, start = 1):
+
+        rgb_image = page_image.convert("RGB")
+        width, height = rgb_image.size
+
+        page_text = ""
+
+        block_no = 0
+
+        # original_stdout = sys.stdout
+
+        # Process the page in 240x71 blocks:
+        # for y in range(0, height, 71):
+        #     for x in range(0, width, 240):
+                
+        #         print(f"Processing block {block_no}")
+
+        #         # long-term: discard output
+        #         # f = open(os.devnull, 'w')
+        #         # sys.stdout = f
+
+        #         # Crop block:
+        #         block = rgb_image.crop((x, y, x + 240, y + 71))
+
+        #         # Process block with TrOCR:
+        #         pixel_values = processor(images=block, return_tensors="pt").pixel_values
+
+        #         generated_ids = model.generate(pixel_values)
+        #         generated_text = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
+
+        #         print(f"generated block text: {generated_text}")
+
+        #         if str(generated_text) != "0.00":
+        #             page_text += generated_text
+
+        #         # Reset stdout to its original value
+        #         # sys.stdout = original_stdout
+
+        #         block_no += 1
+
+        for y in range(0, height, 50):
+                
+            print(f"Processing block {block_no}")
+
+            # long-term: discard output
+            # f = open(os.devnull, 'w')
+            # sys.stdout = f
+
+            # Crop block:
+            block = rgb_image.crop((0, y, width, y + 50))
+
+            # Process block with TrOCR:
+            pixel_values = processor(images=block, return_tensors="pt").pixel_values
+
+            generated_ids = model.generate(pixel_values)
+            generated_text = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
+
+            print(f"generated block text: {generated_text}")
+
+            if str(generated_text) != "0.00":
+                page_text += generated_text
+
+            # Reset stdout to its original value
+            # sys.stdout = original_stdout
+
+            block_no += 1
+
+        # Save raw output of the above process for analysis:
+        try:
+            raw_output_text_file.write(page_text + '\n')
+        except Exception as e:
+            handle_local_error("Could not write to output text file, encountered error: ", e)
+        
+        # Clean Text:
+        print(f"\n\nCleaning Page Text with {llm_name}\n\n")
+        llm_input = f"Correct the following text for any gramatical and formatting errors, otherwise leaving it unchanged: {page_text}"
+        try:
+            clean_text = conv_chain.predict(input=llm_input)
+        except Exception as e:
+            handle_local_error("Could not clean text with LLM, encountered error: ", e)
+
+        # Write the cleaned up text to the file
+        try:
+            output_text_file.write(clean_text + '\n')
+        except Exception as e:
+            handle_local_error("Could not write to output text file, encountered error: ", e)
+
+        # Whoosh prep
+        #whoosh_clean_text = preprocess_string(clean_text)
+        whoosh_page_dict_entry = {"title": source_filename, "content": clean_text, "pagenumber":page_number+1}
+        pdf_data.append(whoosh_page_dict_entry)
+
+    # Close all files
+    raw_output_text_file.close()
+    output_text_file.close()
+
+     # Create Whoosh Index; if error, log exception and proceed to returning output_text_file_path
+    try:
+        whoosh_indexer(pdf_data)
+    except Exception as e:
+        handle_error_no_return("Could not index file, encountered error: ", e)
+
+    return output_text_file_path
+
+
+def PDFtoAzureDocAiTXT(input_filepath):
+
+    print("\n\nProcessing Document - PDF to Azure DocAI TXT\n\n")
+    
+    try:
+        read_return = read_config(['azure_doc_ai_endpoint', 'azure_doc_ai_subscription_key', 'ocr_pdfs'])
+        azure_doc_ai_endpoint = read_return['azure_doc_ai_endpoint']
+        azure_doc_ai_subscription_key = read_return['azure_doc_ai_subscription_key']
+        ocr_pdfs = read_return['ocr_pdfs']
+    except Exception as e:
+        handle_local_error("Missing Azure OCR Endpoint URL & Subscription Key for PDFtoAzureDocAiTXT, please provide required API config. Error: ", e)
+
+    try:
+        source_filename = os.path.basename(input_filepath)
+    except Exception as e:
+        handle_local_error("Could not extract filename, encountered error: ", e)
+
+    # Set output path
+    output_text_file_name = source_filename.replace(".pdf",".txt")
+    output_text_file_path = os.path.join(ocr_pdfs, output_text_file_name).replace("\\","/")
+
+    if os.path.exists(output_text_file_path):
+        print("Azure-OCR'ed doc already exists! Returning existing file.")
+        return output_text_file_path
+
+    # Init list for Whoosh indexing
+    pdf_data = []
+
+    # Initialize text output
+    try:
+        output_text_file = open(output_text_file_path, 'w', encoding='utf-8')
+    except Exception as e:
+        handle_local_error("Could not initialize/access output text file, encountered error: ", e)
+
+    try:
+        docai_client = DocumentAnalysisClient(azure_doc_ai_endpoint, AzureKeyCredential(azure_doc_ai_subscription_key))
+    except Exception as e:
+        handle_local_error("Could not create ComputerVisionClient for Azure DocAI, encountered error: ", e)
+
+    try:
+        with open(input_filepath, "rb") as pdf_file:
+            # 1 - Get page count:
+            try:
+                pypdf_reader = PyPDF2.PdfReader(pdf_file)
+                page_count = len(pypdf_reader.pages)
+                page_range = f"1-{page_count}" if page_count > 1 else "1"
+                print(f"page_range: {page_range}")
+            except Exception as e:
+                handle_local_error("Could not get page count for call to Azure DocAI, encountered error: ", e)
+
+            # 2 - Reset file-read stream's internal pointer, which has now been set to the end of the file due to the above read operation!
+            pdf_file.seek(0)
+
+            # 3 - Call Azure DocAI:
+            try:
+                poller = docai_client.begin_analyze_document("prebuilt-layout", pdf_file, pages=page_range)
+                result = poller.result()
+            except Exception as e:
+                handle_local_error("Could not get results for begin_analyze_document for Azure DocAI, encountered error: ", e)
+
+        # print(f"result: \n{result}")
+
+        used_regions = set()   # set will avoid duplicates
+
+        if hasattr(result, 'tables'):
+            for table in result.tables:
+                #print("Found table")
+                if table.cells:     # Check if there are cells in the table 
+                    for cell in table.cells:
+                        #print(f"Row {cell.row_index}, Column {cell.column_index}, Text: {cell.content}")
+                        cell_text = f'Row {cell.row_index}, Column {cell.column_index}: {cell.content}'
+                        
+                        try:
+                            output_text_file.write(cell_text + '\n')
+                        except Exception as e:
+                            handle_local_error("could not write to output text file, encountered error: ", e)
+
+                        # Get page number
+                        page_number = ""
+                        if cell.bounding_regions:   # Check if there are bounding regions
+                            for region in cell.bounding_regions:
+                                page_number = region.page_number
+                                cell_polygon = region.polygon
+                                cell_polygon_tuple = tuple((point.x, point.y) for point in cell_polygon)    # lists aren't hashable to cast to a tuple
+                                used_regions.add(cell_polygon_tuple)
+
+                        # Whoosh prep
+                        whoosh_page_dict_entry = {"title": source_filename, "content": cell_text, "pagenumber":page_number}
+                        pdf_data.append(whoosh_page_dict_entry)
+
+        # Get paragraphs
+        if hasattr(result, 'paragraphs'):
+            for paragraph in result.paragraphs:
+                para_page_number = paragraph.bounding_regions[0].page_number
+                para_polygon = paragraph.bounding_regions[0].polygon
+                para_polygon_tuple = tuple((point.x, point.y) for point in para_polygon)
+                
+                if para_polygon_tuple in used_regions:
+                    continue
+                
+                para_content = paragraph.content
+                #print(f"\n---Processing Page: {para_page_number}---\n")
+                #print(f"paragraph: {para_content}")
+
+                # write the extracted text to the file:
+                try:
+                    output_text_file.write(para_content + '\n')
+                    used_regions.add(para_polygon_tuple)
+                except Exception as e:
+                    handle_local_error("could not write to output text file, encountered error: ", e)
+
+                # whoosh prep
+                whoosh_page_dict_entry = {"title": source_filename, "content": para_content, "pagenumber":para_page_number}
+                pdf_data.append(whoosh_page_dict_entry)
+
+        # Get Lines:
+        # for doc_page in result.pages:
+        #     #print(f"\n---Processing Page: {doc_page.page_number}---\n")
+
+        #     if hasattr(doc_page, 'lines'):
+        #         for line in doc_page.lines:
+
+        #             line_polygon = line.polygon
+        #             line_polygon_tuple = tuple((point.x, point.y) for point in line_polygon)
+        #             if line_polygon_tuple in used_regions:
+        #                 continue
+                    
+        #             #print(f"line: {line.content}")
+                    
+        #             # Write the extracted text to the file:
+        #             try:
+        #                 output_text_file.write(line.content + '\n')
+        #                 used_regions.add(line_polygon_tuple)
+        #             except Exception as e:
+        #                 handle_local_error("Could not write to output text file, encountered error: ", e)
+
+        #             # Whoosh prep
+        #             whoosh_page_dict_entry = {"title": source_filename, "content": line.content, "pagenumber":doc_page.page_number}
+        #             pdf_data.append(whoosh_page_dict_entry)
+
+        # print(f"used_regions: {used_regions}")
+
+
+    except Exception as e:
+        handle_local_error("Error processing document with azure DocAI: ", e)
+
+    # Close all files
+    output_text_file.close()
+
+    # Create Whoosh Index; if error, log exception and proceed to returning output_text_file_path
+    try:
+        whoosh_indexer(pdf_data)
+    except Exception as e:
+        handle_error_no_return("Could not index file, encountered error: ", e)
+
+    return output_text_file_path
+
+
+def PDFtoAzureOCRTXT(input_filepath):
+    
+    print("\n\nProcessing Document - PDF to Azure OCR TXT\n\n")
+    
+    try:
+        read_return = read_config(['azure_ocr_endpoint', 'azure_ocr_subscription_key', 'ocr_pdfs'])
+        azure_ocr_endpoint = read_return['azure_ocr_endpoint']
+        azure_ocr_subscription_key = read_return['azure_ocr_subscription_key']
+        ocr_pdfs = read_return['ocr_pdfs']
+    except Exception as e:
+        handle_local_error("Missing Azure OCR Endpoint URL & Subscription Key for PDFtoAzureOCRTXT, please provide required API config. Error: ", e)
+
+    try:
+        source_filename = os.path.basename(input_filepath)
+    except Exception as e:
+        handle_local_error("Could not extract filename, encountered error: ", e)
+
+    # Set output path
+    output_text_file_name = source_filename.replace(".pdf",".txt")
+    output_text_file_path = os.path.join(ocr_pdfs, output_text_file_name).replace("\\","/")
+
+    if os.path.exists(output_text_file_path):
+        print("OCR'ed doc already exists! Returning existing file.")
+        return output_text_file_path
+
+    # Convert PDF to  a list of images
+    try:
+        print("\n\nConverting PDF to a list of Images\n\n")
+        pages = convert_from_path(input_filepath, 300) # 300dpi - good balance between quality and performance
+    except Exception as e:
+        handle_local_error("Could not image PDF file, encountered error: ", e)
+
+    # Init list for Whoosh indexing
+    pdf_data = []
+
+    # Initialize text output
+    try:
+        output_text_file = open(output_text_file_path, 'w', encoding='utf-8')
+    except Exception as e:
+        handle_local_error("Could not initialize/access output text file, encountered error: ", e)
+
+    try:
+        computervision_client = ComputerVisionClient(azure_ocr_endpoint, CognitiveServicesCredentials(azure_ocr_subscription_key))
+    except Exception as e:
+        handle_local_error("Could not create ComputerVisionClient for Azure OCR, encountered error: ", e)
+    
+    calls_made = 0
+
+    # Iterate over each page and apply OCR:
+    print("\n\nBeginning image to Text OCR\n\n")
+    for page_number, image in enumerate(pages, start = 1):
+        
+        # Convert to bytes and create a stream
+        try:
+            img_stream = io.BytesIO()
+            image.save(img_stream, format='PNG')
+            img_stream.seek(0)  # Reset the stream position to the beginning
+        except Exception as e:
+            handle_local_error("Could not convert image to Byte Stream for Azure OCR, encountered error: ", e)
+            continue
+
+        # Send to Azure OCR
+        try:
+            if calls_made < 20:
+                print(f"Submitting page {page_number} to AzureComputerVision for OCR")
+                result = computervision_client.recognize_printed_text_in_stream(image=img_stream)
+                #analyze_result = computervision_client.begin_analyze_document("prebuilt-layout", img_stream).result()
+                calls_made += 1
+            else:
+                print("Sleeping for 60secs due to AzureOCR free-tier restrictions!")
+                time.sleep(63)  #free tier restrictions!
+                print(f"Submitting page {page_number} to AzureComputerVision for OCR")
+                result = computervision_client.recognize_printed_text_in_stream(image=img_stream)
+                #analyze_result = computervision_client.begin_analyze_document("prebuilt-layout", img_stream).result()
+                calls_made = 1  #reset counter
+        except Exception as e:
+            handle_local_error("Could not convert image to Byte Stream for Azure OCR, encountered error: ", e)
+
+        for region in result.regions:
+            for line in region.lines:
+                #print(" ".join([word.text for word in line.words]))
+
+                try:
+                    clean_text = str(" ".join([word.text for word in line.words]))
+                except Exception as e:
+                    handle_error_no_return("Could not obtain line from Azure OCR result, encountered error: ", e)
+                    continue
+
+                # Write the extracted text to the file:
+                try:
+                    output_text_file.write(clean_text + '\n')
+                except Exception as e:
+                    handle_local_error("Could not write to output text file, encountered error: ", e)
+
+                # Whoosh prep
+                #whoosh_clean_text = preprocess_string(clean_text)
+                whoosh_page_dict_entry = {"title": source_filename, "content": clean_text, "pagenumber":page_number}
+                pdf_data.append(whoosh_page_dict_entry)
+
+    # Close all files
+    output_text_file.close()
+
+    # Create Whoosh Index; if error, log exception and proceed to returning output_text_file_path
+    try:
+        whoosh_indexer(pdf_data)
+    except Exception as e:
+        handle_error_no_return("Could not index file, encountered error: ", e)
+
+    return output_text_file_path
+
+
+def PDFtoAzureOCRTXT_url(input_filepath):
+    
+    print("\n\nProcessing Document - PDF to Azure OCR TXT\n\n")
+
+    try:
+        read_return = read_config(['azure_ocr_endpoint', 'azure_ocr_subscription_key'])
+        azure_ocr_endpoint = read_return['azure_ocr_endpoint']
+        azure_ocr_subscription_key = read_return['azure_ocr_subscription_key']
+    except Exception as e:
+        handle_local_error("Missing Azure OCR Endpoint URL & Subscription Key for PDFtoAzureOCRTXT_url, please provide required API config. Error: ", e)
+    
+    try:
+        os.environ["azure_ocr_endpoint"] = azure_ocr_endpoint
+        os.environ["azure_ocr_subscription_key"] = azure_ocr_subscription_key
+    except Exception as e:
+        handle_local_error("Could not set OS environment variables for Azure OCR, encountered error: ", e)
+
+    try:
+        source_filename = os.path.basename(input_filepath)
+    except Exception as e:
+        handle_local_error("Could not extract filename, encountered error: ", e)
+
+    # Convert PDF to  a list of images
+    try:
+        print("\n\nConverting PDF to a list of Images\n\n")
+        pages = convert_from_path(input_filepath, 300) # 300dpi - good balance between quality and performance
+    except Exception as e:
+        handle_local_error("Could not image PDF file, encountered error: ", e)
+    
+    # Set output path
+    output_text_file_path = input_filepath.replace(".pdf","_azure_ocr_300.txt") 
+
+    # Init list for Whoosh indexing
+    pdf_data = []
+
+    # Initialize text output
+    try:
+        output_text_file = open(output_text_file_path, 'w', encoding='utf-8')
+    except Exception as e:
+        handle_local_error("Could not initialize/access output text file, encountered error: ", e)
+    
+    # Init Azure VisionServiceOptions
+    service_options = sdk.VisionServiceOptions(os.environ["azure_ocr_endpoint"], os.environ["azure_ocr_subscription_key"])
+    
+    # Iterate over each page and apply OCR:
+    print("\n\nBeginning image to Text OCR\n\n")
+    for page_number, image in enumerate(pages, start = 1):
+    #for image in pages:
+        # Convert to bytes
+        img_byte_arr = io.BytesIO()
+        image.save(img_byte_arr, format='PNG')
+        img_byte_arr = img_byte_arr.getvalue()
+
+        # Save the image temporarily
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.png') as temp_image_file:
+            image.save(temp_image_file, format='PNG')
+            temp_image_path = temp_image_file.name
+
+            # Setup cision source with byte array
+            vision_source = sdk.VisionSource(url=temp_image_path)
+
+            # Set analysis options:
+            analysis_options = sdk.ImageAnalysisOptions()
+            analysis_options.features = sdk.ImageAnalysisFeature.TEXT
+
+
+            # Send to Azure OCR & analyze the image
+            image_analyzer = sdk.ImageAnalyzer(service_options, vision_source, analysis_options)
+            result = image_analyzer.analyze()
+
+            if result.reason == sdk.ImageAnalysisResultReason.ANALYZED:
+                if result.text is not None:
+                    # print("Text:")
+                    for line in result.text.lines:
+                        # print(f"Line: {line.content}")
+                        clean_text = line.content
+
+                        # Write the extracted text to the file:
+                        try:
+                            output_text_file.write(clean_text + '\n')
+                        except Exception as e:
+                            handle_local_error("Could not write to output text file, encountered error: ", e)
+
+                        # Whoosh prep
+                        #whoosh_clean_text = preprocess_string(clean_text)
+                        whoosh_page_dict_entry = {"title": source_filename, "content": clean_text, "pagenumber":page_number+1}
+                        pdf_data.append(whoosh_page_dict_entry)
+
+            else:
+                # Handle errors:
+                error_details = sdk.ImageAnalysisErrorDetails.from_result(result)
+                print(" Analysis failed.")
+                print("   Error reason: {}".format(error_details.reason))
+                print("   Error code: {}".format(error_details.error_code))
+                print("   Error message: {}".format(error_details.message))
+
+    # Close all files
+    output_text_file.close()
+
+    # Create Whoosh Index; if error, log exception and proceed to returning output_text_file_path
+    try:
+        whoosh_indexer(pdf_data)
+    except Exception as e:
+        handle_error_no_return("Could not index file, encountered error: ", e)
+
+    return output_text_file_path
+
+
+def PDFtoTXT(input_file):
+
+    print("\n\nProcessing Document - PDF to TXT\n\n")
+
+    try:
+        read_return = read_config(['pdfs_to_txts'])
+        pdfs_to_txts = read_return['pdfs_to_txts']
+    except Exception as e:
+        handle_local_error("Missing pdfs_to_txts directory for PDFtoTXT in config.json, encountered error: ", e)
+    
+    # Initialize PDF file reader
+    try:
+        pdf_file = open(input_file, 'rb')
+    except Exception as e:
+        handle_local_error("Could not open PDF file, encountered error: ", e)
+
+    try:
+        source_filename = os.path.basename(input_file)
+    except Exception as e:
+        handle_local_error("Could not open PDF file, encountered error: ", e)
+
+    # Initialize PDF reader
+    try:
+        pdf_reader = PyPDF2.PdfReader(pdf_file)
+    except Exception as e:
+        handle_local_error("Could not initialize PDF reader, encountered error: ", e)
+
+    # Set output path
+    output_text_file_name = source_filename.replace(".pdf",".txt")
+    output_text_file_path = os.path.join(pdfs_to_txts, output_text_file_name).replace("\\","/")
+
+    if os.path.exists(output_text_file_path):
+        print("PyPDF2-extracted .txt already exists! Returning existing file.")
+        return output_text_file_path
+
+    # Init list for Whoosh indexing
+    pdf_data = []
+
+    # Initialize text output
+    try:
+        output_text_file = open(output_text_file_path, 'w', encoding='utf-8')
+    except Exception as e:
+        handle_local_error("Could not initialize/access output text file, encountered error: ", e)
+
+    # Loop through all the pages and extract text
+    for page_num in range(len(pdf_reader.pages)):
+        
+        try:
+            page = pdf_reader.pages[page_num]
+            text = page.extract_text()
+        except Exception as e:
+            handle_error_no_return("Could not extract text from page, encountered error: ", e)
+
+        #clean_text = text
+        # Clean text
+        clean_text = clean_text_string(text)
+        
+        # Optionally, you can include page numbers in the text file
+        # output_text_file.write(f'\n\n--- Page {page_num + 1} ---\n\n')
+        
+        # Write the extracted text to the file
+        try:
+            output_text_file.write(clean_text + '\n')
+        except Exception as e:
+            handle_local_error("Could not write to output text file, encountered error: ", e)
+
+        # Whoosh prep
+        #whoosh_clean_text = preprocess_string(clean_text)
+        whoosh_page_dict_entry = {"title": source_filename, "content": clean_text, "pagenumber":page_num+1}
+        pdf_data.append(whoosh_page_dict_entry)
+
+    # Close all files
+    pdf_file.close()
+    output_text_file.close()
+
+    # Create Whoosh Index; if error, log exception and proceed to returning output_text_file_path
+    try:
+        whoosh_indexer(pdf_data)
+    except Exception as e:
+        handle_error_no_return("Could not index file, encountered error: ", e)
+
+    return output_text_file_path
+
+
+def TxtCleaner(input_file):
+    """
+    Processes a text file by cleaning and subsequent indexing.
+
+    :param input_file: Path to the input text file within the app's folder.
+    :return: path to the cleaned output text file.
+    """
+
+    print("\nProcessing Text File")
+
+    # Ensure the file is .txt:
+    if not input_file.lower().endswith('.txt'):
+        raise ValueError("File must be a .txt file")
+    
+    # Get filename
+    try:
+        source_filename = os.path.basename(input_file)
+    except Exception as e:
+        handle_local_error("Could not extract filename, encountered error: ", e)
+
+    # Set output path:
+    output_text_file_path = input_file.replace(".txt","_cleaned.txt")
+
+    # Init list for Whoosh indexing
+    text_data = []
+
+    try:
+        # Read and process the file, \ is a continuation char in Python used to split long lines of code for readibility!
+        with open(input_file, 'r', encoding='utf-8') as input_file ,\
+                open(output_text_file_path, 'w', encoding='utf-8') as output_text_file:
+            
+            # enumerate returns a tuple containing the count and value of an iterable such as a file or list. It starts at 0 but here we specify 1 as the start index:
+            for line_num, line in enumerate(input_file, 1):
+                
+                # Clean text:
+                clean_line = line.replace("►", "").replace("■", "").replace("▼", "")
+                clean_line = clean_line.replace("Confidential Copy \n            for \n         DKPPU", "")
+                clean_line = re.sub(r'\n(?=[a-z.])', '', clean_line)
+                clean_line = re.sub(r'\n+', '\n', clean_line)
+                clean_line = re.sub(r'[^\w\s]', '', clean_line)     # This regex substitutes anything that is not a word character or whitespace with an empty string.
+                clean_line = re.sub(r'\s+', ' ', clean_line).strip()    # This regex substitutes any sequence of whitespace characters with a single space.
+
+                # Write the cleaned text to the output file 
+                output_text_file.write(clean_line + '\n')
+
+                # Whoosh prep
+                whoosh_page_dict_entry = {"title": source_filename, "content": clean_line, "pagenumber":line_num}
+                text_data.append(whoosh_page_dict_entry)
+    except Exception as e:
+        handle_local_error("Could not create text file, encountered error: ", e)
+
+    # Create Whoosh Index; if error, log exception and proceed to returning output_text_file_path
+    try:
+        whoosh_indexer(text_data)
+    except Exception as e:
+        handle_error_no_return("Could not index file, encountered error: ", e)
+
+    return output_text_file_path
+
+
+def get_page_content_from_whoosh_index(title, pagenumber):
+
+    print("\n\nSearching Index for Page Content\n\n")
+
+    try:
+        read_return = read_config(['index_dir'])
+        index_dir = read_return['index_dir']
+    except Exception as e:
+        handle_local_error("Missing index_dir in config.json for get_page_content_from_whoosh_index. Error: ", e)
+
+    try:
+        ix = open_dir(index_dir)
+        searcher = ix.searcher()
+
+        parser = MultifieldParser(["title", "pagenumber"], schema=ix.schema)
+        query = parser.parse(f'title:"{title}" AND pagenumber:{pagenumber}')
+
+        results = searcher.search(query)
+
+        if results:
+            return results[0]["content"]
+        else:
+            return None
+    except Exception as e:
+        handle_local_error("Failed to open & search Whoosh Index for page content, encountered error: ", e)
+    finally:
+        searcher.close()
+
+
+def extract_images_from_pdf(pdf_path):
+    
+    print("Extracting Images from PDF")
+
+    try:
+        source_filename = os.path.basename(pdf_path)
+    except Exception as e:
+        handle_local_error("Could not extract filename, encountered error: ", e)
+    
+    with open(pdf_path, 'rb') as file:
+        
+        try:
+            pdf_reader = PyPDF2.PdfReader(file)
+        except Exception as e:
+            handle_local_error("Could not read PDF, encountered error: ", e)
+
+        images = []
+
+        for page_num in range(len(pdf_reader.pages)):
+            page = pdf_reader.pages[page_num]
+            if '/XObject' in page['/Resources']:
+                xObject = page['/Resources']['/XObject'].get_object()
+                for obj in xObject:
+                    if xObject[obj]['/Subtype'] == '/Image':
+
+                        # Log details about the image object:
+                        try:
+                            image_obj = xObject[obj]
+                            obj_details = {
+                                'Object Reference': obj,
+                                'Width': image_obj.get('/Width', 'Unknown'),
+                                'Height': image_obj.get('/Height', 'Unknown'),
+                                'Color Space': image_obj.get('/ColorSpace', 'Unkown'),
+                                'Filter': image_obj.get('/Filter', 'Unknown'),
+                                'Bits Per Component': image_obj.get('/BitsPerComponent', 'Unknown')
+                            }
+                            #print(f"\n\nImage Object Details: {obj_details}\n\n")   # Filter is indicative of format: '/DCTDecode': 'JPEG', '/FlateDecode': 'PNG or others','/JPXDecode': 'JPEG 2000', etc.
+
+                            # data  = image_obj._data
+
+                            if obj_details['Filter'] == '/FlateDecode':
+                                #print("\n\nDecoding PNG!\n\n")
+                                try:
+                                    data  = image_obj._data
+                                    decompressed_data = zlib.decompress(data)
+                                except Exception as e:
+                                    error_message = f"\n\nPNG decompression exception: {e}\n\n"
+                                    if logger:
+                                        logger.error(error_message)
+                                        print(error_message)
+                                    else:
+                                        print(error_message)
+                            else:
+                                decompressed_data  = image_obj._data
+
+                            text = page.extract_text()  
+                            # clean_text = text
+
+                            # Clean text
+                            clean_text = clean_text_string(text)
+
+                            # clean_text = get_page_content_from_whoosh_index(source_filename, page_num)
+
+                            try:
+                                if obj_details['Filter'] == '/FlateDecode':
+                                    # Determine Color Space:
+                                    color_space = image_obj.get('/ColorSpace')
+
+                                    if color_space == '/DeviceRGB':
+                                        mode = 'RGB'
+                                    elif color_space == '/DeviceCMYK':
+                                        mode = 'CMYK'
+                                    elif color_space == '/DeviceGray':
+                                        mode = 'L'
+                                    else:
+                                        mode = 'L'  # Default to grayscale if unsure
+
+                                    # Create image from bytes
+                                    image = Image.frombytes(mode, ((obj_details['Width']), (obj_details['Height'])), decompressed_data) # 'L' for 8-bit pixels, black and white
+                                    with io.BytesIO() as output:
+                                        image.save(output, format='JPEG')
+                                        binary_data = output.getvalue()
+                                        format = "JPEG"
+                                        images.append((binary_data,clean_text,format))
+
+                                else:
+                                    # Load image from bytes
+                                    image = Image.open(io.BytesIO(decompressed_data))
+
+                                    # Determine format (JPEG)
+                                    format = image.format
+                                    
+                                    #print(f"\n\nImage format: {format}\n\n")  # This will print the format
+
+                                    # If image loads, append image to images DB
+                                    images.append((decompressed_data,clean_text,format))
+
+                            except Exception as e:
+                                error_message = f"\n\nEncountered unrecognized or invalid image data for object detailed below. Exception: {e}\n\n"
+                                if logger:
+                                    logger.error(error_message)
+                                    logger.error(obj_details)
+                                    print(error_message)
+                                    print(f"\n\nImage Object Details: {obj_details}\n\n")   # Filter is indicative of format: '/DCTDecode': 'JPEG', '/FlateDecode': 'PNG or others','/JPXDecode': 'JPEG 2000', etc.
+
+                                else:
+                                    print(error_message)
+                                    print(f"\n\nImage Object Details: {obj_details}\n\n")   # Filter is indicative of format: '/DCTDecode': 'JPEG', '/FlateDecode': 'PNG or others','/JPXDecode': 'JPEG 2000', etc.
+
+
+                        except Exception as e:
+                            handle_error_no_return("Could not process image object. Exception: ", e)
+
+        # print("Images array:")
+        # print(images)
+        return images
+
+
+def store_images_to_db(images):
+
+    print("\n\nStoring Images to Database\n\n")
+
+    try:
+        read_return = read_config(['sqlite_images_db'])
+        sqlite_images_db = read_return['sqlite_images_db']
+    except Exception as e:
+        handle_local_error("Missing sqlite_images_db in config.json for method store_images_to_db. Error: ", e)
+
+    try:
+        conn = sqlite3.connect(sqlite_images_db)
+        cursor = conn.cursor()
+    except Exception as e:
+        handle_local_error("Could not establish connection to Images DB, encountered error: ", e)
+    
+    # If the database does not currently exist...
+    try:
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS images (
+                    id INTEGER PRIMARY KEY,
+                    image_data BLOB NOT NULL,
+                    surrounding_text TEXT,
+                    metadata TEXT,
+                    format TEXT
+            )
+        ''')
+
+        conn.commit()
+    except Exception as e:
+        handle_local_error("Could not create Images DB, encountered error: ", e)
+    
+    try:
+        for image_data, surrounding_text, format in images:
+            #print("surrounding_text: ", surrounding_text)
+            # Check if the image_data already exists in the database:
+            cursor.execute("SELECT COUNT(*) FROM images WHERE image_data = ?", (image_data,))
+            if cursor.fetchone()[0] == 0:
+                print("\nInserting new image into images DB\n")
+                cursor.execute("INSERT INTO images (image_data, surrounding_text, format) VALUES (?, ?, ?)", (image_data, surrounding_text, format))
+        conn.commit()
+    except Exception as e:
+        handle_local_error("Could not store images to Images DB, encountered error: ", e)
+    finally:
+        conn.close()
+
+
+def record_doc_loaded_to_db(document_name, embedding_model, vectordb_used, chunk_size, chunk_overlap):
+
+    print("\n\nRecording document loading to records DB\n\n")
+
+    try:
+        read_return = read_config(['sqlite_docs_loaded_db'])
+        sqlite_docs_loaded_db = read_return['sqlite_docs_loaded_db']
+    except Exception as e:
+        handle_local_error("Missing sqlite_docs_loaded_db in config.json for method store_images_to_db. Error: ", e)
+
+    try:
+        conn = sqlite3.connect(sqlite_docs_loaded_db)
+        cursor = conn.cursor()
+    except Exception as e:
+        handle_local_error("Could not establish connection to document_records DB, encountered error: ", e)
+    
+    # If the database does not currently exist...
+    try:
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS document_records (
+                    id INTEGER PRIMARY KEY,
+                    document_name TEXT NOT NULL,
+                    embedding_model TEXT NOT NULL,
+                    vectordb_used TEXT,
+                    chunk_size INTEGER,
+                    chunk_overlap INTEGER
+            )
+        ''')
+
+        conn.commit()
+    except Exception as e:
+        handle_local_error("Could not create document_records DB, encountered error: ", e)
+    
+    try:
+        cursor.execute("INSERT INTO document_records (document_name, embedding_model, vectordb_used, chunk_size, chunk_overlap) VALUES (?, ?, ?, ?, ?)", (document_name, embedding_model, vectordb_used, chunk_size, chunk_overlap))
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        handle_local_error("Could not update document_records DB, encountered error: ", e)
+
+
+
+# List-splitter function for a large number of embeddings!
+def split_embeddings_list(all_splits, max_emmbeddings_list_size):
+    for i in range(0, len(all_splits), max_emmbeddings_list_size):  # Step through the large list in steps of max size
+        yield all_splits[i:i + max_emmbeddings_list_size]   # Yield a slice of all_splits from index i upto but NOT including i+max_size 
+
+
+# Document vectorization and chunking
+def LoadNewDocument(input_file):
+
+    global VECTOR_STORE
+    
+    ### L1 - Load Data from Source ###
+    #loader = UnstructuredPDFLoader("737.pdf", mode="elements", strategy="fast")
+    print("\nLoading Document")
+    #loader.start()
+
+    try:
+        read_return = read_config(['use_sbert_embeddings', 'use_openai_embeddings', 'use_bge_base_embeddings', 'use_bge_large_embeddings', 'vectordb_sbert_folder', 'vectordb_openai_folder', 'vectordb_bge_base_folder', 'vectordb_bge_large_folder'])
+        use_sbert_embeddings = read_return['use_sbert_embeddings']
+        use_openai_embeddings = read_return['use_openai_embeddings']
+        use_bge_base_embeddings = read_return['use_bge_base_embeddings']
+        use_bge_large_embeddings = read_return['use_bge_large_embeddings']
+        vectordb_sbert_folder = read_return['vectordb_sbert_folder']
+        vectordb_openai_folder = read_return['vectordb_openai_folder']
+        vectordb_bge_base_folder = read_return['vectordb_bge_base_folder']
+        vectordb_bge_large_folder = read_return['vectordb_bge_large_folder']
+    except Exception as e:
+        handle_local_error("Missing values in config.json, could not LoadNewDocument. Error: ", e)
+
+    try:
+        txt_loader = TextLoader(input_file, encoding="UTF-8", autodetect_encoding="true")
+        docs = txt_loader.load()
+        #loader.stop()
+    except Exception as e:
+        #loader.stop()
+        handle_local_error("Failed to load document for storage to VectorDB, encountered error: ", e)
+    #finally:
+        #loader.stop()
+
+    chunk_sz = 250
+    chunk_olp = 0
+
+    ### L2 - Chunk Source Data ###
+    print("Chunking Doc")
+    #loader.start()
+    try:
+        text_splitter = RecursiveCharacterTextSplitter(chunk_size = chunk_sz, chunk_overlap = chunk_olp) # chunk_size refers to max size; nice to have some small sliding-window overlap between chunks such as 20-50 chars
+        all_splits = text_splitter.split_documents(docs)
+        
+        #For JINA2 Embeddings:
+        # Initialize an empty list to hold the page_content values
+        page_contents = []
+        # Iterate through each Document in the list
+        for doc in all_splits:
+            # Access the 'page_content' attribute and append it to the 'page_contents' list
+            page_contents.append(doc.page_content)
+        #loader.stop()
+    except Exception as e:
+        #loader.stop()
+        handle_local_error("Failed to chunk document for storage to VectorDB, encountered error: ", e)
+    #finally:
+        #oader.stop()
+
+
+    ### L3 - Store Chunks in VectorDB ###
+    print("Storing to VectorDB: ChromaDB")
+    #chroma_persist_directory=upload_folder + '/chroma_db_250'
+    #loader.start()
+    try:
+        # Return VectorStore initialized from documents and embeddings.
+        if use_sbert_embeddings:
+            # Ideally should use MAX_BATCH_SIZE obtained elsewhere 
+            if len(all_splits) > 5000:
+                split_docs = split_embeddings_list(all_splits, 5000)
+                for split_docs_list in split_docs:
+                    VECTOR_STORE = Chroma.from_documents(documents=split_docs_list, embedding=HuggingFaceEmbeddings(), persist_directory=vectordb_sbert_folder)
+            else:
+                VECTOR_STORE = Chroma.from_documents(documents=all_splits, embedding=HuggingFaceEmbeddings(), persist_directory=vectordb_sbert_folder)
+        
+        elif use_openai_embeddings:
+            print("Using OpenAI Text Ada Model via Azure OpenAI")
+
+            list_position = 0
+            token_count = 0
+
+            for i in range(list_position, len(all_splits)):
+
+                token_count += len(str(all_splits[i]))
+                if token_count >= 108000:
+                    VECTOR_STORE = Chroma.from_documents(documents=all_splits[list_position:i+1], embedding=AZURE_OPENAI_EMBEDDINGS, persist_directory=vectordb_openai_folder)  #AZURE_OPENAI_EMBEDDINGS defined on line 407
+                    list_position = i+1
+                    token_count = 0
+                    print("Loaded batch, sleeping for one minute to stay within rate-limit")
+                    time.sleep(63)
+                    continue
+
+            # post-loop, if any splits are left to be processed but were missed due to token_count not reaching the limit:
+            if list_position < len(all_splits):
+                VECTOR_STORE = Chroma.from_documents(documents=all_splits[list_position:], embedding=AZURE_OPENAI_EMBEDDINGS, persist_directory=vectordb_openai_folder) #AZURE_OPENAI_EMBEDDINGS defined on line 407
+
+        elif use_bge_base_embeddings or use_bge_large_embeddings:
+            persist_directory = ""
+            if use_bge_base_embeddings:
+                persist_directory = vectordb_bge_base_folder
+            elif use_bge_large_embeddings:
+                persist_directory = vectordb_bge_large_folder
+            VECTOR_STORE = Chroma.from_documents(documents=all_splits, embedding=HF_BGE_EMBEDDINGS, persist_directory=persist_directory)    #HF_BGE_EMBEDDINGS defined in process_model() line 2133
+
+        #loader.stop()
+    except Exception as e:
+        #loader.stop()
+        handle_local_error("Could not store to VectorDB, encountered error: ", e)
+    #finally:
+        #loader.stop()
+
+    return chunk_sz, chunk_olp
+
+
+def find_text_in_pdf_dpr(pdf_path, target_text):
+    print("pdf_path, target_text: ", pdf_path, ", ", target_text)
+
+    page_numbers = []
+
+    try:
+        with open(pdf_path, 'rb') as file:
+
+            reader = PyPDF2.PdfReader(file)
+
+            for page_num in range(len(reader.pages)):
+
+                page = reader.pages[page_num]
+
+                content = page.extract_text()
+
+                if target_text in content:
+                    print("found match!")
+                    page_numbers.append(page_num + 1)
+    except Exception as e:
+        handle_local_error("Could not find page numbers from PDF, encountered error: ", e)
+
+    print("page numbers before returning: ")
+    print(page_numbers)
+    return page_numbers
+
+
+def find_text_in_pdf(reference_pages):
+
+    user_should_refer_pages_in_doc = {}
+    docs_have_relevant_info = False
+
+    for doc_path in reference_pages:
+
+        source_filename = os.path.basename(doc_path)
+
+        try:
+            text = extract_text(doc_path)
+            pages = text.split("\f")
+            page_numbers = []
+
+            for page_num, content in enumerate(pages):
+                for target_text in reference_pages[doc_path]:
+                    target_text = preprocess_string(target_text)
+                    content = preprocess_string(content)
+                    if target_text in content:
+                        page_numbers.append(page_num + 1)
+                        docs_have_relevant_info = True
+            
+            page_numbers = set(page_numbers)
+
+            user_should_refer_pages_in_doc[source_filename] = page_numbers
+        except Exception as e:
+            handle_local_error("Could not find page numbers from PDF, encountered error: ", e)
+
+    return docs_have_relevant_info, user_should_refer_pages_in_doc
+
+
+def find_images_in_db(reference_pages):
+
+    print("Searching for relevant Images")
+
+    try:
+        read_return = read_config(['sqlite_images_db'])
+        sqlite_images_db = read_return['sqlite_images_db']
+    except Exception as e:
+        handle_local_error("Missing sqlite_images_db in config.json for method find_images_in_db. Error: ", e)
+
+    matched_images = []
+    matched_images_found = False
+
+    try:
+        conn = sqlite3.connect(sqlite_images_db)
+        conn.row_factory = sqlite3.Row
+        print("Database connected for image search")
+    except Exception as e:
+        handle_local_error("Could not connect to images DB for image search, encountered error: ", e)
+
+    for doc in reference_pages:
+                
+        #source_filename = os.path.basename(doc)
+
+        for search_string in reference_pages[doc]:
+
+            # Only search for non-empty search strings
+            if search_string:
+                print(f"String found for image search: {search_string}")
+                try:
+                    images = conn.execute('SELECT DISTINCT id, image_data FROM images WHERE surrounding_text LIKE ?', ('%' + search_string + '%',)).fetchall()
+                except Exception as e:
+                    handle_error_no_return("Could not select images from Images DB, encountered error: ", e)
+                for row in images:
+                    print("Matching image found!")
+                    matched_images_found = True
+                    image_id = row['id']
+                    image_data = row['image_data']
+                    matched_images.append((image_id, image_data))
+
+    conn.close()
+    matched_images = set(matched_images)
+    return matched_images_found, matched_images
+
+
+def highlight_text_on_page(highlight_list, stream_session_id):
+
+    print(f"highlight_list: {highlight_list}")
+
+    try:
+        read_return = read_config(['upload_folder', 'highlighted_docs'])
+        upload_folder = read_return['upload_folder']
+        highlighted_pdfs = read_return['highlighted_docs']
+    except Exception as e:
+        handle_local_error("Missing upload_folder in config.json for method highlight_text_on_page. Error: ", e)
+    
+    for index, doc in enumerate(highlight_list, start=1):
+
+        try:
+            pdf_path = os.path.join(upload_folder, doc).replace("\\","/")
+            output_file_extension = "_" + stream_session_id + '.pdf'
+            output_file_name = doc.replace(".pdf",output_file_extension) 
+            output_pdf_path = os.path.join(highlighted_pdfs, output_file_name).replace("\\","/")
+
+            print(f"stream_session_id:{stream_session_id}")
+            print(f"\npdf_path:{pdf_path}")
+
+            highlight_doc = fitz.open(pdf_path)
+        except Exception as e:
+            handle_error_no_return("Could not open doc for highlighting, encountered error: ", e)
+            continue
+        
+        for target in highlight_list[doc]:
+            try:
+                text_to_highlight = str(target[1])
+                text_to_highlight = re.sub(r'Row \d+, Column \d+: ', '', text_to_highlight)
+                page_number = int(target[0])
+                
+                print(f"text_to_highlight: {text_to_highlight}")
+                print(f"page_number: {page_number}")
+
+                page = highlight_doc.load_page(page_number-1)
+                text_instances = page.search_for(text_to_highlight)
+            except Exception as e:
+                handle_error_no_return("Error loading page or searching for text to highlight, encountered error: ", e)
+                continue
+            
+            for inst in text_instances:
+                try:
+                    print("HIGHLIGHTING", inst)
+                    page.add_highlight_annot(inst)
+                except Exception as e:
+                    handle_error_no_return("Could not highlight text instance, encountered error: ", e)
+                    continue
+        
+        try:
+            highlight_doc.save(output_pdf_path, garbage=0, deflate=False, clean=False)
+        except Exception as e:
+            handle_error_no_return("Could not save highlighted doc, encountered error: ", e)
+            continue
+
+    return True
+
+
+def whoosh_text_in_pdf_and_highlight(reference_pages, stream_session_id):
+
+    print("Searching Index")
+
+    try:
+        read_return = read_config(['index_dir'])
+        index_dir = read_return['index_dir']
+    except Exception as e:
+        handle_local_error("Missing index_dir in config.json for method whoosh_text_in_pdf_and_highlight. Error: ", e)
+
+    user_should_refer_pages_in_doc = {}
+    docs_have_relevant_info = False
+
+    highlight_list = {}
+
+    try:
+        # Open the index
+        ix = open_dir(index_dir)
+
+        # Create a 'searcher' object
+        with ix.searcher() as searcher:
+            query_parser = QueryParser("content", ix.schema)
+
+            for doc in reference_pages:
+                
+                source_filename = os.path.basename(doc)
+                output_file_extension = "_" + stream_session_id + '.pdf'
+                output_file_name = source_filename.replace(".pdf",output_file_extension) 
+                page_numbers = []
+                highlight_strings = []
+                
+                for search_string in reference_pages[doc]:
+
+                    # Only search for non-empty search strings
+                    if search_string:
+
+                        query = query_parser.parse(search_string)
+
+                        results = searcher.search(query)
+
+                        for hit in results:
+                            print(f"\n\nFound in {hit['title']} on page {hit['pagenumber']}")
+                            page_numbers.append(int(hit['pagenumber']))
+                            docs_have_relevant_info = True
+                            
+                            highlight_target = [hit['pagenumber'], search_string]
+                            highlight_strings.append(highlight_target)
+
+                page_numbers = set(page_numbers)
+                user_should_refer_pages_in_doc[output_file_name] = page_numbers
+
+                highlight_strings_set = set(tuple(inner_list) for inner_list in highlight_strings)  # Because using a set directly on a list of lists won't work because lists are mutable and cannot be hashed, which is a requirement for the elements of a set. 
+                highlight_strings = [list(inner_tuple) for inner_tuple in highlight_strings_set]
+                highlight_list[source_filename] = highlight_strings
+
+    except Exception as e:
+        handle_error_no_return("Could not search Whoosh Index, encountered error: ", e)
+    
+    # Highlight line in PDF
+    if docs_have_relevant_info:
+        try:
+            highlight_text_on_page(highlight_list, str(stream_session_id))
+        except Exception as e:
+            handle_error_no_return("Could not highlight text, encountered error: ", e)
+
+    return docs_have_relevant_info, user_should_refer_pages_in_doc
+
+
+def whoosh_text_in_pdf(reference_pages):
+
+    print("Searching Index")
+
+    try:
+        read_return = read_config(['index_dir'])
+        index_dir = read_return['index_dir']
+    except Exception as e:
+        handle_local_error("Missing index_dir in config.json for method whoosh_text_in_pdf. Error: ", e)
+
+    user_should_refer_pages_in_doc = {}
+    docs_have_relevant_info = False
+
+    try:
+        # Open the index
+        ix = open_dir(index_dir)
+
+        # Create a 'searcher' object
+        with ix.searcher() as searcher:
+            query_parser = QueryParser("content", ix.schema)
+
+            for doc in reference_pages:
+                
+                source_filename = os.path.basename(doc)
+                page_numbers = []
+                
+                for search_string in reference_pages[doc]:
+
+                    # Only search for non-empty search strings
+                    if search_string:
+
+                        query = query_parser.parse(search_string)
+
+                        results = searcher.search(query)
+
+                        for hit in results:
+                            print(f"Found in {hit['title']} on page {hit['pagenumber']}")
+                            page_numbers.append(int(hit['pagenumber']))
+                            docs_have_relevant_info = True
+
+                page_numbers = set(page_numbers)
+                user_should_refer_pages_in_doc[source_filename] = page_numbers
+
+    except Exception as e:
+        handle_error_no_return("Could not search Whoosh Index, encountered error: ", e)
+
+    return docs_have_relevant_info, user_should_refer_pages_in_doc
+
+
+def determine_sequence_id_for_chat(chat_id):
+
+    try:
+        read_return = read_config(['sqlite_history_db'])
+        sqlite_history_db = read_return['sqlite_history_db']
+    except Exception as e:
+        handle_local_error("Missing keys in config.json for method store_chat_history_to_db. Error: ", e)
+
+    # Connect to or create the DB
+    try:
+        conn = sqlite3.connect(sqlite_history_db)
+        cursor = conn.cursor()
+    except Exception as e:
+        handle_local_error("Could not establish connection to DB for chat history storage, encountered error: ", e)
+
+    try:
+        # Determine sequence_id
+        cursor.execute("SELECT COALESCE(MAX(sequence_id), 0) FROM chat_history WHERE chat_id = ?", (int(chat_id),))
+        # "The COALESCE function accepts two or more arguments and returns the first non-null argument."
+        # This accounts for a new chat!
+        # Note that trailing comma! Without it, the simple select query will produce an error: "parameters are of unsupported type" !!
+        # This is because the SQLite3 module can have trouble recognizing single-item tuples as tuples, so a trailing comma helps alleviate this! 
+
+        result = cursor.fetchone()
+        current_sequence_id = result[0]     # 'result' will be a list, so extract the first value
+        
+    except Exception as e:
+        handle_local_error("Could not determine sequence ID for storage to chat history DB, encountered error: ", e)
+
+    return int(current_sequence_id)
+
+
+def store_llama_cpp_chat_history_to_db(chat_id, sequence_id, user_query_for_history_db, model_response_for_history_db, current_prompt_template):
+
+    global SEQUENCE_ID
+
+    print(f"\n\nStoring chat history for chat with CHAT_ID: {chat_id}")
+
+    try:
+        read_return = read_config(['sqlite_history_db', 'model_choice', 'base_template'])
+        sqlite_history_db = read_return['sqlite_history_db']
+        model_choice = read_return['model_choice']
+    except Exception as e:
+        handle_local_error("Missing keys in config.json for method store_chat_history_to_db. Error: ", e)
+
+    # Connect to or create the DB
+    try:
+        conn = sqlite3.connect(sqlite_history_db)
+        cursor = conn.cursor()
+    except Exception as e:
+        handle_local_error("Could not establish connection to DB for chat history storage, encountered error: ", e)
+
+    try:
+        prev_sequence_id = determine_sequence_id_for_chat(chat_id)
+        #print("prev_sequence_id: ", prev_sequence_id)
+        SEQUENCE_ID = prev_sequence_id + 1
+        #print("current_sequence_id: ", SEQUENCE_ID)
+    except Exception as e:
+        handle_local_error("Could not determine sequence ID for storage to chat history DB, encountered error: ", e)
+       
+    # print(type(CHAT_ID))
+    # print(type(current_sequence_id))
+    # print(type(user_query_for_history_db))
+    # print(type(model_response_for_history_db))
+
+    try:
+        # Store conversation history into DB
+        cursor.execute("INSERT INTO chat_history (chat_id, sequence_id, user_query, llm_response, llm_model, prompt_template) VALUES (?, ?, ?, ?, ?, ?)", (int(chat_id), int(sequence_id), user_query_for_history_db, model_response_for_history_db, model_choice, str(current_prompt_template)))
+        conn.commit()
+    except Exception as e:
+        handle_local_error("Could not insert chat history into DB, encountered error: ", e)
+
+
+
+def store_chat_history_to_db(user_query_for_history_db, model_response_for_history_db, current_historical_summary):
+
+    global SEQUENCE_ID
+
+    print(f"\n\nStoring chat history for chat with CHAT_ID: {CHAT_ID}")
+
+    try:
+        read_return = read_config(['sqlite_history_db', 'model_choice', 'base_template'])
+        sqlite_history_db = read_return['sqlite_history_db']
+        model_choice = read_return['model_choice']
+        base_template = read_return['base_template']
+    except Exception as e:
+        handle_local_error("Missing keys in config.json for method store_chat_history_to_db. Error: ", e)
+
+    # Connect to or create the DB
+    try:
+        conn = sqlite3.connect(sqlite_history_db)
+        cursor = conn.cursor()
+    except Exception as e:
+        handle_local_error("Could not establish connection to DB for chat history storage, encountered error: ", e)
+
+    try:
+        prev_sequence_id = determine_sequence_id_for_chat(CHAT_ID)
+        #print("prev_sequence_id: ", prev_sequence_id)
+        SEQUENCE_ID = prev_sequence_id + 1
+        #print("current_sequence_id: ", SEQUENCE_ID)
+    except Exception as e:
+        handle_local_error("Could not determine sequence ID for storage to chat history DB, encountered error: ", e)
+       
+    # print(type(CHAT_ID))
+    # print(type(current_sequence_id))
+    # print(type(user_query_for_history_db))
+    # print(type(model_response_for_history_db))
+
+    try:
+        # Store conversation history into DB
+        cursor.execute("INSERT INTO chat_history (chat_id, sequence_id, user_query, llm_response, llm_model, prompt_template, history_summary) VALUES (?, ?, ?, ?, ?, ?, ?)", (int(CHAT_ID), int(SEQUENCE_ID), user_query_for_history_db, model_response_for_history_db, model_choice, str(base_template), str(current_historical_summary)))
+        conn.commit()
+    except Exception as e:
+        handle_local_error("Could not insert chat history into DB, encountered error: ", e)
+
+    conn.close()
+
+
+
+# Route for loading all models from model dir
+@app.route('/load_local_models')
+def load_local_models():
+
+    try:
+        read_return = read_config(['model_dir'])
+        model_dir = read_return['model_dir']
+    except Exception as e:
+        handle_api_error("Missing model_dir in config.json for method load_local_models. Error: ", e)
+    
+    try:
+        models = [f for f in os.listdir(model_dir) if os.path.isfile(os.path.join(model_dir, f))]
+    except Exception as e:
+        handle_api_error("Could not load list of local models, encountered error: ", e)
+        
+    #print(f"locally available models: {models}")
+    return jsonify({'success': True, 'models': models})
+
+
+
+# Route to handle the submission of the first form (LLM & embeddings model and GPU selection)
+@app.route('/process_model', methods=['POST'])
+def process_model():
+    
+    global HF_BGE_EMBEDDINGS
+
+    ###---New config.json---###
+
+    config_update_dict = {}
+
+    use_azure_open_ai = 'use_azure' in request.form
+    use_openai_embeddings = 'use_openai_embeddings' in request.form
+    use_sbert_embeddings = 'use_sbert_embeddings' in request.form
+    use_bge_large_embeddings = 'use_bge_large_embeddings' in request.form
+    use_bge_base_embeddings = 'use_bge_base_embeddings' in request.form
+    use_gpu_for_embeddings = request.form.get('use_gpu_for_embeds', False)    # default no
+    model_choice = str(request.form['model_choice'])
+    use_gpu = request.form.get('use_gpu', False)
+
+    config_update_dict.update({'use_azure_open_ai':use_azure_open_ai, 'use_openai_embeddings':use_openai_embeddings, 'use_sbert_embeddings':use_sbert_embeddings, 'use_bge_large_embeddings':use_bge_large_embeddings, 'use_bge_base_embeddings':use_bge_base_embeddings, 'use_gpu_for_embeddings':use_gpu_for_embeddings, 'model_choice':model_choice, 'use_gpu':use_gpu})
+
+    try:
+        if use_bge_base_embeddings or use_bge_large_embeddings:
+            model_name = ""
+            if use_bge_base_embeddings:
+                model_name = "BAAI/bge-base-en"
+            elif use_bge_large_embeddings:
+                model_name = "BAAI/bge-large-en"
+            model_kwargs = {}
+            if use_gpu_for_embeddings:
+                model_kwargs.update({"device": "cuda"})
+            else:
+                model_kwargs.update({"device": "cpu"})
+            encode_kwargs = {"normalize_embeddings": True}
+            HF_BGE_EMBEDDINGS = HuggingFaceBgeEmbeddings(
+                model_name=model_name, model_kwargs=model_kwargs, encode_kwargs=encode_kwargs
+            )
+    except Exception as e:
+        handle_api_error("Could not load BGE embeddings in process_model, encountered error: ", e)
+    
+    try:
+        write_config(config_update_dict)
+    except Exception as e:
+        handle_local_error("Could not write updates to config.json, encountered error: ", e)
+
+    # Redirect to the next step
+    return redirect(url_for('load_file'))
+
+
+def convert_to_pdf_with_unoconv(input_file_path, output_file_path):
+    print("\n\nConverting non-PDF document to PDF format\n\n")
+    if platform.system() == 'Windows':
+        subprocess.run(['python', 'unoconv.py', '-f', 'pdf', '-o', output_file_path, input_file_path], check=True)
+    else:
+        subprocess.run(['unoconv', '-f', 'pdf', '-o', output_file_path, input_file_path], check=True)
+
+
+# Route to handle the submission of the second form (file loading)
+@app.route('/process_file', methods=['POST'])
+def process_file():
+
+    use_ocr = False
+    try:
+        read_return = read_config(['use_ocr', 'ocr_service_choice'])
+        use_ocr = read_return['use_ocr']
+        ocr_service_choice = read_return['ocr_service_choice']
+    except Exception as e:
+        handle_api_error("Could not determine use_ocr in config.json for process_new_file. Disabling OCR and proceeding. Error: ", e)
+
+    try:
+        load_new_file = request.form.get('load_new_file', 'n').lower()
+    except Exception as e:
+        handle_api_error("Server-side error - could not interpret user selection. Encountered error: ", e)
+
+    if load_new_file ==  'y':
+
+        try:
+            input_file = request.files['input_file']
+        except Exception as e:
+            handle_api_error("Server-side error recieving file: ", e)
+
+        # Ensure the filename is secure
+        filename = secure_filename(input_file.filename)
+        if "PDF" in filename:
+            filename = filename.replace("PDF", "pdf")
+
+        pdf_file = False
+        txt_file = False
+
+        if filename.endswith('.pdf'):
+            pdf_file = True
+        elif filename.endswith('.txt'):
+            txt_file = True
+        else:
+            return jsonify(success=False, error="Invalid file format, expected a PDF or TXT file"), 400 #HTTP Bad Request
+
+
+        try:
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            
+            print("Loading new file - filename: ", filename)
+            print("Loading new file - filepath: ", filepath)
+
+            # Save the uploaded file to the specified path
+            input_file.save(filepath)
+        except Exception as e:
+            handle_api_error("Failed to save document to app folder, encountered error: ", e)
+        
+        # print("input_file: ", input_file)
+        
+        if pdf_file:
+            print("Processing PDF file")
+            
+            if use_ocr:
+                try:
+                    if ocr_service_choice == 'AzureVision':
+                        input_file = PDFtoAzureOCRTXT(filepath)
+                    elif ocr_service_choice == 'AzureDocAi':
+                        input_file = PDFtoAzureDocAiTXT(filepath)
+                except Exception as e:
+                    handle_error_no_return("Failed to OCR text from PDF. Will now attempt to extract text via PyPDF2. Encountered error: ", e)
+                    try:
+                        input_file = PDFtoTXT(filepath)
+                    except Exception as e:
+                        handle_api_error("Failed to extract text from the PDF document, even via fallback PyPDF2, encountered error: ", e)
+            else:
+                try:
+                    input_file = PDFtoTXT(filepath)
+                except Exception as e:
+                    handle_api_error("Failed to extract text from the PDF document, even via fallback PyPDF2, encountered error: ", e)
+
+            try:
+                images = extract_images_from_pdf(filepath)
+            except Exception as e:
+                handle_error_no_return("Failed to extract images from the PDF document, encountered error: ", e)
+
+            try:
+                store_images_to_db(images)
+            except Exception as e:
+                handle_error_no_return("Failed to save images to database, encountered error: ", e)
+
+        if txt_file:
+            print("Processing Text file")
+
+            try:
+                # Need to set to filepath as input_file just contains the file itself from the POST!
+                input_file = TxtCleaner(filepath)
+            except Exception as e:
+                handle_api_error("Failed to extract text from PDF: ", e)
+        
+        try:
+            LoadNewDocument(input_file)         
+        except Exception as e:
+            handle_api_error("Failed to extract text from PDF: ", e)
+
+
+    # Don't get confused about not loading the VectorDB here! You'll notice that we're doing an additional VectorDB load step in the route method below, 'process_new_file()', but not here!
+    # This is because this current route is triggered BEFORE the initital model and VectorDB loading occurs, so after this '/load_model_and_vectordb' triggers and loads the DB anyway!
+    # However, when '/process_new_file' is invoked mid-chat, the VectorDB must be RE-LOADED! Hence the extra step in the route below. 
+    
+    #return "File processed (or not) and ready for chat!"
+    #return redirect(url_for('load_model_and_vectordb'))
+    return jsonify(success=True)
+
+
+# Route to handle the submission of the second form (file loading)
+@app.route('/process_new_file', methods=['POST'])
+def process_new_file():
+
+    use_ocr = False
+    try:
+        read_return = read_config(['use_ocr', 'ocr_service_choice'])
+        use_ocr = read_return['use_ocr']
+        ocr_service_choice = read_return['ocr_service_choice']
+    except Exception as e:
+        handle_api_error("Could not determine use_ocr in config.json for process_new_file. Disabling OCR and proceeding. Error: ", e)
+
+    try:
+        input_file = request.files['file']
+    except Exception as e:
+        handle_api_error("Server-side error recieving file: ", e)
+
+    # Ensure the filename is secure
+    filename = secure_filename(input_file.filename)
+    if "PDF" in filename:
+        filename = filename.replace("PDF", "pdf")
+
+    try:
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+
+        print("Loading new file - filename: ", filename)
+        print("Loading new file - filepath: ", filepath)
+
+        # Save the uploaded file to the specified path
+        input_file.save(filepath)
+    except Exception as e:
+        handle_api_error("Failed to save document to app folder, encountered error: ", e)
+
+    if not filename.lower().endswith('.pdf'):
+        try:
+            conv_filename = os.path.splitext(filename)[0] + '.pdf'
+            conv_filepath = os.path.join(app.config['UPLOAD_FOLDER'], conv_filename)
+
+            convert_to_pdf_with_unoconv(filepath, conv_filepath)
+
+            filepath = conv_filepath
+        except subprocess.CalledProcessError as e:
+            handle_api_error("Could not convert file to PDF, encountered error: ", e)
+        except Exception as e:
+            handle_api_error("Unexpected error when converting file to PDF, encountered error: ", e)
+
+    print("Processing PDF file")
+    
+    if use_ocr:
+        try:
+            if ocr_service_choice == 'AzureVision':
+                input_file = PDFtoAzureOCRTXT(filepath)
+            elif ocr_service_choice == 'AzureDocAi':
+                input_file = PDFtoAzureDocAiTXT(filepath)
+        except Exception as e:
+            handle_error_no_return("Failed to OCR text from PDF. Will now attempt to extract text via PyPDF2. Encountered error: ", e)
+            try:
+                input_file = PDFtoTXT(filepath)
+            except Exception as e:
+                handle_api_error("Failed to extract text from the PDF document, even via fallback PyPDF2, encountered error: ", e)
+    else:
+        try:
+            input_file = PDFtoTXT(filepath)
+        except Exception as e:
+            handle_api_error("Failed to extract text from the PDF document, even via fallback PyPDF2, encountered error: ", e)
+    
+    try:
+        images = extract_images_from_pdf(filepath)
+    except Exception as e:
+        handle_error_no_return("Failed to extract images from the PDF document, encountered error: ", e)
+
+    try:
+        store_images_to_db(images)
+    except Exception as e:
+        handle_error_no_return("Failed to save images to database, encountered error: ", e)
+    
+    try:
+        chunk_size, chunk_overlap = LoadNewDocument(input_file)
+    except Exception as e:
+        handle_api_error("Failed to extract text from PDF: ", e)
+    
+
+    global VECTOR_STORE
+    print("\nRe-Loading VectorDB: ChromaDB")
+
+    vectordb_used = ""
+
+    try:
+        read_return = read_config(['use_sbert_embeddings', 'use_openai_embeddings', 'use_bge_base_embeddings', 'use_bge_large_embeddings', 'vectordb_sbert_folder', 'vectordb_openai_folder', 'vectordb_bge_base_folder', 'vectordb_bge_large_folder', 'embedding_model_choice'])
+        use_sbert_embeddings = read_return['use_sbert_embeddings']
+        use_openai_embeddings = read_return['use_openai_embeddings']
+        use_bge_base_embeddings = read_return['use_bge_base_embeddings']
+        use_bge_large_embeddings = read_return['use_bge_large_embeddings']
+        vectordb_sbert_folder = read_return['vectordb_sbert_folder']
+        vectordb_openai_folder = read_return['vectordb_openai_folder']
+        vectordb_bge_base_folder = read_return['vectordb_bge_base_folder']
+        vectordb_bge_large_folder = read_return['vectordb_bge_large_folder']
+        embedding_model_choice = read_return['embedding_model_choice']
+    except Exception as e:
+        handle_api_error("Missing values in config.json when reloading VectorDB, could not fully complete process_new_file. Please try restarting the application. Error: ", e)
+
+    try:
+        if use_sbert_embeddings:
+            VECTOR_STORE = Chroma(persist_directory=vectordb_sbert_folder, embedding_function=HuggingFaceEmbeddings())
+            vectordb_used = vectordb_sbert_folder
+        elif use_openai_embeddings:
+            VECTOR_STORE = Chroma(persist_directory=vectordb_openai_folder, embedding_function=AZURE_OPENAI_EMBEDDINGS)
+            vectordb_used = vectordb_openai_folder
+        elif use_bge_base_embeddings:
+            VECTOR_STORE = Chroma(persist_directory=vectordb_bge_base_folder, embedding_function=HF_BGE_EMBEDDINGS)
+            vectordb_used = vectordb_bge_base_folder
+        elif use_bge_large_embeddings:
+            VECTOR_STORE = Chroma(persist_directory=vectordb_bge_large_folder, embedding_function=HF_BGE_EMBEDDINGS)
+            vectordb_used = vectordb_bge_large_folder
+    except Exception as e:
+        handle_api_error("Could not reload VectorDB when trying to process_new_file. Please try restarting the application. Error: ", e)
+
+    try:
+        record_doc_loaded_to_db(filename, embedding_model_choice, vectordb_used, chunk_size, chunk_overlap)
+    except Exception as e:
+        handle_error_no_return("Unable to record document loading to records DB, encountered error: ", e)
+
+    return jsonify(success=True)
+
+
+# Route to store user rating: 
+# ATTN: comment out print() statements, as users may elect to leave a rating as a response is being generated, which is when the stdout is redirected to the event stream! 
+@app.route('/store_user_rating', methods=['POST'])
+def store_user_rating():
+    
+    # print("Stroing user rating")
+
+    try:
+        read_return = read_config(['sqlite_history_db'])
+        sqlite_history_db = read_return['sqlite_history_db']
+    except Exception as e:
+        handle_local_error("Missing sqlite_history_db in config.json for method store_user_rating. Error: ", e)
+    
+    try:
+        user_rating = request.form['rating']
+        chat_id_for_rating = request.form['chat_id']
+        sequence_id_for_rating = request.form['sequence_id']
+    except Exception as e:
+        handle_api_error("Server-side error, could not read user rating or failed to obtain chat/sequence ID, encountered error: ", e)
+
+    # print("user_rating: ", user_rating)
+    # print("chat_id_for_rating: ", chat_id_for_rating)
+    # print("sequence_id_for_rating: ", sequence_id_for_rating)
+
+    try:
+        conn = sqlite3.connect(sqlite_history_db)
+        cursor = conn.cursor()
+    except Exception as e:
+        handle_api_error("Could not connect to chat history DB for storage of user-rating, encountered error: ", e)
+
+    try:
+        cursor.execute(
+            '''
+            UPDATE chat_history
+            SET user_rating = ?
+            WHERE chat_id = ? AND sequence_id = ?
+            ''',
+            (user_rating, chat_id_for_rating, sequence_id_for_rating)
+        )
+        conn.commit()
+    except Exception as e:
+        handle_api_error("Could not store user-rating to chat history db, encountered error: ", e)
+
+    conn.close()
+
+    return jsonify(success=True)
+
+
+
+def is_llama_cpp_local_server_online():
+    try:
+        response = requests.get('http://localhost:8080/health')
+        
+        if response.status_code == 200:
+            data = response.json()  # parse the JSON response to determine the server status
+            if data['status'] == 'ok':
+                print(f"Server ready: {data['slots_idle']} idle slots, {data['slots_processing']} processing slots.")
+                return {"server_available":True, "loading_model":False, "status_code":200}
+            elif data['status'] == 'no slot available':
+                print("No slots available. Server is running but cannot handle more requests.")
+                return {"server_available":False, "loading_model":False, "status_code":200}
+            
+        elif response.status_code == 503:   # model still loading or no slots
+            data = response.json()
+            if data['status'] == 'loading model':
+                print("Server is loading the selected LLM, please wait")
+                return {"server_available":False, "loading_model":True, "status_code":503}
+            else:
+                print("No slots available. Server is running but cannot handle more requests.")
+                return {"server_available":False, "loading_model":False, "status_code":503}
+        
+        elif response.status_code == 500:
+            print("Server error: Failed to load LLM.")
+            logger.error("llama.cpp - 500 event")
+            return {"server_available":False, "loading_model":False, "status_code":500}
+        
+        else:
+            return {"server_available":False, "loading_model":False, "status_code":500}
+    
+    except requests.exceptions.ConnectionError as e:
+        error_message = "\n\nECONNREFUSED event\n\n"
+        if logger:
+            logger.error(error_message)
+            print(error_message)
+        else:
+            print(error_message)
+        return {"server_available":False, "loading_model":True, "status_code":500}
+    except Exception as e:
+        error_message = f"\n\nCould not check llama.cpp local-server health, encountered error: {e}\n\n"
+        if logger:
+            logger.error(error_message)
+            print(error_message)
+        else:
+            print(error_message)
+        return {"server_available":False, "loading_model":False, "status_code":500}
+    
+
+def send_ctrl_c_to_process(process):
+    if process.poll() is None:  # check if process is still running via poll(), which returns None if a process is still running 
+        if platform.system() == 'Windows':
+            process.send_signal(signal.CTRL_BREAK_EVENT)
+        else:
+            process.send_signal(signal.SIGINT)
+        try:
+            # Wait a bit for the process to terminate gracefully:
+            process.wait(timeout=3)
+        except subprocess.TimeoutExpired:
+            print("Process did not terminate within timeout, will be force-killed.")
+            process.kill()  # Sends 'SIGKILL' on Unix-like to force-kill immediately / 'TerminateProcess' on Windows which still allows for graceful termination
+            process.wait()
+            if process.poll() is not None:
+                print("Process has been killed successfully.")
+            else:
+                print("Process still running after force kill attempt.")
+
+
+def terminate_llama_cpp_process(process):
+    try:
+        # process.terminate() sends 'SIGTERM' on Unix-like systems / 'TerminateProcess' on Windows, allows for graceful termination
+        # process.wait()
+        send_ctrl_c_to_process(process)
+        if process.poll() is not None:  # process has indeed terminated
+            print("Process terminated gracefully.")
+    except Exception as e:
+        handle_local_error("Failed to terminate llama.cpp process, encountered error: ", e)
+
+
+@app.route('/llama_cpp_server_starter')
+def llama_cpp_server_starter():
+
+    global LLM_CHANGE_RELOAD_TRIGGER_SET
+    global LLAMA_CPP_PROCESS
+    global LLM_LOADED_UP
+
+    if LLM_LOADED_UP and not LLM_CHANGE_RELOAD_TRIGGER_SET:
+        model_choice = 'undefined'
+        try:
+            read_return = read_config(['model_choice'])
+            model_choice = read_return['model_choice']
+        except Exception as e:
+            handle_error_no_return("Missing model_choice in config.json when attempting to return without re-loading. Printing error and proceeding: ", e)
+        print(f'\n\nAlready loaded! Simply returning model choice: {model_choice}\n\n')
+        return jsonify({'success': True, 'llm_model': model_choice})
+    elif LLM_CHANGE_RELOAD_TRIGGER_SET:
+        print('\n\nProceeding to reload the LLM & resetting the LLM_CHANGE_RELOAD_TRIGGER_SET flag.\n\n')
+        LLM_CHANGE_RELOAD_TRIGGER_SET = False
+
+    try:
+        if is_llama_cpp_local_server_online()['server_available']:
+            print("Server online. Terminating and reloading from config.json")
+            try:
+                terminate_llama_cpp_process(LLAMA_CPP_PROCESS)
+                LLAMA_CPP_PROCESS = None
+            except Exception as e:
+                LLM_LOADED_UP = True
+                handle_api_error("Failed to terminate running llama.cpp process, server was likely launched by a previous session. Retruning with the currently loaded LLM. To change, shutdown the previously launched server manually and reload this page. Technical error-details follow: ", e)
+                try:
+                    read_return = read_config(['model_choice'])
+                    model_choice = read_return['model_choice']
+                    return jsonify({'success': True, 'llm_model': model_choice})
+                except Exception as e:
+                    handle_api_error("Missing values in config.json when preparing to launch llama.cpp server, encountered error: ", e)
+                return jsonify({'success': True, 'llm_model': 'undefined'})
+                
+                
+    except Exception as e:
+        handle_error_no_return("Could not pre-check if llama.cpp server is running, it may be offline. Printing error and proceeding: ", e)
+
+
+    try:
+        read_return = read_config(['model_dir', 'model_choice', 'local_llm_context_length', 'local_llm_max_new_tokens', 'local_llm_gpu_layers', 'server_timeout_seconds', 'server_retry_attempts'])
+        model_dir = read_return['model_dir']
+        model_choice = read_return['model_choice']
+        local_llm_context_length = read_return['local_llm_context_length']
+        local_llm_max_new_tokens = read_return['local_llm_max_new_tokens']
+        local_llm_gpu_layers = read_return['local_llm_gpu_layers']
+        server_timeout_seconds = read_return['server_timeout_seconds']
+        server_retry_attempts = read_return['server_retry_attempts']
+    except Exception as e:
+        handle_api_error("Missing values in config.json when preparing to launch llama.cpp server, encountered error: ", e)
+
+
+    try:
+        cpp_model = os.path.join(model_dir, model_choice)
+    except Exception as e:
+        handle_api_error("Could not os.join path to model file to launch llama.cpp server, encountered error: ", e)
+
+
+    try:
+        cpp_app = ['server', '-m', cpp_model, '-ngl', str(local_llm_gpu_layers), '-c', str(local_llm_context_length), '-n', str(local_llm_max_new_tokens)]
+
+        if platform.system() == 'Windows':
+            LLAMA_CPP_PROCESS = subprocess.Popen(cpp_app, creationflags=subprocess.CREATE_NEW_CONSOLE)  # Windows only! Comment when containerizing or deploying to Linux/MacOS!
+        else:           
+            # Platform & container agnostic:
+            with open('llama_cpp_server_output_log.txt', 'w') as f:
+                LLAMA_CPP_PROCESS = subprocess.Popen(cpp_app, stdout=f, stderr=subprocess.STDOUT, text=True)    #stdout has already been redirected to the file, so simply direct stderr to stdout!
+
+    except Exception as e:
+        handle_api_error("Could not launch llama.cpp process, encountered error: ", e)
+
+
+    timeout = server_timeout_seconds   
+    attempts = server_retry_attempts
+
+    try:
+        for _ in range(attempts):
+            if is_llama_cpp_local_server_online()['server_available']:
+                print("llama.cpp server launched succesfully! Returning.")
+                LLM_LOADED_UP = True
+                return jsonify({'success': True, 'llm_model': model_choice})
+            time.sleep(timeout)
+    except Exception as e:
+        handle_error_no_return("Could not check server status after launch attempt, printing error and retrying: ", e)
+
+    return handle_api_error("Failed to start llama.cpp local-server")
+
+
+
+@app.route('/load_vectordb')
+def load_vectordb():
+
+    global VECTOR_STORE
+    global HF_BGE_EMBEDDINGS
+    global AZURE_OPENAI_EMBEDDINGS
+    global VECTORDB_CHANGE_RELOAD_TRIGGER_SET
+    global VECTORDB_LOADED_UP
+
+    if VECTORDB_LOADED_UP and not VECTORDB_CHANGE_RELOAD_TRIGGER_SET:
+        print(f'\n\nVectorDB already loaded! Simply returning.\n\n')
+        return jsonify({'success': True})
+    elif VECTORDB_CHANGE_RELOAD_TRIGGER_SET:
+        print('\n\nProceeding to reload VectorDB & resetting the VECTORDB_CHANGE_RELOAD_TRIGGER_SET flag.\n\n')
+        VECTORDB_CHANGE_RELOAD_TRIGGER_SET = False
+
+    try:
+        read_return = read_config(['use_gpu_for_embeddings', 'use_sbert_embeddings', 'use_openai_embeddings', 'use_bge_base_embeddings', 'use_bge_large_embeddings', 'vectordb_sbert_folder', 'vectordb_openai_folder', 'vectordb_bge_base_folder', 'vectordb_bge_large_folder'])
+        use_gpu_for_embeddings = read_return['use_gpu_for_embeddings']
+        use_sbert_embeddings = read_return['use_sbert_embeddings']
+        use_openai_embeddings = read_return['use_openai_embeddings']
+        use_bge_base_embeddings = read_return['use_bge_base_embeddings']
+        use_bge_large_embeddings = read_return['use_bge_large_embeddings']
+        vectordb_sbert_folder = read_return['vectordb_sbert_folder']
+        vectordb_openai_folder = read_return['vectordb_openai_folder']
+        vectordb_bge_base_folder = read_return['vectordb_bge_base_folder']
+        vectordb_bge_large_folder = read_return['vectordb_bge_large_folder']
+    except Exception as e:
+        handle_api_error("Missing values in config.json when attempting to load_vectordb. Error: ", e)
+    
+    
+    ### 1 - Load VectorDB from disk
+    print("\n\nLoading VectorDB: ChromaDB\n\n")
+    try:
+        if use_sbert_embeddings:
+            VECTOR_STORE = Chroma(persist_directory=vectordb_sbert_folder, embedding_function=HuggingFaceEmbeddings())
+            # try:
+            #     # chroma_client = VECTOR_STORE.PersistentClient
+            #     # max_batch_size = chroma_client._producer.max_batch_size
+            #     max_batch_size = VECTOR_STORE.max_batch_size
+            #     print(f"max_batch_size: {max_batch_size}")
+            # except Exception as e:
+            #     print(f"Could not get max_batch_size. Error: {e}")
+        
+        elif use_openai_embeddings:
+
+            try:
+                read_return = read_config(['azure_openai_text_ada_api_url', 'azure_openai_text_ada_api_key', 'azure_openai_api_type', 'azure_openai_api_version', 'azure_openai_text_ada_deployment_name'])
+                azure_openai_text_ada_api_url = read_return['azure_openai_text_ada_api_url']
+                azure_openai_text_ada_api_key = read_return['azure_openai_text_ada_api_key']
+                azure_openai_api_type = read_return['azure_openai_api_type']
+                azure_openai_api_version = read_return['azure_openai_api_version']
+                azure_openai_text_ada_deployment_name = read_return['azure_openai_text_ada_deployment_name']
+            except Exception as e:
+                handle_api_error("Missing values for Azure OpenAI Embeddings in method load_model_and_vectordb in config.json. Error: ", e)
+            
+            try:
+                os.environ["OPENAI_API_BASE"] = azure_openai_text_ada_api_url
+                os.environ["OPENAI_API_KEY"] = azure_openai_text_ada_api_key
+                os.environ["OPENAI_API_TYPE"] = azure_openai_api_type
+                os.environ["OPENAI_API_VERSION"] = azure_openai_api_version
+            except Exception as e:
+                handle_api_error("Could not set OS environment variables for Azure OpenAI Embeddings in load_model_and_vectordb, encountered error: ", e)
+
+            
+            AZURE_OPENAI_EMBEDDINGS = OpenAIEmbeddings(deployment=azure_openai_text_ada_deployment_name)
+            VECTOR_STORE = Chroma(persist_directory=vectordb_openai_folder, embedding_function=AZURE_OPENAI_EMBEDDINGS)
+        
+        elif use_bge_base_embeddings:
+            model_name = "BAAI/bge-base-en"
+            model_kwargs = {}
+            if use_gpu_for_embeddings:
+                model_kwargs.update({"device": "cuda"})
+            else:
+                model_kwargs.update({"device": "cpu"})
+            encode_kwargs = {"normalize_embeddings": True}
+            HF_BGE_EMBEDDINGS = HuggingFaceBgeEmbeddings(
+                model_name=model_name, model_kwargs=model_kwargs, encode_kwargs=encode_kwargs
+            )
+            VECTOR_STORE = Chroma(persist_directory=vectordb_bge_base_folder, embedding_function=HF_BGE_EMBEDDINGS)
+                
+        
+        elif use_bge_large_embeddings:
+            model_name = "BAAI/bge-large-en"
+            model_kwargs = {}
+            if use_gpu_for_embeddings:
+                model_kwargs.update({"device": "cuda"})
+            else:
+                model_kwargs.update({"device": "cpu"})
+            encode_kwargs = {"normalize_embeddings": True}
+            HF_BGE_EMBEDDINGS = HuggingFaceBgeEmbeddings(
+                model_name=model_name, model_kwargs=model_kwargs, encode_kwargs=encode_kwargs
+            )
+            VECTOR_STORE = Chroma(persist_directory=vectordb_bge_large_folder, embedding_function=HF_BGE_EMBEDDINGS)
+        
+        #VECTOR_STORE = Chroma(persist_directory=VECTORDB_SBERT_FOLDER, embedding_function=HuggingFaceEmbeddings())
+    except Exception as e:
+        handle_api_error("Could not load VectorDB, encountered error: ", e)
+    
+    VECTORDB_LOADED_UP = True
+    return jsonify(success=True)
+
+
+
+@app.route('/load_model_and_vectordb')
+def load_model_and_vectordb():
+    
+    global LLM
+    global VECTOR_STORE
+    global LOADED_UP
+    global LLM_CHANGE_RELOAD_TRIGGER_SET
+    global HISTORY_SUMMARY
+    global HISTORY_MEMORY_WITH_BUFFER
+    global HF_BGE_EMBEDDINGS
+    global AZURE_OPENAI_EMBEDDINGS
+
+    try:
+        read_return = read_config(['model_choice', 'use_gpu_for_embeddings', 'use_sbert_embeddings', 'use_openai_embeddings', 'use_bge_base_embeddings', 'use_bge_large_embeddings', 'vectordb_sbert_folder', 'vectordb_openai_folder', 'vectordb_bge_base_folder', 'vectordb_bge_large_folder', 'use_azure_open_ai'])
+        model_choice = read_return['model_choice']
+        use_gpu_for_embeddings = read_return['use_gpu_for_embeddings']
+        use_sbert_embeddings = read_return['use_sbert_embeddings']
+        use_openai_embeddings = read_return['use_openai_embeddings']
+        use_bge_base_embeddings = read_return['use_bge_base_embeddings']
+        use_bge_large_embeddings = read_return['use_bge_large_embeddings']
+        vectordb_sbert_folder = read_return['vectordb_sbert_folder']
+        vectordb_openai_folder = read_return['vectordb_openai_folder']
+        vectordb_bge_base_folder = read_return['vectordb_bge_base_folder']
+        vectordb_bge_large_folder = read_return['vectordb_bge_large_folder']
+        use_azure_open_ai = read_return['use_azure_open_ai']
+    except Exception as e:
+        handle_api_error("Missing values in config.json when attempting to load_model_and_vectordb. Error: ", e)
+
+
+    # global CONVERSATION_RAG_CHAIN_WITH_SUMMARY_BUFFER
+
+    if LOADED_UP and not LLM_CHANGE_RELOAD_TRIGGER_SET:
+        print(f'\n\nAlready loaded! Clearing chat history and returning model choice: {model_choice}\n\n')
+        HISTORY_MEMORY_WITH_BUFFER.chat_memory.clear()
+        HISTORY_MEMORY_WITH_BUFFER = ConversationSummaryBufferMemory(llm=LLM, max_token_limit=300, return_messages=False)
+        HISTORY_SUMMARY = {}
+        return jsonify({'success': True, 'llm_model': model_choice})
+    elif LLM_CHANGE_RELOAD_TRIGGER_SET:
+        print('\n\nForce restarting app! Preserving chat history and proceeding to reload the VectorDB & LLM. Resetting reset flag too.\n\n')
+        LLM_CHANGE_RELOAD_TRIGGER_SET = False
+        
+
+    ### 1 - Load VectorDB from disk
+    print("\n\nLoading VectorDB: ChromaDB\n\n")
+    try:
+        if use_sbert_embeddings:
+            VECTOR_STORE = Chroma(persist_directory=vectordb_sbert_folder, embedding_function=HuggingFaceEmbeddings())
+            # try:
+            #     # chroma_client = VECTOR_STORE.PersistentClient
+            #     # max_batch_size = chroma_client._producer.max_batch_size
+            #     max_batch_size = VECTOR_STORE.max_batch_size
+            #     print(f"max_batch_size: {max_batch_size}")
+            # except Exception as e:
+            #     print(f"Could not get max_batch_size. Error: {e}")
+        
+        elif use_openai_embeddings:
+
+            try:
+                read_return = read_config(['azure_openai_base_url', 'azure_openai_api_key', 'azure_openai_api_type', 'c'])
+                azure_openai_base_url = read_return['azure_openai_base_url']
+                azure_openai_api_key = read_return['azure_openai_api_key']
+                azure_openai_api_type = read_return['azure_openai_api_type']
+                azure_openai_api_version = read_return['azure_openai_api_version']
+            except Exception as e:
+                handle_error_no_return("Missing values for Azure OpenAI Embeddings in method load_model_and_vectordb in config.json. Error: ", e)
+            
+            try:
+                os.environ["OPENAI_API_BASE"] = azure_openai_base_url
+                os.environ["OPENAI_API_KEY"] = azure_openai_api_key
+                os.environ["OPENAI_API_TYPE"] = azure_openai_api_type
+                os.environ["OPENAI_API_VERSION"] = azure_openai_api_version
+            except Exception as e:
+                handle_error_no_return("Could not set OS environment variables for Azure OpenAI Embeddings in load_model_and_vectordb, encountered error: ", e)
+            
+            AZURE_OPENAI_EMBEDDINGS = OpenAIEmbeddings(deployment="openai-ada-embedding")
+            VECTOR_STORE = Chroma(persist_directory=vectordb_openai_folder, embedding_function=AZURE_OPENAI_EMBEDDINGS)
+        
+        elif use_bge_base_embeddings:
+            if HF_BGE_EMBEDDINGS is not None:
+                VECTOR_STORE = Chroma(persist_directory=vectordb_bge_base_folder, embedding_function=HF_BGE_EMBEDDINGS)
+            else:
+                model_name = "BAAI/bge-base-en"
+                model_kwargs = {}
+                if use_gpu_for_embeddings:
+                    model_kwargs.update({"device": "cuda"})
+                else:
+                    model_kwargs.update({"device": "cpu"})
+                encode_kwargs = {"normalize_embeddings": True}
+                HF_BGE_EMBEDDINGS = HuggingFaceBgeEmbeddings(
+                    model_name=model_name, model_kwargs=model_kwargs, encode_kwargs=encode_kwargs
+                )
+                VECTOR_STORE = Chroma(persist_directory=vectordb_bge_base_folder, embedding_function=HF_BGE_EMBEDDINGS)
+        
+        elif use_bge_large_embeddings:
+            if HF_BGE_EMBEDDINGS is not None:
+                VECTOR_STORE = Chroma(persist_directory=vectordb_bge_large_folder, embedding_function=HF_BGE_EMBEDDINGS)
+            else:
+                model_name = "BAAI/bge-large-en"
+                model_kwargs = {}
+                if use_gpu_for_embeddings:
+                    model_kwargs.update({"device": "cuda"})
+                else:
+                    model_kwargs.update({"device": "cpu"})
+                encode_kwargs = {"normalize_embeddings": True}
+                HF_BGE_EMBEDDINGS = HuggingFaceBgeEmbeddings(
+                    model_name=model_name, model_kwargs=model_kwargs, encode_kwargs=encode_kwargs
+                )
+                VECTOR_STORE = Chroma(persist_directory=vectordb_bge_large_folder, embedding_function=HF_BGE_EMBEDDINGS)
+        
+        #VECTOR_STORE = Chroma(persist_directory=VECTORDB_SBERT_FOLDER, embedding_function=HuggingFaceEmbeddings())
+    except Exception as e:
+        handle_api_error("Could not load VectorDB, encountered error: ", e)
+
+
+    ### 2 - Load LLM Model from config.json ###
+    print("\n\nLoading LLM from config.json\n\n")
+    try:
+
+        if not use_azure_open_ai:
+
+            try:
+                read_return = read_config(['use_gpu', 'model_dir', 'local_llm_context_length', 'local_llm_max_new_tokens', 'local_llm_gpu_layers', 'local_llm_model_type', 'local_llm_temperature'])
+                use_gpu = read_return['use_gpu']
+                local_llm_context_length = read_return['local_llm_context_length']
+                local_llm_max_new_tokens = read_return['local_llm_max_new_tokens']
+                local_llm_gpu_layers = read_return['local_llm_gpu_layers']
+                local_llm_model_type = read_return['local_llm_model_type']
+                local_llm_temperature = read_return['local_llm_temperature']
+                model_dir = read_return['model_dir']
+            except Exception as e:
+                handle_api_error("Missing values in config.json for setting-up local-LLM in method load_model_and_vectordb. Error: ", e)
+
+            llm_model = model_dir + '/' + model_choice
+
+            config = {'context_length': local_llm_context_length, 'max_new_tokens': local_llm_max_new_tokens, 'temperature': local_llm_temperature}
+            
+            if use_gpu:
+                config.update({'gpu_layers':local_llm_gpu_layers})
+            
+            LLM = CTransformers(model=llm_model, model_type=local_llm_model_type, config=config, streaming=True, callbacks=[StreamingStdOutCallbackHandler()])
+
+        else:
+
+            try:
+                read_return = read_config(['azure_openai_base_url', 'azure_openai_api_key', 'azure_openai_api_type', 'azure_openai_deployment_name', 'azure_openai_api_version', 'azure_openai_max_tokens', 'azure_openai_temperature'])
+                azure_openai_base_url = read_return['azure_openai_base_url']
+                azure_openai_api_key = read_return['azure_openai_api_key']
+                azure_openai_api_type = read_return['azure_openai_api_type']
+                azure_openai_deployment_name = read_return['azure_openai_deployment_name']
+                azure_openai_api_version = read_return['azure_openai_api_version']
+                azure_openai_max_tokens = read_return['azure_openai_max_tokens']
+                azure_openai_temperature = read_return['azure_openai_temperature']
+            except Exception as e:
+                handle_api_error("Missing values in config.json for setting-up Azure-OpenAI-LLM in method load_model_and_vectordb. Error: ", e)
+            
+            LLM = AzureChatOpenAI(
+                openai_api_base=azure_openai_base_url,
+                openai_api_version=azure_openai_api_version,
+                deployment_name=azure_openai_deployment_name,
+                openai_api_key=azure_openai_api_key,
+                openai_api_type=azure_openai_api_type,
+                max_tokens=azure_openai_max_tokens, 
+                temperature=azure_openai_temperature,
+                streaming=True,
+                callbacks=[StreamingStdOutCallbackHandler()]
+            )
+
+    except Exception as e:
+        handle_api_error("Could not load LLM, encountered error: ", e)
+
+    print("\n\n")
+
+
+    ### 3 - Define History memory w/ buffer:
+    try:
+        HISTORY_MEMORY_WITH_BUFFER = ConversationSummaryBufferMemory(llm=LLM, max_token_limit=300, return_messages=False)
+    except Exception as e:
+        handle_api_error("Could not setup memory buffer for LLM, encountered error: ", e)
+    
+    LOADED_UP = True
+    print(f'\n\nDone loading! Returning model choice: {model_choice}\n\n')
+    return jsonify({'success': True, 'llm_model': model_choice})
+
+
+@app.route('/set_prompt_template', methods=['POST'])
+def set_prompt_template():
+
+    base_template = ""
+
+    try:
+        base_template = request.form['prompt_template']
+    except Exception as e:
+        handle_api_error("Server-side error, could not read prompt_template from the POST request in method set_prompt_template, encountered error: ", e)
+    
+    try:
+        write_config({'base_template':base_template})
+    except Exception as e:
+        handle_api_error("Could not update base_template in method set_prompt_template, encountered error: ", e)
+
+    return jsonify({'success':True})
+
+
+@app.route('/fetch_file_list_for_vector_db', methods=['POST'])
+def fetch_file_list_for_vector_db():
+
+    print("Loading file list for selected VectorDB")
+
+    try:
+        selected_embedding_model_choice = request.form['embedding_model_choice']
+    except Exception as e:
+        handle_api_error("Server-side error, could not read embedding_model_choice from the POST request in method fetch_file_list_for_vector_db, encountered error: ", e)
+
+    # For the VectorDB presently picked by the user in the dropdown, obtain the associated VectorDB folder for the select query:
+    vdb_for_select = ""
+    try:
+        if selected_embedding_model_choice == 'bge_large':
+            read_return = read_config(['vectordb_bge_large_folder'])
+            vdb_for_select = read_return['vectordb_bge_large_folder']
+            
+        elif selected_embedding_model_choice == 'bge_base':
+            read_return = read_config(['vectordb_bge_base_folder'])
+            vdb_for_select = read_return['vectordb_bge_base_folder']
+
+        elif selected_embedding_model_choice == 'sbert_mpnet_base_v2':
+            read_return = read_config(['vectordb_sbert_folder'])
+            vdb_for_select = read_return['vectordb_sbert_folder']
+
+        elif selected_embedding_model_choice == 'openai_text_ada':
+            read_return = read_config(['vectordb_openai_folder'])
+            vdb_for_select = read_return['vectordb_openai_folder']
+
+    except Exception as e:
+        handle_api_error("Could not create new VectorDB in reset_vector_db_on_disk, encountered error: ", e)
+
+    try:
+        read_return = read_config(['sqlite_docs_loaded_db'])
+        sqlite_docs_loaded_db = read_return['sqlite_docs_loaded_db']
+    except Exception as e:
+        handle_api_error("Missing sqlite_docs_loaded_db in config.json in method fetch_file_list_for_vector_db. Error: ", e)
+
+    file_row_list = []
+    
+    try:
+        conn = sqlite3.connect(sqlite_docs_loaded_db)
+        c = conn.cursor()
+    except Exception as e:
+        handle_api_error("Could not connect to sqlite_docs_loaded_db database to load file list, encountered error: ", e)
+
+    try:
+        c.execute("SELECT document_name, vectordb_used, chunk_size, chunk_overlap FROM document_records where vectordb_used = ?", (vdb_for_select,))
+    except Exception as e:
+        handle_api_error("Could not get document list from document_records db, encountered error: ", e)
+    
+    try:
+        result = c.fetchall()
+
+        for list_item in result:
+            file_row_list.append(list(list_item))
+    except Exception as e:
+        handle_api_error("Could not parse document list from document_records db, encountered error: ", e)
+
+    #print(f'returning docs loaded list: {file_row_list}')
+
+    return jsonify({'success': True, 'file_row_list': file_row_list})
+
+
+@app.route('/reset_vector_db_on_disk', methods=['POST'])
+def reset_vector_db_on_disk():
+
+    print("Resetting selected VectorDB")
+
+    try:
+        selected_embedding_model_choice = request.form['embedding_model_choice']
+    except Exception as e:
+        handle_api_error("Server-side error, could not read embedding_model_choice from the POST request in method reset_vector_db_on_disk, encountered error: ", e)
+
+    try:
+        read_return = read_config(['base_directory'])
+        base_directory = read_return['base_directory']
+    except Exception as e:
+        handle_local_error("Could not read base_directory from config.json for reset_vector_db_on_disk. Error: ", e)
+
+    try:
+        current_datetime = datetime.datetime.now()
+        formatted_datetime = current_datetime.strftime('%Y-%m-%d-%Hhr-%Mmin-%Ssec')
+    except Exception as e:
+        handle_api_error("Could not obtain timestamp in reset_vector_db_on_disk, encountered error: ", e)
+
+    # Now that we have all pre-requisite data to create a new VectorDB, proceed to do so by checking the model the user had currently picked from the dropdown: 
+    try:
+        if selected_embedding_model_choice == 'bge_large':
+            vectordb_bge_large_folder = base_directory + '/chroma_db_bge_large_embeddings' + '-' + formatted_datetime
+            write_config({'vectordb_bge_large_folder':vectordb_bge_large_folder})
+            
+        elif selected_embedding_model_choice == 'bge_base':
+            vectordb_bge_base_folder = base_directory + '/chroma_db_bge_base_embeddings' + '-' + formatted_datetime
+            write_config({'vectordb_bge_base_folder':vectordb_bge_base_folder})
+
+        elif selected_embedding_model_choice == 'sbert_mpnet_base_v2':
+            vectordb_sbert_folder = base_directory + '/chroma_db_250_sbert_embeddings' + '-' + formatted_datetime
+            write_config({'vectordb_sbert_folder':vectordb_sbert_folder})
+
+        elif selected_embedding_model_choice == 'openai_text_ada':
+            vectordb_openai_folder = base_directory + '/chroma_db_openai_embeddings' + '-' + formatted_datetime
+            write_config({'vectordb_openai_folder':vectordb_openai_folder})
+
+    except Exception as e:
+        handle_api_error("Could not create new VectorDB in reset_vector_db_on_disk, encountered error: ", e)
+
+    restart_required = True
+    global VECTORDB_CHANGE_RELOAD_TRIGGER_SET
+    VECTORDB_CHANGE_RELOAD_TRIGGER_SET = True
+    try:
+        read_return = read_config(['embedding_model_choice'])
+        set_embedding_model_choice = read_return['embedding_model_choice']
+        if set_embedding_model_choice != selected_embedding_model_choice:
+            restart_required = False
+            VECTORDB_CHANGE_RELOAD_TRIGGER_SET = False
+    except Exception as e:
+        handle_error_no_return("Could not compare selected and set embedding models when determining if restart_required in reset_vector_db_on_disk(), encountered error: ", e)
+
+    # Do not delete as vectorDB folder remains on disk
+    # Once new VectorDB is created, proceed to update records DB:
+    # try:
+    #     read_return = read_config(['sqlite_docs_loaded_db'])
+    #     sqlite_docs_loaded_db = read_return['sqlite_docs_loaded_db']
+    # except Exception as e:
+    #     handle_api_error("Missing sqlite_docs_loaded_db in config.json in method reset_vector_db_on_disk. Error: ", e)
+    
+    # try:
+    #     conn = sqlite3.connect(sqlite_docs_loaded_db)
+    #     c = conn.cursor()
+    # except Exception as e:
+    #     handle_api_error("Could not connect to sqlite_docs_loaded_db database to delete file list, encountered error: ", e)
+
+    # try:
+    #     c.execute("DELETE FROM document_records where embedding_model = ?", (selected_embedding_model_choice,))
+    #     conn.commit()
+    #     print(f"Deleted all records where embedding_model = {selected_embedding_model_choice}")
+    # except Exception as e:
+    #     handle_api_error("Could not delete document list from document_records db, encountered error: ", e)
+    
+
+    #print(f'returning docs loaded list: {file_row_list}')
+
+    return jsonify({'success': True, "restart_required": restart_required})
+
+
+@app.route('/load_chat_history_list')
+def load_chat_history_list():
+
+    print("loading chat history list for sidebar")
+
+    try:
+        read_return = read_config(['sqlite_history_db'])
+        sqlite_history_db = read_return['sqlite_history_db']
+    except Exception as e:
+        handle_api_error("Missing sqlite_history_db in config.json in method load_chat_history_list. Error: ", e)
+
+    history_id_list = []
+    
+    try:
+        conn = sqlite3.connect(sqlite_history_db)
+        c = conn.cursor()
+    except Exception as e:
+        handle_api_error("Could not connect to sqlite_history_db database to load chat history list, encountered error: ", e)
+
+    try:
+        c.execute("SELECT DISTINCT chat_id FROM chat_history")
+    except Exception as e:
+        handle_api_error("Could not get list from chat history db, encountered error: ", e)
+    
+    try:
+        result = c.fetchall()
+
+        for list_item in result:
+            history_id_list.append(list_item)
+    except Exception as e:
+        handle_api_error("Could not parse chat history list from db, encountered error: ", e)
+
+    #print(f'returning chat hsitory list: {history_id_list}')
+
+    return jsonify({'success': True, 'history_list': history_id_list})
+
+
+@app.route('/load_chat_history', methods=['POST'])
+def load_chat_history():
+
+    global CHAT_ID
+    global SEQUENCE_ID
+    global HISTORY_SUMMARY
+    global HISTORY_MEMORY_WITH_BUFFER
+
+    print("loading chat history")
+
+    try:
+        read_return = read_config(['sqlite_history_db'])
+        sqlite_history_db = read_return['sqlite_history_db']
+    except Exception as e:
+        handle_local_error("Missing sqlite_history_db in config.json in method load_chat_history. Error: ", e)
+
+    # Clear chat history of current chat, prep for loading historical chat summary:
+    # try:
+    #     HISTORY_MEMORY_WITH_BUFFER.chat_memory.clear()
+    #     HISTORY_MEMORY_WITH_BUFFER = ConversationSummaryBufferMemory(llm=LLM, max_token_limit=300, return_messages=False)
+    #     HISTORY_SUMMARY = {}
+    # except Exception as e:
+    #     handle_error_no_return("Could not clear memory when loading chat history, encountered error: ", e)
+
+    try:
+        chat_id_for_history_search = request.form['chat_id']
+        CHAT_ID = request.form['chat_id']
+    except Exception as e:
+        handle_api_error("Could not retrieve Chat ID from request form, encountered error: ", e)
+
+    try:
+        conn = sqlite3.connect(sqlite_history_db)
+        c = conn.cursor()
+    except Exception as e:
+        handle_api_error("Could not connect to chat history database, encountered error: ", e)
+
+    sequence_id_for_history_search = 1
+    retrieve_history = True
+    chat_history = []
+    old_chat_model = ""
+
+    while(retrieve_history):
+
+        try:
+            c.execute("SELECT user_query FROM chat_history WHERE chat_id = ? AND sequence_id = ?", (int(chat_id_for_history_search), int(sequence_id_for_history_search)))
+            result = c.fetchone()
+            
+            user_message = str(result[0])
+
+            user_message = user_message.strip('\n')
+            regex_to_swap_multiple_spaces_with_newline = r' {2,}'
+            user_message = re.sub(regex_to_swap_multiple_spaces_with_newline, '<br>', user_message)
+
+            user_message = '<div class="user-message">' + user_message + '</div>'
+
+            chat_history.append(user_message)
+
+            c.execute("SELECT llm_response FROM chat_history WHERE chat_id = ? AND sequence_id = ?", (int(chat_id_for_history_search), int(sequence_id_for_history_search)))
+            result = c.fetchone()
+
+            result = str(result[0])
+            result_parts = result.split("pdf_pane_data=",1)
+            # llm_response = '<div class="llm-wrapper"> <div class="llm-response">' + str(result[0]) + '</div>'
+            llm_response = '<div class="response-and-viewer-container"><div class="llm-wrapper"> <div class="llm-response">' + result_parts[0]
+
+        except Exception as e:
+            handle_api_error("Could not retrieve chat history, encountered error: ", e)
+        
+        llm_response = llm_response.strip('\n')
+        llm_response = llm_response.replace('\n\n', '<br><br>')
+        llm_response = llm_response.replace('\n', '<br>')
+        
+        try:
+            c.execute("SELECT user_rating FROM chat_history WHERE chat_id = ? AND sequence_id = ?", (int(chat_id_for_history_search), int(sequence_id_for_history_search)))
+            result = c.fetchone()
+        except Exception as e:
+            handle_error_no_return("Could not fetch user rating, encountered error: ", e)
+
+        response_rated = False
+        user_rating_for_history_chat = None
+
+        if result[0]:
+            response_rated = True
+            try:
+                user_rating_for_history_chat = int(result[0])
+                #print(f'rating exists: {user_rating_for_history_chat}')
+            except Exception as e:
+                handle_error_no_return("Could not retrieve integer value of user rating, encountered error: ", e)
+
+
+        llm_rating = f'''<div class="star-rating" data-rated={response_rated} rating-chat-id={chat_id_for_history_search} rating-sequence-id={sequence_id_for_history_search}>
+        <i class="far fa-star" data-rate="1"></i>
+        <i class="far fa-star" data-rate="2"></i>
+        <i class="far fa-star" data-rate="3"></i>
+        <i class="far fa-star" data-rate="4"></i>
+        <i class="far fa-star" data-rate="5"></i>
+        </div>
+        </div>
+        </div>'''
+
+
+        if user_rating_for_history_chat:
+            rating_parts = llm_rating.split("far", user_rating_for_history_chat)
+            if len(rating_parts) <= user_rating_for_history_chat:
+                llm_rating = "fas".join(rating_parts)
+            else:
+                llm_rating = "fas".join(rating_parts[:-1]) + "fas" + "far".join(rating_parts[-1:])
+
+        llm_response += llm_rating
+
+        if len(result_parts) > 1:
+            llm_response += result_parts[1]
+            llm_response += "</div>"
+            llm_response = llm_response.strip('\n')
+            llm_response = llm_response.replace('\n\n', '<br><br>')
+            llm_response = llm_response.replace('\n', '<br>')
+
+        chat_history.append(llm_response)
+
+        # Increment sequence ID for next iteration:
+        sequence_id_for_history_search += 1
+
+        # But first, check to see if next sequence exists!
+        try:
+            c.execute("SELECT EXISTS(SELECT 1 FROM chat_history WHERE chat_id = ? AND sequence_id = ?)", (int(chat_id_for_history_search), int(sequence_id_for_history_search)))
+            exists = c.fetchone()[0]
+        except Exception as e:
+            handle_api_error("Could not determine if next sequence exists in chat history DB, encountered error: ", e)
+            
+        if not exists:
+            SEQUENCE_ID = sequence_id_for_history_search - 1
+            retrieve_history = False
+            try:
+                c.execute("SELECT llm_model FROM chat_history WHERE chat_id = ? AND sequence_id = ?", (CHAT_ID, SEQUENCE_ID))
+                result = c.fetchone()
+                old_chat_model = str(result[0])
+            except Exception as e:
+                handle_error_no_return("Could not determine previously used LLM in chat, encountered error: ", e)
+            try:
+                c.execute("SELECT history_summary FROM chat_history WHERE chat_id = ? AND sequence_id = ?", (CHAT_ID, SEQUENCE_ID))
+                result = c.fetchone()
+                history_summary_dict = str(result[0])
+            except Exception as e:
+                handle_error_no_return("Could not fetch history summary of last chat, encountered error: ", e)
+            c.close()
+
+    # Convert History Summary and add a new key indicating it was recently cleared!
+    if history_summary_dict is not None and history_summary_dict != "" and history_summary_dict != 'None':
+        print(f"\n\history_summary_dict string from old chat: {history_summary_dict}\n\n")
+        try:
+            HISTORY_SUMMARY = ast.literal_eval(history_summary_dict)    #cast as dictionary
+            HISTORY_SUMMARY["has_been_reset"] = True
+        except Exception as e:
+            handle_error_no_return("Could not cast history summary string from DB to dict and/or set has_been_reset boolean, encountered error: ", e)
+
+    # Temp prints:
+    print(f"\n\nHISTORY_SUMMARY: {HISTORY_SUMMARY}\n\n")
+    # print(f"\n\history_summary_dict: {history_summary_dict}\n\n")
+    # print(f"\n\nHISTORY_MEMORY_WITH_BUFFER.summary: {HISTORY_MEMORY_WITH_BUFFER.summary}\n\n")
+    # print(f"\n\nHISTORY_MEMORY_WITH_BUFFER.chat_memory.messages: {HISTORY_MEMORY_WITH_BUFFER.chat_memory.messages}\n\n")
+    print(f'\n\nChat history loaded for chat with model: {old_chat_model}\n\n')
+
+    return jsonify({'success': True, 'chat_history': chat_history, 'old_chat_model': old_chat_model})
+
+
+@app.route('/init_chat_history_db')
+def init_chat_history_db():
+
+    global CHAT_ID
+
+    try:
+        read_return = read_config(['sqlite_history_db'])
+        sqlite_history_db = read_return['sqlite_history_db']
+    except Exception as e:
+        handle_api_error("Missing sqlite_history_db in config.json in method init_chat_history_db. Error: ", e)
+
+    # Connect to chat_history.db to determine appropriate chat_id
+    try:
+        conn = sqlite3.connect(sqlite_history_db)
+        c = conn.cursor()
+    except Exception as e:
+        handle_api_error("Could not connect to chat history database, encountered error: ", e)
+
+    # If the database does not currently exist...
+    try:
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS chat_history (
+                        id INTEGER PRIMARY KEY,
+                        chat_id INTEGER,
+                        sequence_id INTEGER,
+                        user_query TEXT,
+                        llm_response TEXT,
+                        user_rating INTEGER,
+                        llm_model TEXT, 
+                        prompt_template TEXT,
+                        history_summary TEXT
+            )
+        ''')
+        conn.commit()
+    except Exception as e:
+        handle_api_error("Could not create new chat history db, encountered error: ", e)
+
+    try:
+        c.execute("SELECT COALESCE(MAX(chat_id), 0) FROM chat_history")
+        # "The COALESCE function accepts two or more arguments and returns the first non-null argument."
+        # This accounts for an empty DB!
+
+        result = c.fetchone()
+
+        # 'result' will be a tuple, so extract the first element
+        max_chat_id = result[0]
+
+        new_chat_id = max_chat_id + 1
+        CHAT_ID = new_chat_id
+
+        print(f"Chat history DB initialised with CHAT_ID: {CHAT_ID}")
+    except Exception as e:
+        handle_api_error("Could not set CHAT_ID, encountered error: ", e)
+
+    conn.close()
+
+    return jsonify({'success': True, 'chat_id': CHAT_ID})
+
+
+def fetch_image_from_db(image_id):
+
+    try:
+        read_return = read_config(['sqlite_images_db'])
+        sqlite_images_db = read_return['sqlite_images_db']
+    except Exception as e:
+        handle_local_error("Missing sqlite_history_db in config.json in method fetch_image_from_db. Error: ", e)
+    
+    # 1 - Connect to DB
+    try:
+        conn = sqlite3.connect(sqlite_images_db)
+    except Exception as e:
+        handle_local_error("Could not connect to images database, encountered error: ", e)
+    
+    # 2 - Get Images
+    try:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute('SELECT image_data FROM images WHERE id = ?', (image_id,)).fetchone()
+        images_bytes = row['image_data'] if row else None
+    except Exception as e:
+        handle_local_error("Could not fetch image from DB, encountered error: ", e)
+    
+    conn.close()
+    
+    return images_bytes
+
+
+@app.route('/image_display/<int:image_id>')
+def image_display(image_id):
+    print(f"\n\nprepping image for display: {image_id}\n\n")
+
+    try: 
+        image_bytes = fetch_image_from_db(image_id)
+    except Exception as e:
+        handle_local_error("Could not fetch image for display, encountered error: ", e)
+    
+    try:
+        encoded = base64.b64encode(image_bytes).decode('utf-8')
+    except Exception as e:
+        handle_local_error("Could not encode image for display URI, encountered error: ", e)
+
+    # Return an HTML response with the embedded image:
+    data_uri = f"data:image/jpeg;base64,{encoded}"
+    html_content = f'<img src="{data_uri}" alt="Image">'
+
+    return html_content
+
+
+def extract_significant_phrases(query):
+    print("Extracting significant phrases")
+
+    try:
+        nltk.download('stopwords')
+        stop_words = set(stopwords.words('english'))
+    except Exception as e:
+        handle_error_no_return("Failed to download & set stopwords, encountered error: ", e)
+    
+    try:
+        tokens = [token for token in query.lower().split() if token not in stop_words]
+    except Exception as e:
+        handle_local_error("Could not extract significant tokens, encountered error: ", e)
+
+    return tokens
+
+
+def calculate_relevance_score(phrases, document_content):
+    #print("calculating relevance score")
+    
+    try:
+        content_lower = document_content.lower()
+    except Exception as e:
+        handle_local_error("Could not read document_content in calculate_relevance_score(), encountered error: ", e)
+    
+    #print(f"document content: {content_lower}")
+    
+    #score = sum(1 for phrase in phrases if phrase in content_lower)
+    
+    score = 0
+    try:
+        for phrase in phrases:
+            if phrase in content_lower:
+                print(f"Match found to enable RAG: {phrase}")
+                score += 1
+    except Exception as e:
+        handle_local_error("Could not compare phrases in calculate_relevance_score(), encountered error: ", e)
+    
+    return score
+
+
+def filter_relevant_documents(query, search_results, threshold=1):
+
+    print("Checking relevant docs to determin if RAG is required")
+
+    do_rag = False
+    page_contents = []
+
+    try:
+        significant_phrases = extract_significant_phrases(query)
+    except Exception as e:
+        handle_local_error("Could not extract significant phrases, encountered error: ", e)
+    
+    print(f"significant tokens: {significant_phrases}")
+    #relevant_documents = []
+
+    try:
+        for document in search_results:
+            # check for non-empty source field
+            if document.page_content:
+                page_contents.append(document.page_content)
+
+            if not do_rag:  # if do_rag has already been set to true, why look?
+                if document.metadata.get('source'):
+                    score = calculate_relevance_score(significant_phrases, document.page_content)
+                    if score >= threshold:
+                        #relevant_documents.append(document)
+                        print("Must do RAG!")
+                        do_rag = True
+    except Exception as e:
+        handle_local_error("Could not read calculate relevance score, encountered error: ", e)
+
+    #return relevant_documents
+    return page_contents, do_rag
+
+
+
+@app.route('/setup_for_llama_cpp_response', methods=['POST'])
+def setup_for_llama_cpp_response():
+
+    global QUERIES
+
+    do_rag = True
+
+    stream_session_id = ""
+    key_for_vector_results = ""
+    # Generate a unique session ID using universally Unique Identifier via the uuid4() method, wherein the randomness of the result is dependent on the randomness of the underlying operating system's random number generator
+    # UUI is a standard used for creating unique strings that have a very high likelihood of being unique across all time and space, for ex: f47ac10b-58cc-4372-a567-0e02b2c3d479
+    try:
+        stream_session_id = str(uuid.uuid4())
+        key_for_vector_results = "VectorDocsforQueryID_" + stream_session_id
+    except Exception as e:
+        handle_api_error("Error creating unique stream_session_id when attempting to setup_for_streaming_response. Error: ", e)
+    
+
+    # Determine do_rag
+    try:
+        read_return = read_config(['use_sbert_embeddings', 'use_openai_embeddings', 'use_bge_base_embeddings', 'use_bge_large_embeddings', 'force_enable_rag', 'force_disable_rag', 'local_llm_chat_template_format', 'base_template'])
+        use_sbert_embeddings = read_return['use_sbert_embeddings']
+        use_openai_embeddings = read_return['use_openai_embeddings']
+        use_bge_base_embeddings = read_return['use_bge_base_embeddings']
+        use_bge_large_embeddings = read_return['use_bge_large_embeddings']
+        force_enable_rag = read_return['force_enable_rag']
+        force_disable_rag = read_return['force_disable_rag']
+        local_llm_chat_template_format = read_return['local_llm_chat_template_format']
+        base_template = read_return['base_template']
+
+    except Exception as e:
+        handle_api_error("Missing values in config.json when attempting to setup_for_streaming_response. Error: ", e)
+
+    try:
+        # Attempt to get query data
+        user_query = request.json['user_query']
+        chat_id = request.json['chat_id']
+
+        # Store the query associated with the ID
+        QUERIES[stream_session_id] = user_query
+    except KeyError:
+        handle_api_error("Could not obtain and/or store user_query in setup_for_streaming_response, encountered error: ", e)
+
+    print("chat_id: ", chat_id)
+
+    # Perform similarity search on the vector DB
+    print("\n\nPerforming similarity search to determine if RAG necessary\n\n")
+    embedding_function = None
+    try:
+        if use_sbert_embeddings:
+            embedding_function=HuggingFaceEmbeddings()
+        elif use_openai_embeddings:
+            embedding_function=AZURE_OPENAI_EMBEDDINGS
+        elif use_bge_base_embeddings:
+            embedding_function=HF_BGE_EMBEDDINGS
+        elif use_bge_large_embeddings:
+            embedding_function=HF_BGE_EMBEDDINGS
+    except Exception as e:
+        handle_error_no_return("Could not set embedding_function for similarity_search when attempting to setup_for_streaming_response, encountered error: ", e)
+    
+    try:
+        docs = VECTOR_STORE.similarity_search(user_query, embedding_fn=embedding_function)
+        # docs_with_relevance_score = VECTOR_STORE.similarity_search_with_relevance_scores(user_query, 10, embedding_fn=embedding_function)
+        # docs_list_with_cosine_distance = VECTOR_STORE.similarity_search_with_score(user_query, 10, embedding_fn=embedding_function)
+        # print(f'\n\nsimple similarity search results: \n {docs}\n\n')
+        # print(f'\n\nRelevance Score similarity search results (range 0 to 1): \n {docs_with_relevance_score}\n\n')
+        # print(f'\n\nDocs list most similar to query based on cosine distance: \n {docs_list_with_cosine_distance}\n\n')
+    except Exception as e:
+        handle_error_no_return("Could not perform similarity_search to determine do_rag when attempting to setup_for_streaming_response, encountered error: ", e)
+
+    print("\n\nDetermining do_rag \n\n")
+    # We do not modify the force_enable_rag or force_disable_rag flags in this method, we simply respond to them here. UI updates should handle those flags.
+    if force_enable_rag:
+        print("\n\nFORCE_ENABLE_RAG True, force enabling RAG and returning\n\n")
+        page_contents, do_rag = filter_relevant_documents(user_query, docs)
+        do_rag = True
+    elif force_disable_rag:
+        print("\n\nFORCE_DISABLE_RAG True, force disabling RAG and returning\n\n")
+        do_rag = False
+    else:
+        try:
+            page_contents, do_rag = filter_relevant_documents(user_query, docs)
+        except Exception as e:
+            handle_error_no_return("Force enabling RAG and returning: could not determine do_rag during setup_for_streaming_response, encountered error: ", e)
+    
+    print(f'Do RAG? {do_rag}')
+
+    try:
+        write_config({'do_rag':do_rag})
+    except Exception as e:
+        handle_api_error("Could not write do_rag during setup_for_streaming_response, encountered error: ", e)
+
+    
+    # Having determined do_rag, time to build the prompt template!
+    
+    if do_rag:  # add similarity search results for RAG!
+        QUERIES[key_for_vector_results] = docs
+        user_query += f"\n\nThe following context might be helpful in answering the user query above:\n{page_contents}"
+        print(f"RAG formatted user_query: {user_query}")
+
+    current_sequence_id = determine_sequence_id_for_chat(chat_id)
+    formatted_prompt = ""
+    print("current_sequence_id: ", current_sequence_id)
+    if current_sequence_id > 0:    # get the last prompt so we can continue the completions
+
+        try:
+            read_return = read_config(['sqlite_history_db'])
+            sqlite_history_db = read_return['sqlite_history_db']
+        except Exception as e:
+            handle_error_no_return("Missing keys in config.json for method store_chat_history_to_db. Error: ", e)
+
+        # Connect to or create the DB
+        try:
+            conn = sqlite3.connect(sqlite_history_db)
+            cursor = conn.cursor()
+        except Exception as e:
+            handle_error_no_return("Could not establish connection to DB for chat history storage, encountered error: ", e)
+
+        try:
+            # Determine sequence_id
+            cursor.execute("SELECT prompt_template FROM chat_history WHERE chat_id = ? AND sequence_id = ?", (int(chat_id), int(current_sequence_id)))
+            # "The COALESCE function accepts two or more arguments and returns the first non-null argument."
+            # This accounts for a new chat!
+            # Note that trailing comma! Without it, the simple select query will produce an error: "parameters are of unsupported type" !!
+            # This is because the SQLite3 module can have trouble recognizing single-item tuples as tuples, so a trailing comma helps alleviate this! 
+
+            result = cursor.fetchone()
+            formatted_prompt = str(result[0])
+            
+        except Exception as e:
+            handle_error_no_return("Could not determine sequence ID for storage to chat history DB, encountered error: ", e)
+    
+    if formatted_prompt == "":  # could not be updated above
+        current_sequence_id = 0 # reset chat sequence id
+
+    if local_llm_chat_template_format == 'llama3':
+
+        if current_sequence_id > 0:
+            formatted_prompt += f"<|start_header_id|>user<|end_header_id|>\n\n{user_query}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n"
+        else:
+            formatted_prompt += f"<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n{base_template}<|eot_id|><|start_header_id|>user<|end_header_id|>\n\n{user_query}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n"
+
+    elif local_llm_chat_template_format == 'llama2':
+
+        if current_sequence_id > 0:
+            formatted_prompt += f"<s>[INST] {user_query} [/INST]"
+        else:
+            formatted_prompt += f"<s>[INST] <<SYS>>\n {base_template} \n<</SYS>>\n\n {user_query}  [/INST]"
+
+    elif local_llm_chat_template_format == 'chatml':
+        
+        if current_sequence_id > 0:
+            formatted_prompt += f"\n<|im_start|>user\n{user_query}<|im_end|>\n"
+        else:
+            formatted_prompt += f"<|im_start|>system\n{base_template}<|im_end|>\n<|im_start|>user\n{user_query}<|im_end|>\n<|im_start|>assistant\n"
+
+    elif local_llm_chat_template_format == 'phi3':
+
+        if current_sequence_id > 0:
+            formatted_prompt += f"<|user|>\n{user_query}<|end|>\n<|assistant|>\n"
+        else:
+            formatted_prompt += f"<|system|>\n{base_template}<|end|>\n<|user|>\n{user_query}<|end|>\n<|assistant|>\n"
+
+    elif local_llm_chat_template_format == 'command-r':
+
+        if current_sequence_id > 0:
+            formatted_prompt += f"<|START_OF_TURN_TOKEN|><|USER_TOKEN|>{user_query}<|END_OF_TURN_TOKEN|><|START_OF_TURN_TOKEN|><|CHATBOT_TOKEN|>"
+        else:
+            formatted_prompt += f"<|START_OF_TURN_TOKEN|><|SYSTEM_TOKEN|>{base_template}<|END_OF_TURN_TOKEN|><|START_OF_TURN_TOKEN|><|USER_TOKEN|>{user_query}<|END_OF_TURN_TOKEN|><|START_OF_TURN_TOKEN|><|CHATBOT_TOKEN|>"
+
+    elif local_llm_chat_template_format == 'deepseek':
+        
+        if current_sequence_id > 0:
+            formatted_prompt += f"### Instruction:\n{user_query}\n### Response:\n"
+        else:
+            formatted_prompt += f"{base_template}### Instruction:\n{user_query}\n### Response:\n"
+
+    if local_llm_chat_template_format == 'vicuna':
+
+        if current_sequence_id > 0:
+            formatted_prompt += f"USER: {user_query}\nASSISTANT: "
+        else:
+            formatted_prompt += f"{base_template}\n\nUSER: {user_query}\nASSISTANT: "
+
+    elif local_llm_chat_template_format == 'openchat':
+
+        if current_sequence_id > 0:
+            formatted_prompt += f"GPT4 Correct User: {user_query}<|end_of_turn|>GPT4 Correct Assistant: "
+        else:
+            formatted_prompt += f"<s>GPT4 Correct System: {base_template}<|end_of_turn|>GPT4 Correct User: {user_query}<|end_of_turn|>GPT4 Correct Assistant: "
+
+    # Return a bunch of stuff
+    new_sequence_id = int(current_sequence_id) + 1
+    return jsonify({"success": True, "stream_session_id": stream_session_id, "do_rag": do_rag, "formatted_user_prompt": formatted_prompt, "sequence_id":new_sequence_id})
+
+
+
+@app.route('/get_references', methods=['POST'])
+def get_references():
+
+    print("\n\nGetting References\n\n")
+
+    try:
+        read_return = read_config(['do_rag', 'upload_folder', 'local_llm_chat_template_format'])
+        do_rag = read_return['do_rag']
+        upload_folder = read_return['upload_folder']
+        local_llm_chat_template_format = read_return['local_llm_chat_template_format']
+    except Exception as e:
+        handle_api_error("Missing values in config.json when attempting to get_references. Error: ", e)
+
+    try:
+        stream_session_id = request.json['stream_session_id']
+        user_query = request.json['user_query']
+        llm_response = request.json['llm_response']
+        formatted_user_prompt = request.json['formatted_user_prompt']
+        chat_id = request.json['chat_id']
+        sequence_id = request.json['sequence_id']
+    except Exception as e:
+        handle_api_error("Could not read request content in method get_references, encountered error: ", e)
+
+    if local_llm_chat_template_format == 'llama3':
+        formatted_user_prompt += f"{llm_response}<|eot_id|>"
+    elif local_llm_chat_template_format == 'llama2':
+        formatted_user_prompt += f"{llm_response}</s>"
+    elif local_llm_chat_template_format == 'chatml':
+        formatted_user_prompt += f"{llm_response}<|im_end|>\n"
+    elif local_llm_chat_template_format == 'phi3':
+        formatted_user_prompt += f"{llm_response}<|end|>\n"
+    elif local_llm_chat_template_format == 'command-r':
+        formatted_user_prompt += f"{llm_response}<|END_OF_TURN_TOKEN|>"
+    elif local_llm_chat_template_format == 'deepseek':
+        formatted_user_prompt += f"{llm_response}\n<|EOT|>\n"
+    elif local_llm_chat_template_format == 'vicuna':
+        formatted_user_prompt += f"{llm_response} </s>\n"
+    elif local_llm_chat_template_format == 'openchat':
+        formatted_user_prompt += f"{llm_response}<|end_of_turn|>"
+
+    if not do_rag:
+        print("\n\nSkipping RAG, storing chat history and returning\n\n")
+        try:
+            store_llama_cpp_chat_history_to_db(chat_id, sequence_id, user_query, llm_response, formatted_user_prompt)
+        except Exception as e:
+            handle_error_no_return("Could not store_llama_cpp_chat_history_to_db in get_references(), encountered error: ", e)
+        return jsonify({'success': True})
+        
+    try:
+        key_for_vector_results = "VectorDocsforQueryID_" + stream_session_id
+        docs = QUERIES[key_for_vector_results]
+        print(f"\n\ntype(docs): {type(docs)}\n\n")
+    except Exception as e:
+        handle_api_error("Could not obtain relevant data from QUERIES dict, encountered error: ", e)
+
+    # Having obtained the relevant info, clear the QUERIES{} dict so as to not bloat it!
+    try:
+        del QUERIES[key_for_vector_results]
+    except Exception as e:
+        handle_error_no_return("Error clearing queries dict in method get_references: ", e)
+
+    reference_response = ""
+
+    all_sources = {}
+    reference_pages = {}
+
+    for doc in docs:
+        
+        try:
+            relevant_page_text = str(doc.page_content)
+            # relevant_page_text = relevant_page_text.replace('\n', ' ')
+            source_filepath = str(doc.metadata.get('source'))
+            #print(relevant_page_text)
+            #print(source_filepath)
+        except Exception as e:
+            handle_error_no_return("Could not access doc.page_content and/or doc.metadata, encountered error: ", e)
+            continue
+        
+        relevant_page_text = relevant_page_text.split('\n', 1)[0]
+        relevant_page_text = relevant_page_text.strip()
+        relevant_page_text = re.sub(r'[\W_]+Page \d+[\W_]+', '', relevant_page_text)
+        source_filepath = source_filepath.replace('\\', '/')
+        
+        try:
+            source_filename = os.path.basename(source_filepath)
+            _, file_extension = os.path.splitext(source_filepath)
+            #print(source_filename)
+            #print(file_extension)
+        except Exception as e:
+            handle_error_no_return("Could not parse path with OS lib, encountered error: ", e)
+            continue
+
+        # The source_filepath will likely always reference a TXT file because of how we're loading the VectorDB!
+        # Check if the PDF version of the source doc exists
+        if file_extension == '.txt':
+
+            #print("\n\ntxt file\n\n")
+
+            # Construct the path to the potential PDF version
+            pdf_version_path = os.path.join(upload_folder, os.path.basename(source_filepath).replace('.txt', '.pdf'))   # not catching an error here as os.path.basename(source_filepath) has already been caught just above!
+
+            # Check if PDF version of the source TXT exists!
+            if os.path.exists(pdf_version_path):
+
+                #print("\n\pdf exists\n\n")
+
+                source_filename = source_filename.replace('.txt', '.pdf')
+                
+                if pdf_version_path in reference_pages:
+                    reference_pages[pdf_version_path].extend([relevant_page_text])
+                else:
+                    reference_pages[pdf_version_path] = [relevant_page_text]
+
+                # Add this file to our sources dictionary if it's not already present
+                if source_filename not in all_sources:
+                    source_filepath = pdf_version_path
+                    all_sources.update({source_filename: source_filepath})
+
+            # Else PDF does not exist, TXT is the source
+            else:
+                # Check if the TXT is already in the sources dict
+                if source_filename not in all_sources:
+                    try:
+                        source_filepath = os.path.join(upload_folder, source_filename) # reconstructed path using the OS module just to be safe
+                        all_sources.update({source_filename: source_filepath})
+                    except Exception as e:
+                        handle_error_no_return("Could not construct filepath for TXT file, encountered error: ", e)
+
+
+        # If file is not a TXT file
+        else:
+            # Check if the TXT is already in the sources dict
+            if source_filename not in all_sources:
+                try:
+                    source_filepath = os.path.join(upload_folder, source_filename) # reconstructed path using the OS module just to be safe
+                    all_sources.update({source_filename: source_filepath})
+                except Exception as e:
+                    handle_error_no_return("Could not construct filepath for non-TXT file, encountered error: ", e)
+
+    # print(f"\n\nreference_pages: {reference_pages}\n\n")
+
+    try:
+        docs_have_relevant_info, user_should_refer_pages_in_doc = whoosh_text_in_pdf_and_highlight(reference_pages, stream_session_id)
+        # docs_have_relevant_info, user_should_refer_pages_in_doc = whoosh_text_in_pdf(reference_pages)
+    except Exception as e:
+        handle_error_no_return("Could not search Whoosh Index, encountered error: ", e)
+
+    try:
+        matched_images_found, matched_images_in_bytes = find_images_in_db(reference_pages)
+    except Exception as e:
+        handle_error_no_return("Could not search for images, encountered error: ", e)
+
+    refer_pages_string = ""
+    download_link_html = ""
+    images_iframe_html = ""
+
+    if docs_have_relevant_info:
+
+        refer_pages_string = "<br><br><h6>Refer to the following pages in the mentioned docs:</h6><br>"
+        
+        # for doc in user_should_refer_pages_in_doc:
+        for index, doc in enumerate(user_should_refer_pages_in_doc, start=1):
+            # pdf_iframe_id = str(doc) + "PdfViewer"
+            pdf_iframe_id = "stream" + stream_session_id + "PdfViewer" + str(index)
+            frame_doc_path = f"/pdf/{doc}"
+            # frame_doc_path = upload_folder + f"/{doc}" 
+            try:
+                refer_pages_string += f"<br><h6>{doc}: "
+                for page in user_should_refer_pages_in_doc[doc]:
+                    frame_doc_path += "#page=" + str(page) 
+                    refer_pages_string += f'<a href="javascript:void(0)" onclick="goToPage(\'{pdf_iframe_id}\', \'{frame_doc_path}\')">Page {page}</a>, '
+                    frame_doc_path = f"/pdf/{doc}"
+                refer_pages_string = refer_pages_string.strip(', ') + "</h6><br>"
+            except Exception as e:
+                handle_error_no_return("Could not construct refer_pages_string, encountered error: ", e)
+
+        # download_link_html = "<br><h6>Refer to the source documents below:</h6>"
+        pdf_right_pane_id = "stream" + stream_session_id + "PdfPane"
+        download_link_html = f'<div class="pdf-viewer" id={pdf_right_pane_id}>'
+
+        for index, source in enumerate(user_should_refer_pages_in_doc, start=1):
+            try:
+                # print("\n\nlooping sources\n\n")
+                download_link_url = url_for('download_file', filename=source)
+                pdf_iframe_id = "stream" + stream_session_id + "PdfViewer" + str(index)
+                download_link_html += f'<br><h6><a href="{download_link_url}" target="_blank"><iframe id="{pdf_iframe_id}" src="{download_link_url}" width="100%" height="600"></iframe></a></h6><br>'
+            except Exception as e:
+                handle_error_no_return("Could not construct download_link_html, encountered error: ", e)
+
+        download_link_html += "</div>"
+
+    
+    # if matched_images_found:
+    #     images_iframe_html = "<br><h6>Refer to the images below:</h6>"
+    #     for image_id, image_bytes_data in matched_images_in_bytes:
+    #         #print(f"\n\nmatched image id: {image_id}")
+    #         try:
+    #             image_link_url = url_for('image_display', image_id=image_id)
+    #             images_iframe_html += f'<br><iframe width="750" height="400" src="{image_link_url}" frameborder="0"></iframe><br>'
+    #         except Exception as e:
+    #             handle_error_no_return("Could not construct images_iframe_html, encountered error: ", e)
+
+    if matched_images_found:
+        image_gallery_id = f"image_gallery_for_stream_{stream_session_id}"
+        images_iframe_html = f'''
+        <h6>Browse a gallery of relevant images by clicking on the thumbnail below:</h6>
+        <i class="fas fa-images thumbnail-icon" onclick="openImageGalleryModal('{image_gallery_id}')"></i>
+        <div id="{image_gallery_id}" class="image-gallery-modal">
+        <span class="image-gallery-close" onclick="closeImageGalleryModal('{image_gallery_id}')">&times;</span>
+        <div class="image-gallery-content">
+        '''
+        for image_id, image_bytes_data in matched_images_in_bytes:
+            #print(f"\n\nmatched image id: {image_id}")
+            try:
+                image_link_url = url_for('image_display', image_id=image_id)
+                images_iframe_html += f'<iframe src="{image_link_url}" frameborder="0" class="gallery-thumbnail"></iframe>'
+            except Exception as e:
+                handle_error_no_return("Could not construct images_iframe_html, encountered error: ", e)
+        
+        images_iframe_html += f'</div></div>'
+
+    
+    # reference_response = refer_pages_string + download_link_html + images_iframe_html
+    reference_response = refer_pages_string + images_iframe_html
+
+    try:
+        # model_response_for_history_db = str(llm_response) + refer_pages_string
+        model_response_for_history_db = str(llm_response)
+        model_response_for_history_db += f"\n\n{reference_response}"
+        model_response_for_history_db += f"\n\npdf_pane_data={download_link_html}"
+        model_response_for_history_db = model_response_for_history_db.strip('\n')
+
+        formatted_user_query = str(user_query).strip('\n')
+
+        user_query_for_history_db = formatted_user_query
+    except Exception as e:
+        handle_error_no_return("Could not prep data to store_chat_history_to_db in get_references(), encountered error: ", e)
+
+    try:
+        store_llama_cpp_chat_history_to_db(chat_id, sequence_id, user_query_for_history_db, model_response_for_history_db, formatted_user_prompt)
+    except Exception as e:
+        handle_error_no_return("Could not store_chat_history_to_db in get_references(), encountered error: ", e)
+
+    return jsonify({'success': True, 'response': reference_response, 'pdf_frame':download_link_html})
+
+
+
+
+
+@app.route('/setup_for_streaming_response', methods=['POST'])
+def setup_for_streaming_response():
+
+    print("\n\nSetting up to stream response\n\n")
+
+    global QUERIES
+    do_rag = True   # We will only return an internal server error in the events that do_rag cannot be written, the user_query cannot be read or if a unique stream_session_id cannot be established
+
+    stream_session_id = ""
+    # Generate a unique session ID using universally Unique Identifier via the uuid4() method, wherein the randomness of the result is dependent on the randomness of the underlying operating system's random number generator
+    # UUI is a standard used for creating unique strings that have a very high likelihood of being unique across all time and space, for ex: f47ac10b-58cc-4372-a567-0e02b2c3d479
+    try:
+        stream_session_id = str(uuid.uuid4())
+    except Exception as e:
+        handle_api_error("Error creating unique stream_session_id when attempting to setup_for_streaming_response. Error: ", e)
+
+
+    try:
+        read_return = read_config(['use_sbert_embeddings', 'use_openai_embeddings', 'use_bge_base_embeddings', 'use_bge_large_embeddings', 'force_enable_rag', 'force_disable_rag'])
+        use_sbert_embeddings = read_return['use_sbert_embeddings']
+        use_openai_embeddings = read_return['use_openai_embeddings']
+        use_bge_base_embeddings = read_return['use_bge_base_embeddings']
+        use_bge_large_embeddings = read_return['use_bge_large_embeddings']
+        force_enable_rag = read_return['force_enable_rag']
+        force_disable_rag = read_return['force_disable_rag']
+    except Exception as e:
+        handle_api_error("Missing values in config.json when attempting to setup_for_streaming_response. Error: ", e)
+
+
+    # We do not modify the force_enable_rag or force_disable_rag flags in this method, we simply respond to them here. UI updates should handle those flags.
+    if force_enable_rag:
+        
+        print("\n\nFORCE_ENABLE_RAG True, force enabling RAG and returning\n\n")
+        
+        do_rag = True
+        
+        try:
+            write_config({'do_rag':do_rag})
+        except Exception as e:
+            handle_api_error("Could not force_enable_rag when attempting to setup_for_streaming_response, encountered error: ", e)
+        
+        return jsonify({"success": True, "stream_session_id": stream_session_id, "do_rag": do_rag})
+    
+    if force_disable_rag:
+
+        print("\n\nFORCE_DISABLE_RAG True, force disabling RAG and returning\n\n")
+
+        do_rag = False
+
+        try:
+            write_config({'do_rag':do_rag})
+        except Exception as e:
+            handle_api_error("Could not force_disable_rag when attempting to setup_for_streaming_response, encountered error: ", e)
+
+        return jsonify({"success": True, "stream_session_id": stream_session_id, "do_rag": do_rag})
+
+    try:
+        # Attempt to get the user's query
+        user_query = request.json['message']
+        # Store the query associated with the ID
+        QUERIES[stream_session_id] = user_query
+    except KeyError:
+        handle_api_error("Could not obtain and/or store user_query in setup_for_streaming_response, encountered error: ", e)
+
+
+    # Perform similarity search on the vector DB
+    print("\n\nPerforming similarity search to determine if RAG necessary\n\n")
+    embedding_function = None
+    try:
+        if use_sbert_embeddings:
+            embedding_function=HuggingFaceEmbeddings()
+        elif use_openai_embeddings:
+            embedding_function=AZURE_OPENAI_EMBEDDINGS
+        elif use_bge_base_embeddings:
+            embedding_function=HF_BGE_EMBEDDINGS
+        elif use_bge_large_embeddings:
+            embedding_function=HF_BGE_EMBEDDINGS
+    except Exception as e:
+        handle_error_no_return("Could not set embedding_function for similarity_search when attempting to setup_for_streaming_response, encountered error: ", e)
+    
+    try:
+        docs = VECTOR_STORE.similarity_search(user_query, embedding_fn=embedding_function)
+        # docs_with_relevance_score = VECTOR_STORE.similarity_search_with_relevance_scores(user_query, 10, embedding_fn=embedding_function)
+        # docs_list_with_cosine_distance = VECTOR_STORE.similarity_search_with_score(user_query, 10, embedding_fn=embedding_function)
+        # print(f'\n\nsimple similarity search results: \n {docs}\n\n')
+        # print(f'\n\nRelevance Score similarity search results (range 0 to 1): \n {docs_with_relevance_score}\n\n')
+        # print(f'\n\nDocs list most similar to query based on cosine distance: \n {docs_list_with_cosine_distance}\n\n')
+    except Exception as e:
+        handle_error_no_return("Could not perform similarity_search to determin do_rag when attempting to setup_for_streaming_response, encountered error: ", e)
+
+
+    print("\n\nDetermining do_rag \n\n")
+    try:
+        page_contents, do_rag = filter_relevant_documents(user_query, docs)
+    except Exception as e:
+        handle_error_no_return("Force enabling RAG and returning: could not determine do_rag during setup_for_streaming_response, encountered error: ", e)
+    
+    print(f'Do RAG? {do_rag}')
+
+    try:
+        write_config({'do_rag':do_rag})
+    except Exception as e:
+        handle_api_error("Could not write do_rag during setup_for_streaming_response, encountered error: ", e)
+
+
+    # Return the stream_session_id
+    return jsonify({"success": True, "stream_session_id": stream_session_id, "do_rag": do_rag})
+    
+    
+
+
+#############################################################################
+##############---NOTES ON THE BELOW CUSTOM CLASS APPROACH---#################
+#############################################################################
+
+# class CustomStream(io.StringIO)
+#   defines a new class 'CustomStream' that inherits the StringIO class from the io module.
+#   'StringIO' is an in-memory, file-like object that can be used as a string buffer, essentially a file in-memory rather than on disk
+
+# def __init__(self, callback=None)
+#   initialization method for instances of 'CustomStream' accepting one optional argument that defaults to None if not provided
+
+# super().__init__()
+#   calls the 'init' method of the parent class 'StringIO', which here is also the super & base class!
+#   necessary to ensure that parent/base/super class 'StringIO' is properly initialized for instances of 'CustomStream'
+# 
+# self.callback = callback
+#   The passed 'callback' attribute is stored as an instance attrib, meaning each instance of 'CustomStream' will have its own 'callback' attrib
+ 
+# def write(self, data)
+#   Overwrites the 'write' method of parent class 'StringIO'; this method is called whenever data is written to our 'CustomStream'
+ 
+# PRIMARY MOTIVATION FOR THIS CUSTOM CLASS!! If we have a callback, call it:
+# if self.callback:
+#   self.callback(data)
+#
+#   The method checks if a 'callback' function has been set for the instance, i.e. 'self.callback' is not 'None'
+#   If there is a 'callback', it calls that function with the provided data, 
+#   which allows us to "hook" into the write process & execute additional logic whenever data is written to the 'CustomStream'   
+
+# return super().write(data)
+#   Finally, this calls the 'write' method of the parent class 'StringIO' using the 'super()' function
+#   This ensures that the actual writing of the data to the in-memory buffer, which is the primary function of 'StringIO' still happens!
+#   The provided data is passed for this to the base method
+ 
+# In summary, this 'CustomStream' class provides a custom implementation of 'StringIO' that supports a callback mechanism:
+# Everytime data is written to this custom stream, the 'callback', if provided, is executed thus allowing for additional functionality during the write
+
+# In this application, this mechanism is used to queue data for the streaming response! 
+# It extends the 'StringIO' class by adding a new feature: the ability to trigger a 'callback' function whenever a 'write()' occurs!
+
+# So to use this:
+
+# 1. We define a queue: 
+#       data_queue = queue.Queue()
+
+# 2. We define a callback function that puts data in this queue:
+#        def callback(data):
+#           data_queue.put(data)
+
+# 3. We create an instance of our custom stream passing this callback function:
+#        custom_stream = CustomStream(callback=callback)
+
+# 4. We redirect stdout to our custom stream temporarily
+#       original_stdout = sys.stdout
+#        sys.stdout = custom_stream
+
+# 5. We start the llm_task() thread & the LLM() function now outputs here, finally resetting stdout and putting None into the queue: data_queue.put(None)
+
+# 6. While the thread runs, we start a while loop that keeps yielding from the queue and stopping when None is read: yield f"data: {line}\n\n"
+
+# 7. A final yield signals the end of the stream, to be handled at the client-side:  yield "event: END\ndata: null\n\n"
+
+#############################################################################
+#################---XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX---####################
+#############################################################################
+
+
+class CustomStream(io.StringIO):
+    def __init__(self, callback=None):
+        super().__init__()
+        self.callback = callback
+
+    def write(self, data):
+        # If we have a callback, call it
+        if self.callback:
+            self.callback(data)
+
+        return super().write(data)
+
+
+@app.route('/stream/<stream_session_id>')
+def stream(stream_session_id):
+
+    print("stream route triggered")
+
+    global QUERIES
+    global HISTORY_MEMORY_WITH_BUFFER
+
+    try:
+        read_return = read_config(['do_rag', 'base_template'])
+        do_rag = read_return['do_rag']
+        base_template = read_return['base_template']
+    except Exception as e:
+        error_message = f"\n\Missing values in config.json in main method stream!. Error: {e}\n\n"
+        if logger:
+            logger.error(error_message)
+            print(error_message)
+        else:
+            print(error_message)
+        return jsonify(success=False, error=error_message), 500 # internal server error
+
+    key_for_llm_result = "LlmResponseforQueryID_" + stream_session_id
+    key_for_vector_results = "VectorDocsforQueryID_" + stream_session_id
+
+    user_query = request.args.get('input')
+    #print(f"do_rag: {do_rag}")
+
+    print(f'\n\nuser query passed to the LLM: {user_query}\n\n')
+
+    if do_rag:
+        ### 0 - If memory has been reset due to an old chat loading up, delete the additional key that added for a non-RAG resuming scenario:
+        if 'has_been_reset' in HISTORY_SUMMARY:
+            del HISTORY_SUMMARY['has_been_reset']
+
+        ### 1 - Define Template:
+        rag_prompt_template_variables = """
+
+        Use the following context to answer the user's question:
+        
+        Context:{context}
+        Question:{question}
+        """
+        history_summary_for_rag = re.sub(r"\{|\}", "", str(HISTORY_SUMMARY))    #search through the string str(HISTORY_SUMMARY) for all instances of { and } and replace them with an empty string "", effectively removing these characters from the string
+
+        rag_history_prompt = "The conversation so far: " + history_summary_for_rag
+
+        rag_prompt_template = rag_history_prompt + "\n" + base_template + "\n" + rag_prompt_template_variables
+
+        print(f"\n\nrag_prompt_template: {rag_prompt_template}\n\n")
+
+        rag_qa_chain_prompt = PromptTemplate.from_template(rag_prompt_template)
+
+        ### 2 - Setup Chain
+        qa_chain = RetrievalQA.from_chain_type(LLM, retriever=VECTOR_STORE.as_retriever(), return_source_documents=True, chain_type_kwargs={"prompt":rag_qa_chain_prompt})
+
+    else:
+        ### 0 - If memory has been reset due to an old chat loading up, delete the additional key that added for a non-RAG resuming scenario:
+        if 'has_been_reset' in HISTORY_SUMMARY:
+            del HISTORY_SUMMARY['has_been_reset']
+
+        ### 1 - Define Template keping in mind if memory has been reset due to an an old chat loading up:
+        non_rag_prompt_template_variables = "\nCurrent conversation:\n{history}\nHuman: {input}\nAI Assistant:"
+
+        history_summary_for_non_rag = re.sub(r"\{|\}", "", str(HISTORY_SUMMARY))    #search through the string str(HISTORY_SUMMARY) for all instances of { and } and replace them with an empty string "", effectively removing these characters from the string
+        
+        non_rag_history_prompt = "The conversation so far: " + history_summary_for_non_rag
+        
+        non_rag_prompt_template = non_rag_history_prompt + "\n" + base_template + "\n" + non_rag_prompt_template_variables
+
+        #print(f"\n\nnon_rag_prompt_template: {non_rag_prompt_template}\n\n")
+        non_rag_qa_chain_prompt = PromptTemplate(template=non_rag_prompt_template, input_variables=["history","input"])
+        print(f"\n\non_rag_qa_chain_prompt: {non_rag_qa_chain_prompt}\n\n")
+
+        ### 2 - Setup Chain
+        conversation_chain_with_summary_buffer = ConversationChain(
+            llm = LLM,
+            prompt=non_rag_qa_chain_prompt
+        )
+
+    if not user_query:
+        return "Session not found", 404
+    
+    stop_thread = threading.Event()
+    # Will be set() in llm_task() methods 'finally' block to stop the thread: Once the inferencing is complete in the 'try' block, the 'finally' block adds a 'None' object to the queue 
+    # and sets the threading event below. The 'None' causes the yielding while loop to invoke join() on the llm_task() thread for synchronization, as it causes the invoking thread, 
+    # in this case main thread, to wait until the ll_task thread object completes execution before resuming. Meanwhile setting the stop_thread causes the llm_task threads while() to complete!
+
+    def generate():
+
+        data_queue = queue.Queue()
+
+        def callback(data):
+            data_queue.put(data)
+
+        custom_stream = CustomStream(callback=callback)
+
+        # Redirect stdout to our custom stream temporarily
+        original_stdout = sys.stdout
+        sys.stdout = custom_stream
+
+        def llm_task():
+            global QUERIES
+            global HISTORY_SUMMARY
+            result = ""
+            while not stop_thread.is_set():
+                # Call LLM
+                try:
+                    
+                    if do_rag:
+                        result = qa_chain({"query": user_query})
+
+                        # Experimental RAG chains here:
+
+                    else:
+                        result = conversation_chain_with_summary_buffer.predict(input=user_query)
+                        
+                        # Experimental chains here:
+                finally:
+                    # Reset stdout to its original value
+                    sys.stdout = original_stdout
+
+                    # experimental outputs here:
+                    #print(f"history_buffer_result: {history_buffer_result}")
+
+                    # Save the LLM's formatted response for reference searching 
+                    formatted_llm_output = ""
+                    
+                    if do_rag:
+                        print("\n\nStoring RAG-Context history:\n")
+
+                        formatted_llm_output = str(result['result'])
+                        QUERIES[key_for_llm_result] = formatted_llm_output
+                        QUERIES[key_for_vector_results] = result
+
+                        HISTORY_MEMORY_WITH_BUFFER.save_context({"input":user_query}, {"output":formatted_llm_output})
+                    else:
+                        HISTORY_MEMORY_WITH_BUFFER.save_context({"input":user_query}, {"output":result})
+
+                    
+                    HISTORY_SUMMARY = HISTORY_MEMORY_WITH_BUFFER.load_memory_variables({})
+                    print(f"\n\nHISTORY_SUMMARY:{HISTORY_SUMMARY}\n\n")
+                    print(f"\n\nHISTORY_MEMORY_WITH_BUFFER.chat_memory.messages: {HISTORY_MEMORY_WITH_BUFFER.chat_memory.messages}\n\n")
+
+
+                    if not do_rag:
+                        formatted_user_query = str(user_query).strip('\n')
+                        formatted_llm_output = str(result)
+                        formatted_llm_output = formatted_llm_output.strip('\n')
+                        
+                        # If RAG is done, get_references() method stores history. If not, we store history right here
+                        print(f"\n\nStoring chat history with non-RAG LLM output: {formatted_llm_output}\n\n")
+                        
+                        # Storing to history DB as get_references() will not be invoked in non-RAG chains!
+                        store_chat_history_to_db(formatted_user_query, formatted_llm_output, HISTORY_SUMMARY)
+
+                    # Stop thread
+                    data_queue.put(None)
+                    stop_thread.set()
+
+        # Start the LLM task in a separate thread
+        thread = threading.Thread(target=llm_task)
+        thread.start()
+
+        i = 0
+        # Continuously yield data as it becomes available
+        while True:
+            line = data_queue.get()
+            if line is None:
+                print("None read, breaking & stopping thread")
+                thread.join()
+                break
+            if i == 0:
+                line = line.strip('\n')
+                i += 1
+            line = line.replace('\n\n', '</br></br>')
+            line = line.replace('\n', '</br>')
+            #line = re.sub(r'\s{2,}', lambda match: '&nbsp;' * len(match.group()), line)
+            yield f"data: {line}\n\n"
+
+        # This part ensures that after LLM finishes, the stream is closed
+        yield "event: END\ndata: null\n\n"
+
+        print("LLM stream done")
+
+    print("\n\nStarting inferencing!\n\n")
+    return Response(generate(), content_type='text/event-stream')
+
+
+@app.route('/lc_get_references', methods=['POST'])
+def lc_get_references():
+
+    print("\n\nGetting References\n\n")
+
+    try:
+        read_return = read_config(['do_rag', 'upload_folder'])
+        do_rag = read_return['do_rag']
+        upload_folder = read_return['upload_folder']
+    except Exception as e:
+        handle_api_error("Missing values in config.json when attempting to get_references. Error: ", e)
+
+    if not do_rag:
+        print("\n\nSkipping RAG and returning\n\n")
+        return jsonify({'success': True, 'chat_id': CHAT_ID, 'sequence_id': SEQUENCE_ID})
+
+    try:
+        stream_session_id = request.json['stream_session_id']
+        user_query = request.json['message']
+    except Exception as e:
+        handle_api_error("Could not read request content in method get_references, encountered error: ", e)
+        
+    try:
+        key_for_vector_results = "VectorDocsforQueryID_" + stream_session_id
+        key_for_llm_result = "LlmResponseforQueryID_" + stream_session_id
+
+        docs = QUERIES[key_for_vector_results]
+        llm_response = QUERIES[key_for_llm_result]
+    except Exception as e:
+        handle_api_error("Could not obtain relevant data from QUERIES dict, encountered error: ", e)
+
+    # Having obtained the relevant info, clear the QUERIES{} dict so as to not bloat it!
+    try:
+        del QUERIES[key_for_vector_results]
+        del QUERIES[key_for_llm_result]
+    except Exception as e:
+        handle_error_no_return("Error clearing queries dict in method get_references: ", e)
+
+    reference_response = ""
+
+    all_sources = {}
+    reference_pages = {}
+
+    try:
+        print(f"\n\ndocs['source_documents']: {docs['source_documents']}\n\n")
+        print(f"\n\ndocs['result']: {docs['result']}\n\n")
+    except Exception as e:
+        handle_api_error("Could not parse vector DB search results during get_references() ops, encountered error: ", e)
+    
+
+    relevant_pages = "<br><br>Relevant Pages & Topics:<br><br>"
+
+    for doc in docs['source_documents']:
+        try:
+            relevant_pages += str(doc.page_content)
+            relevant_pages += "<br>In Source Document:<br>"
+            relevant_pages += str(doc.metadata)
+            relevant_pages += "<br><br>"
+
+            relevant_page_text = str(doc.page_content)
+
+            source_filepath = str(doc.metadata["source"])
+        except Exception as e:
+            handle_error_no_return("Could not access doc.page_content and/or doc.metadata, encountered error: ", e)
+            continue
+    
+        relevant_page_text = relevant_page_text.split('\n', 1)[0]
+        relevant_page_text = relevant_page_text.strip()
+        relevant_page_text = re.sub(r'[\W_]+Page \d+[\W_]+', '', relevant_page_text)
+
+        source_filepath = source_filepath.replace('\\', '/')
+        
+        try:
+            source_filename = os.path.basename(source_filepath)
+            _, file_extension = os.path.splitext(source_filepath)
+        except Exception as e:
+            handle_error_no_return("Could not parse path with OS lib, encountered error: ", e)
+            continue
+
+        # The source_filepath will likely always reference a TXT file because of how we're loading the VectorDB!
+        # Check if the PDF version of the source doc exists
+        if file_extension == '.txt':
+
+            #print("\n\ntxt file\n\n")
+
+            # Construct the path to the potential PDF version
+            pdf_version_path = os.path.join(upload_folder, os.path.basename(source_filepath).replace('.txt', '.pdf'))   # not catching an error here as os.path.basename(source_filepath) has already been caught just above!
+
+            # Check if PDF version of the source TXT exists!
+            if os.path.exists(pdf_version_path):
+
+                source_filename = source_filename.replace('.txt', '.pdf')
+                
+                if pdf_version_path in reference_pages:
+                    reference_pages[pdf_version_path].extend([relevant_page_text])
+                else:
+                    reference_pages[pdf_version_path] = [relevant_page_text]
+
+                # Add this file to our sources dictionary if it's not already present
+                if source_filename not in all_sources:
+                    source_filepath = pdf_version_path
+                    all_sources.update({source_filename: source_filepath})
+
+            # Else PDF does not exist, TXT is the source
+            else:
+                # Check if the TXT is already in the sources dict
+                if source_filename not in all_sources:
+                    try:
+                        source_filepath = os.path.join(upload_folder, source_filename) # reconstructed path using the OS module just to be safe
+                        all_sources.update({source_filename: source_filepath})
+                    except Exception as e:
+                        handle_error_no_return("Could not construct filepath for TXT file, encountered error: ", e)
+
+
+        # If file is not a TXT file
+        else:
+            # Check if the TXT is already in the sources dict
+            if source_filename not in all_sources:
+                try:
+                    source_filepath = os.path.join(upload_folder, source_filename) # reconstructed path using the OS module just to be safe
+                    all_sources.update({source_filename: source_filepath})
+                except Exception as e:
+                    handle_error_no_return("Could not construct filepath for non-TXT file, encountered error: ", e)
+
+    # print(f"\n\nreference_pages: {reference_pages}\n\n")
+
+    try:
+        docs_have_relevant_info, user_should_refer_pages_in_doc = whoosh_text_in_pdf_and_highlight(reference_pages, stream_session_id)
+        # docs_have_relevant_info, user_should_refer_pages_in_doc = whoosh_text_in_pdf(reference_pages)
+    except Exception as e:
+        handle_error_no_return("Could not search Whoosh Index, encountered error: ", e)
+
+    try:
+        matched_images_found, matched_images_in_bytes = find_images_in_db(reference_pages)
+    except Exception as e:
+        handle_error_no_return("Could not search for images, encountered error: ", e)
+
+    refer_pages_string = ""
+    download_link_html = ""
+    images_iframe_html = ""
+
+    if docs_have_relevant_info:
+        
+        # refer_pages_string = "<br><br>Refer to the following pages in the mentioned docs:<br>"
+        # for doc in user_should_refer_pages_in_doc:
+        #     try:
+        #         # Remove duplicates from reference_pages dict
+        #         refer_pages_string += "<br>" + str(doc) + ": " + str(user_should_refer_pages_in_doc[doc]).replace("{", "").replace("}", "") + "<br>"
+        #     except Exception as e:
+        #         error_message = f"\n\nCould not construct refer_pages_string, encountered error: {e}\n\n"
+        #         if logger:
+        #             logger.error(error_message)
+        #             print(error_message)
+        #         else:
+        #             print(error_message)
+
+
+        refer_pages_string = "<br><br><h6>Refer to the following pages in the mentioned docs:</h6><br>"
+        
+        # for doc in user_should_refer_pages_in_doc:
+        for index, doc in enumerate(user_should_refer_pages_in_doc, start=1):
+            # pdf_iframe_id = str(doc) + "PdfViewer"
+            pdf_iframe_id = "stream" + stream_session_id + "PdfViewer" + str(index)
+            frame_doc_path = f"/pdf/{doc}"
+            # frame_doc_path = upload_folder + f"/{doc}" 
+            try:
+                refer_pages_string += f"<br><h6>{doc}: "
+                for page in user_should_refer_pages_in_doc[doc]:
+                    frame_doc_path += "#page=" + str(page) 
+                    refer_pages_string += f'<a href="javascript:void(0)" onclick="goToPage(\'{pdf_iframe_id}\', \'{frame_doc_path}\')">Page {page}</a>, '
+                    frame_doc_path = f"/pdf/{doc}"
+                refer_pages_string = refer_pages_string.strip(', ') + "</h6><br>"
+            except Exception as e:
+                handle_error_no_return("Could not construct refer_pages_string, encountered error: ", e)
+
+        # download_link_html = "<br><h6>Refer to the source documents below:</h6>"
+        pdf_right_pane_id = "stream" + stream_session_id + "PdfPane"
+        download_link_html = f'<div class="pdf-viewer" id={pdf_right_pane_id}>'
+
+        for index, source in enumerate(user_should_refer_pages_in_doc, start=1):
+            try:
+                # print("\n\nlooping sources\n\n")
+                download_link_url = url_for('download_file', filename=source)
+                pdf_iframe_id = "stream" + stream_session_id + "PdfViewer" + str(index)
+                download_link_html += f'<br><h6><a href="{download_link_url}" target="_blank"><iframe id="{pdf_iframe_id}" src="{download_link_url}" width="100%" height="600"></iframe></a></h6><br>'
+            except Exception as e:
+                handle_error_no_return("Could not construct download_link_html, encountered error: ", e)
+
+        download_link_html += "</div>"
+        
+        # print(f"\n\nall_sources: {all_sources}\n\n")
+        # for source in all_sources:
+        #     try:
+        #         # print("\n\nlooping sources\n\n")
+        #         download_link_url = url_for('download_file', filename=source)
+        #         pdf_iframe_id = str(source) + "PdfViewer"
+        #         download_link_html += f'<br><a href="{download_link_url}" target="_blank"><iframe id="{pdf_iframe_id}" src="{download_link_url}" width="600" height="400"></iframe></a><br>'
+        #     except Exception as e:
+        #         error_message = f"\n\nCould not construct download_link_html, encountered error: {e}\n\n"
+        #         if logger:
+        #             logger.error(error_message)
+        #             print(error_message)
+        #         else:
+        #             print(error_message)
+    
+    if matched_images_found:
+        images_iframe_html = "<br><h6>Refer to the images below:</h6>"
+        for image_id, image_bytes_data in matched_images_in_bytes:
+            #print(f"\n\nmatched image id: {image_id}")
+            try:
+                image_link_url = url_for('image_display', image_id=image_id)
+                images_iframe_html += f'<br><iframe width="750" height="400" src="{image_link_url}" frameborder="0"></iframe><br>'
+            except Exception as e:
+                handle_error_no_return("Could not construct images_iframe_html, encountered error: ", e)
+
+    
+    # reference_response = refer_pages_string + download_link_html + images_iframe_html
+    reference_response = refer_pages_string + images_iframe_html
+
+    try:
+        # model_response_for_history_db = str(llm_response) + refer_pages_string
+        model_response_for_history_db = str(llm_response)
+        model_response_for_history_db += f"\n\n{reference_response}"
+        model_response_for_history_db += f"\n\npdf_pane_data={download_link_html}"
+        model_response_for_history_db = model_response_for_history_db.strip('\n')
+
+        formatted_user_query = str(user_query).strip('\n')
+
+        user_query_for_history_db = formatted_user_query
+    except Exception as e:
+        handle_error_no_return("Could not prep data to store_chat_history_to_db in get_references(), encountered error: ", e)
+
+    try:
+        store_chat_history_to_db(user_query_for_history_db, model_response_for_history_db, HISTORY_SUMMARY)
+    except Exception as e:
+        handle_error_no_return("Could not store_chat_history_to_db in get_references(), encountered error: ", e)
+
+    return jsonify({'success': True, 'response': reference_response, 'pdf_frame':download_link_html, 'chat_id': CHAT_ID, 'sequence_id': SEQUENCE_ID})
+
+
+if __name__ == '__main__':
+    # app.run(debug=True)
+    app.run(host='0.0.0.0', port=5000)

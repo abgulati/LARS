@@ -1,0 +1,3036 @@
+<!-- chat.html -->
+
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>LLM Chat</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+        <link href='https://fonts.googleapis.com/css?family=Lato&subset=latin,latin-ext' rel='stylesheet' type='text/css'>
+        <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+
+
+        <!--CSS Goes Here-->
+        <style>
+
+            /* body {
+                background-color: azure;
+            } */
+
+            @font-face {
+                font-family: Boeing Meso;
+                font-weight: 400;
+                font-style: normal;
+                src: url(/assets/BoeingMeso-Regular-5934ec84.woff) format("woff")
+            }
+
+            .sidenav {
+                height: 100%;
+                width: 0;
+                position: fixed;
+                z-index: 1;
+                top: 0;
+                left: 0;
+                background-color: #111;
+                transition: 0.5s;
+                overflow-x: hidden;
+                overflow-y: auto;
+                padding-top: 10px;
+            }
+
+            .nav-item {
+                padding: 8px 8px 8px 32px;
+                text-decoration: none;
+                font-size: 18px;
+                color: #818181;
+                display: block;
+                transition: 0.3s;
+                cursor: pointer;
+            }
+
+            .sidenav a {
+                padding: 8px 8px 8px 32px;
+                text-decoration: none;
+                font-size: 25px;
+                color: #818181;
+                display: block;
+                transition: 0.3s;
+            }
+
+            .nav-item:hover {
+                background-color: #555;
+            }
+
+            .sidenav a:hover {
+                color: #f1f1f1;
+            }
+
+            .sidenav .sortbtn:hover {
+                color: #f1f1f1;
+            }
+
+            .sortbtn {
+                padding: 8px 8px 8px 32px;
+                text-decoration: none;
+                font-size: 18px;
+                color: #818181;
+                display: block;
+                transition: 0.3s;
+                position: absolute;
+            }
+
+            .sidenav .closebtn {
+                position: absolute;
+                top: 0;
+                right: 25px;
+                font-size: 36px;
+                margin-left: 50px;
+            }
+
+            .sidenav-content {
+                overflow-y: auto;
+                position: absolute;
+                top: 69px;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                /* padding-top: 60px;
+                height: 100%; */
+            }
+
+            /* .closebtn {
+                position: absolute;
+                top: 10px;
+                right: 25px;
+                z-index: 10;
+                font-size: 36px;
+            } */
+
+            /* @media screen and (max-height: 450px) {
+                .sidenav {padding-top: 15px;}
+                .sidenav a {font-size: 18px;}
+            } */
+
+            .chat-container {
+                display: flex;
+                flex-direction: column; /* Stack children vertically */
+                justify-content: space-between; /* Space between chat area and input area */
+                /* height: calc(100vh - header-container); */
+                flex-grow: 1;
+                z-index: 0;
+                height: 95vh;
+            }
+
+            .chat-area {
+                position: relative;
+                flex: 1;
+                overflow-y: auto; /* Add a scrollbar if content overflows */
+                padding: 1rem;
+                border-bottom: 1px solid #383d3f;
+                /* flex-grow: 1; /* Allow chat area to grow and consume available space */
+                font-family: 'Roboto', sans-serif; /* Use Roboto font */
+                /* font-family: Boeing Meso, Arial, sans-serif; */
+                font-size: 16px; /* Adjust as needed */
+                color: #333; /* Dark gray color for better readability */
+                margin-top: 30px;
+            }
+
+            .input-area {
+                /* Any specific styles you want for the input area */
+                padding: 1rem;
+                background-color: #f5f5f5;
+            }
+
+            .form-control {
+                background-color: #181a1b;
+                color: #d1cdc7;
+                border: solid #383d3f;
+                border-width: thin;
+            }
+
+            .input-area .form-control {
+                margin-right: 0.5rem;
+            }
+
+            .form-control::placeholder {
+                color: #464b4d !important;
+                font-weight:500;
+            }
+
+            .user-message {
+                font-weight: 500; /* Medium thickness */
+                margin-bottom: 0.5rem; /* Spacing between messages */
+                /* background-color: #e9ecef; /* A light gray background for user's messages */
+                /* background-color: #343a40; */
+                background-color: darkslategray;
+                padding: 0.5rem;
+                border-radius: 1rem;
+                color: white;
+                box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+            }
+
+            .llm-response {
+                font-weight: 400; /* Was 500 */
+                margin-bottom: 0.5rem; /* Spacing between messages */
+                /* background-color: #007bff;  Bootstrap primary color for LLM's responses */
+                /* background-color: #00ffaa;  Bootstrap primary color for LLM's responses */
+                /* background-color: 0098ff63; */
+                /* background-color: #00c3ff; */
+                /* background-color: #6c757d; */
+                /* background-color: #0033A1; /*BOEING BLUE! Use 300-weight White font */
+                /* background-color: #0069ff54; */
+                /* background-color: aliceblue; */
+                background-color: #1e2022;
+                color: #e8e6e3; 
+                padding: 0.5rem;
+                border-radius: 1rem;
+                /* box-shadow: 5px 5px #9ccd9d47; */
+                /* box-shadow: 5px 5px #BADCE6; */
+                box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+                border: 1px solid #3A3E41;
+            }
+
+            .scroll-down-btn {
+                position: absolute;
+                bottom: 80px;
+                right: 20px;
+                cursor: pointer;
+                font-size: 24px;
+                background-color: transparent;
+
+                /* Additional styling */
+                border: none;
+                outline: none;
+                color: #6bb3ff;
+
+                /* Optional padding */
+                padding: 5px;
+
+                /* Effect for hover*/
+                transition: color 0.3s ease;
+
+                /* Adjust alignment if the icon is not centered */
+                text-align: center;
+                line-height: 1;
+            }
+
+            /* Style for hover effect (optional) */
+            .scroll-down-btn:hover {
+                color: #327DFF;
+            }
+
+            .upload-file-btn {
+                margin-right: 7px; /* adjust as needed */
+            }
+
+            @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+            }
+
+            .loader {
+                margin: 60px auto;
+                font-size: 10px;
+                width: 50px;
+                height: 50px;
+                position: relative;
+                text-indent: -9999em;
+                border-top: 1.1em solid rgba(255, 255, 255, 0.2);
+                border-right: 1.1em solid rgba(255, 255, 255, 0.2);
+                border-bottom: 1.1em solid rgba(255, 255, 255, 0.2);
+                border-left: 1.1em solid #ffffff;
+                transform: translateZ(0);
+                animation: spin 0.7s infinite linear;
+                border-radius: 50%;
+            }
+
+            #overlay {
+                /* ... your existing styles ... */
+                backdrop-filter: blur(10px);
+                background-color: rgb(255, 255, 255, 0.7); /* This will add a white translucent background, adjust opacity as needed */
+            }
+
+            .llm-wrapper {
+                position: relative;
+                margin-bottom: 2rem;
+            }
+
+            .response-and-viewer-container {
+                display: flex;
+            }
+
+            .pdf-viewer {
+                /* width: 50%; */
+                flex: 1;
+                padding: 10px;
+                padding-top: 0px;
+                transform: translateY(-15px);
+                box-sizing: border-box;
+            }
+
+            .llm-wrapper {
+                flex: 1;
+                padding: 10px;
+                box-sizing: border-box;
+            }
+
+
+            .star-rating {
+                position: absolute;
+                /* bottom: -20px; */
+                right: 0;
+                display: flex;
+                justify-content: flex-end;
+                gap: 4px;
+                padding: 5px 10px; /* Spacing inside the star-rating container */
+                border: 1px solid #ccc; /* Border around the star-rating */
+                border-radius: 15px; /* Rounded border */
+                background-color: #181A1B; /* White background */
+                box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1); /* Optional: adds a subtle shadow */
+                /* margin-top: 8px; /* Adds a bit of space between the LLM's response and the stars */
+            }
+
+            .fa-star {
+                cursor: pointer;
+                color: #ccc; /* Color of non-rated stars. #ccc: light-gray */
+                font-size: 18px;
+                transition: color 0.3s; /* Smooth transition for filling stars */
+            }
+
+            .fas.fa-star {
+                /* color: #007bff; /* Color of rater stars: Matching the Bootstrap primary colors. */
+                color: #ffa500; /* Color of rated stars: Yellow */
+            }
+
+            /* .llm-response {
+                position: relative;
+            } */
+
+            .header-container {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                position: relative;
+                padding: 0 15px;
+                height: 5vh;
+            }
+
+            .header-text {
+                display: flex;
+                flex-direction: column; /* Stack h3 and h4 vertically */
+                align-items: center;    /* Center the text horizontally */
+                flex-grow: 1;           /* Allow the container to take up available space */
+                display: none;
+            }
+
+            /* #model_header,
+            #old_model_header {
+                display: none;
+                position: absolute;
+                z-index: 1;
+            }
+
+            .info-icon:hover + #model_header,
+            .info-icon:hover + #old_model_header {
+                display: block !important;
+            } */
+
+            .info-container .info-box {
+                position: absolute;
+                /* left: -100%; /* Adjust as needed to move the box to the left of the icon */
+                right: 100%;
+                margin-right: 10px;
+                top: 0;
+                width: max-content;
+                max-width: 345px;
+                background-color: #171A1B;
+                color: #D1CDC7;
+                box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+                border: 1px solid #3A3E41;
+                z-index: 100;
+                padding: 10px;
+                border-radius: 4px;
+            }
+
+            .info-container .info-box::before {
+                content: '';
+                position: absolute;
+                top: 18px;
+                right: 1px;
+                /* left: 100%; /* Adjust to move the arrow to the left edge of the tooltip */
+                /* transform: translateY(-50%) translateX(-100%); /* Adjust the arrow to point to the icon */
+                /* margin-top: -5px; */
+                margin-left: -5px;
+                border-width: 5px;
+                border-style: solid;
+                border-color: transparent transparent transparent black;
+                z-index: 101;
+            }
+
+            /* Style your h3 and h4 elements inside the info-box as desired */
+            .info-container .info-box h3,
+            .info-container .info-box h4 {
+                margin: 0;
+                text-align: center;
+            }
+
+            .info-container .info-box h3 {
+                font-size: medium;
+            }
+
+            .info-container .info-box h4 {
+                margin-top: 10px;
+                font-size: small;
+            }
+
+            .header-logo {
+                display: flex;
+                flex-direction: column; /* Stack h3 and h4 vertically */
+                align-items: center;    /* Center the text horizontally */
+                flex-grow: 1;           /* Allow the container to take up available space */
+                height: 100%;
+                width: auto;
+            }
+
+            #main_logo {
+                max-width: 250px;
+                height: auto;
+                width: 100%;
+            }
+
+            .modal-content {
+                background-color: #181A1B;
+                color: #e8e6e3;
+                border: 1px solid #3A3E41;
+            }
+
+            .modal-header{
+                border: 1px solid #3A3E41;
+            }
+
+            .modal-footer {
+                border: 1px solid #3A3E41;
+            }
+
+            .modal-selection-radios {
+                /* display: inline; */
+                display: flex; /* Uses flexbox to lay out child elements*/
+                justify-content: space-between; /* space out children evenly */
+                width: 100%;
+            }
+
+            /* .modal-selection-radios input[type="radio"] {
+                /* Optional additional styling for modal radio buttons *
+            } */
+
+            .modal-selection-radios label {
+                flex: 1;    /* Allow each label to grow and take up equal space*/
+            }
+
+            .custom-modal-width {
+                max-width: 50%;
+            }
+
+            .api_form .form-group {
+                display: flex;
+                margin-bottom: 10px;
+            }
+
+            .api_form .form-group label {
+                flex: 0 0 auto; /*prevent label from growing*/
+                margin-right: 10px; /*space between label and input*/
+                white-space: nowrap;    /*prevents label from wrapping*/
+            }
+
+            .api_form .form-group input[type="text"] {
+                flex: 1 1 auto; /*Allow the input to grow and fill available space*/
+                width: 0;   /*trick to ensure flex-grow works!*/
+            }
+
+            .modal-selects {
+                width: 100%;
+            }
+
+            /* Targeting all button elements within .modal-footer and .input-area */
+            .modal-footer button,
+            .input-area button,
+            .input-area input[type="button"],
+            .input-area input[type="submit"] {
+            background-color: #343A40; /* Example: Set a common background color */
+            color: #ffffff; /* Example: Set a common text color */
+            border: none; /* Example: Remove border */
+            border-radius: 5px; /* Example: Set rounded corners */
+            cursor: pointer; /* Change the cursor on hover */
+            }
+
+            /* Common hover effect for all buttons */
+            .modal-footer button:hover,
+            .input-area button:hover,
+            .input-area input[type="button"]:hover,
+            .input-area input[type="submit"]:hover {
+            background-color: #282d33; /* Darker shade on hover */
+            }
+
+            .btn-primary {
+                background-color: darkslategray;
+                border-width: 0;
+            }
+
+            .btn-primary:hover {
+                background-color: darkslateblue;
+            }
+
+            #saveChangesButton {
+                background-color: darkslategray;
+                border-width: 0;
+            }
+
+            #saveChangesButton:hover {
+                background-color: darkslateblue;
+            }
+
+            /* #resetLlmAdvancedDefaults {
+                width: 30%;
+            } */
+
+            .llm-adv-set-toggle {
+                text-decoration: none;
+                color: white;
+                font-weight: 500;
+            }
+
+            .llm-adv-set-toggle:hover {
+                color: black;
+            }
+
+            /* .llm-adv-set-toggle:focus {
+                box-shadow: 0 0 5px rgba(0, 123, 255, 0.5);
+            } */
+
+            /* .llm-adv-set-toggle:active {
+                color: #003d82;
+            } */
+
+            #docs_loaded_details_table {
+                width: 100%;
+                table-layout: fixed;
+            }
+
+            #docs_loaded_details_table th, #docs_loaded_details_table td {
+                word-wrap: break-word;
+                overflow-wrap: break-word;
+            }
+
+            table {
+                border-collapse: collapse;
+                width: 100%;
+            }
+
+            th, td {
+                padding: 7px;
+                text-align: left;
+                border-bottom: 1px solid #DDD;
+            }
+
+            tr:hover {
+                background-color: darkslategray;
+            }
+
+            .settings-requiring-restart-container {
+                border: 1px solid #3A3E41;
+                padding: 10px;
+                position: relative;
+                border-radius: 5px;
+            }
+
+            .restart-settings-group {
+                padding-bottom: 10px;
+            }
+
+            .restart-warning {
+                position: absolute;
+                right: 10px;
+                bottom: 10px;
+                padding: 5px;
+                border-radius: 5px;
+                display: flex;
+                align-items: center;
+                font-size: 16px;    /*Adjusts the size of icon & text*/
+                font-weight: 500;
+                /* color: black;
+                background-color: #ffcc00;
+                border: 1px solid #b3a100; */
+            }
+
+            .restart-warning i {
+                margin-right: 5px;
+                color: #ffcc00;
+            }
+
+            a.list-group-item.list-group-item-action {
+                background-color: #181A1B;
+                border: 1px solid #3A3E41;
+                color: #D1CDC7;
+            }
+
+            a.list-group-item.list-group-item-action:hover {
+                background-color: darkslategray
+            }
+
+            a.list-group-item.list-group-item-action.active {
+                background-color: darkslategray;
+                border: 1px solid darkslategray;
+                color: #D1CDC7;
+            }
+
+            #processingQnS {
+                color: #D1CDC7;
+            }
+
+            #processingQ {
+                color: #D1CDC7;
+            }
+
+            /*SCROLLBAR STYLING - For WebKit-based browsers (Chrome, Safari, newer versions of Edge):*/
+            /* This styles the scrollbar track (the part the thumb slides along) */
+            ::-webkit-scrollbar-track {
+                background: #212324; /* Light grey track background */
+            }
+
+            /* This styles the scrollbar thumb (the part that's draggable) */
+            ::-webkit-scrollbar-thumb {
+                background: #464A4D; /* Grey thumb */
+            }
+
+            /* This styles the scrollbar thumb on hover */
+            ::-webkit-scrollbar-thumb:hover {
+                background: #575E62; /* Darker grey on hover */
+            }
+
+            /* This styles the overall scrollbar (width, etc.) */
+            /* ::-webkit-scrollbar {
+                width: 10px; /* Width of the scrollbar
+            } */
+
+            /*SCROLLBAR STYLING - For Firefox:*/
+            /* The syntax is scrollbar-color: <thumb color> <track color>; */
+            body {
+            scrollbar-color: #464A4D #212324; 
+            /*scrollbar-width: thin; /* Can be "auto", "thin", or "none" */
+            }
+
+            .thumbnail-icon {
+                font-size: 100px;
+                cursor: pointer;
+            }
+
+            .image-gallery-modal {
+                display: none;
+                position: fixed;
+                z-index: 1050;  /* Bootstrap modals use z-index of 1050, so this ensures it is above */
+                padding-top: 100px;
+                left: 0;
+                top: 0;
+                width: 100%;
+                height: 100%;
+                overflow: auto;
+                background-color: rgba(0, 0, 0, 0.9);
+            }
+
+            .image-gallery-content {
+                position: relative;
+                margin: auto;
+                padding: 0;
+                width: 80%;
+                max-width: 1200px;
+                text-align: center;
+            }
+
+            .image-gallery-close {
+                position: absolute;
+                top: 10px;
+                right: 25px;
+                color: white;
+                font-size: 35px;
+                font-weight: bold;
+                cursor: pointer;
+            }
+
+            .image-gallery-close:hover,
+            .image-gallery-close:focus {
+                color: #999;
+                text-decoration: none;
+                cursor: pointer;
+            }
+
+            .gallery-thumbnail {
+                margin: 10px;
+                /* max-width: 375px;
+                max-height: 150px; */
+                width: 100%;
+                height: 350px;
+                cursor: grabbing;
+            }
+
+
+        </style>
+
+    </head>
+
+    <body style="background-color: #181a1b;">
+
+        <!-- <span style="font-size:30px; cursor:pointer; position:absolute; top:3px; left:15px;" onclick="openNav()">&#9776;</span>
+        <span style="font-size:30px; cursor:pointer; position:absolute; top:3px; right:15px;" onclick=""><i class="fa-solid fa-gear"></i></span> -->
+        
+        <div class="header-container">
+            <span style="font-size:30px; cursor:pointer; color: #D1CDC7;" onclick="openNav()">&#9776;</span>
+
+            <div class="header-logo">
+                <img id="main_logo" src="{{ url_for('static', filename='images/LARS_Logo_3.png') }}" alt="LARS Logo" style="visibility: hidden;">
+            </div>
+            
+            <div class="header-text">
+                <!-- <h3 style="display: none;" id="model_header" class="fa-solid fa-brain"></h3>
+                <h4 style="display: none;" id="old_model_header" class="fa-solid fa-brain"></h4> -->
+            </div>
+
+            <div class="info-container" style="cursor: pointer; position: relative; font-size: 30px; padding-right: 10px; color: #D1CDC7;">
+                <i class="fa-solid fa-circle-info info-icon" onclick="toggleInfo()"></i>
+                <div class="info-box" id="info_box" style="display: none;">
+                    <h3 style="display: none;" id="model_header" class="fa-solid fa-brain"></h3>
+                    <h4 style="display: none;" id="old_model_header" class="fa-solid fa-brain"></h4>
+                </div>
+            </div>
+
+            <span style="font-size:30px; cursor:pointer; color: #D1CDC7;" id="settings_gear" data-bs-toggle="modal" data-bs-target="#settingsModal"><i class="fa-solid fa-gear"></i></span>
+        </div>
+        <!--
+            NOTES ON ABOVE:
+            1) data-bs-toggle="modal":
+                This attribute tells Bootstrap that the element (e.g., a button) should act as a trigger for a modal.
+                When the element with this attribute is clicked, it will toggle (in this case, open) the modal specified by the associated data-bs-target attribute.
+                
+            2)data-bs-target="#settingsModal":
+                This attribute specifies the HTML element that should be toggled (opened) when the trigger is clicked.
+                The value is a CSS selector pointing to the desired modal element.
+                The # symbol in #settingsModal indicates that it's an ID selector. In other words, this attribute is pointing to an element with the id="settingsModal" in the HTML. 
+                It means that somewhere in your HTML, there should be a modal with the ID of settingsModal that will be opened when this trigger is clicked.
+        -->
+        
+
+
+        <div class="sidenav" id="sidenav">
+            <a href="javascript:void(0)" class="closebtn" onclick="closeNav()">&times;</a>
+            <a href="javascript:void(0)" class="sortbtn" onclick="sortNavItems()">&#8597;</a>
+            <div class="sidenav-content" id="sidenav-content">
+                <!-- <a href="http://localhost:5000/chat" class="fas fa-plus" style="font-size: 18px;"> New Chat</a> -->
+                <!-- <div class="nav-item">Menu Item 1</div> -->
+                <a href="#" id="dynamicChatLink" class="fas fa-plus" style="font-size: 18px;"> New Chat</a>
+            </div>
+        </div>
+
+        <div class="chat-container">
+           
+            <div class="chat-area" id="chat-area">
+                <!-- ###Messages appended here -->
+            </div>
+
+            <i class="fa-solid fa-circle-down scroll-down-btn" id="scrollDownButton"></i>
+            
+            <h3 id="processingQ" style="display: none;">Thinking...</h3>
+            
+            <h3 id="processingQnS" style="display: none;"></h3>
+            
+            <div class="input-area d-flex justify-content-center align-items-center" id="input-area" style="background-color: #1e2021;">
+                <!-- <input type="text" class="form-control" id="user-input" onclick="closeNav()" placeholder="Type your prompts here..."> -->
+                <textarea rows="1" cols="50" class="form-control" id="user-input" onclick="closeNav()" placeholder="Type your prompts here..."></textarea>
+                <input type="file" name="file" id="fileInput" style="display:none;">
+                <button type="button" id="fileInputButton" class="btn btn-primary upload-file-btn" onclick="closeNav(); document.getElementById('fileInput').click();"><i class="fas fa-paperclip"></i></button>
+                <button class="btn btn-primary" id="sendButton" onclick="closeNav(); requestFormattedPrompt()">Send</button>
+            </div>
+            
+        </div>
+
+        <div class="loader2" id="overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgb(250,250,250,0.5); z-index: 1000;">
+            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: black; font-size: 24px; font-family: 'Roboto', sans-serif; font-weight: 500;">
+                Processing New Document...
+            </div>
+        </div>
+
+        <div id="ModelAndDBLoading" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgb(250,250,250,0.5); z-index: 1000;">
+            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: black; font-size: 24px; font-family: 'Roboto', sans-serif; font-weight: 500;">
+                Loading Model and Vector Database...
+            </div>
+        </div>
+
+        <div id="ReadyToChat" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgb(250,250,250,0.5); z-index: 1000;">
+            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: black; font-size: 24px; font-family: 'Roboto', sans-serif; font-weight: 500;">
+                All loaded up & ready to chat!
+            </div>
+        </div>
+
+
+        <!-- Settings Popup - Bootstrap Modal -->
+        <div class="modal fade" id="settingsModal" tabindex="-1" aria-labelledby="settingsModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-xl custom-modal-width">
+                <div class="modal-content">
+                    
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="settingsModalLabel">Settings</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+
+                    <div class="modal-body">
+
+                        <!--To ensure content is displayed side-by-side-->
+                        <div class="d-flex">
+
+                            <!--Options on the left-->
+                            <div class="list-group w-25 me-3" id="modal-left-options-list">
+                                <a href="#" class="list-group-item list-group-item-action active" data-content="option1">LLM Selection</a>
+                                <a href="#" class="list-group-item list-group-item-action" data-content="option2">VectorDB & Embedding Models</a>
+                                <a href="#" class="list-group-item list-group-item-action" data-content="option3">System Prompt</a>
+                                <a href="#" class="list-group-item list-group-item-action" data-content="option4">RAG Options</a>
+                                <a href="#" class="list-group-item list-group-item-action" data-content="option5">OCR Options</a>
+                                <a href="#" class="list-group-item list-group-item-action" data-content="option6">Additional Settings</a>
+                                <!--Add as Needed-->
+                            </div>
+
+                            <!--Details on the right-->
+                            <div class="w-75">
+
+                                <div id="option1">
+                                    <!--Option 1 Content-->
+                                    <h5>LLM Selection: Options for Local-Inferencing & APIs</h5>
+
+                                    <br>
+                                    
+                                    <div id="llm_type_choice" class="modal-selection-radios">
+                                        <label for="local_llm_radio_button" style="flex: 1;">
+                                            <input type="radio" id="local_llm_radio_button" name="use_local_or_api_llm" value="local"> Local-LLMs
+                                        </label>
+                                        <label for="api_llm_radio_button" style="flex: 1;">
+                                            <input type="radio" id="api_llm_radio_button" name="use_local_or_api_llm" value="api"> APIs
+                                        </label>
+                                    </div>
+
+                                    <br>
+
+                                    <div  id="localLlmSelection" style="display: none;">
+                                        <label style="margin-bottom: 3px;">Select a local LLM:</label>
+                                        <br>
+                                        <select class="modal-selects" name="model_choice" id="modelDropdown">
+                                            
+                                        </select>
+                                    </div>
+
+                                    <br>
+
+                                    <div  id="localLlmTemplateSelection" style="display: none;">
+                                        <label style="margin-bottom: 3px;">Select a Prompt-Template Format</label>
+                                        <br>
+                                        <select class="modal-selects" name="llm_template_choice" id="llmTemplateDropdown">
+                                            <option value="">Please select</option>
+                                            <option value="llama3">Llama-3 Prompt Template Format</option>
+                                            <option value="llama2">Llama-2 Prompt Template Format (Mistral-Instruct 7B & MoE - v0.1 & v0.2, etc.)</option>
+                                            <option value="chatml">ChatML Prompt Template Format (Open & Nous Hermes-Mistral & MoE, etc.) </option>
+                                            <option value="phi3">Microsoft Phi-3 Prompt Template Format</option>
+                                            <option value="command-r">Cohere Command-R & Command-R+ Prompt Template Format</option>
+                                            <option value="deepseek">Deepseek-Coder Prompt Template Format</option>
+                                            <option value="vicuna">Nous-Capybara Vicuna Prompt Template Format</option>
+                                            <option value="openchat">OpenChat-3.5-0106 Prompt Template Format</option>
+                                        </select>
+                                    </div>
+                                                        
+                                    <div id="apiLlmSelection" style="display: none;">
+                                        <label style="margin-bottom: 3px;">Select an LLM-API Inferencing Service:</label>
+                                        <br>
+                                        <select class="modal-selects" name="llm_api_choice" id="llmApiDropdown">
+                                            <option value="">Please select</option>
+                                            <option value="AzureOpenAI">Azure OpenAI Service</option>
+                                            <!-- Add more API services here!-->
+                                        </select>
+                                    </div>
+                                    
+                                    <br>
+
+                                    <form action="" class="api_form" id="azure_openai_api_form" style="display: none;">
+                                        <div class="form-group">
+                                            <input type="checkbox" id="update_azure_gpt" name="update_azure_gpt">
+                                            <label for="update_azure_gpt">Update Configuration</label>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="azure_openai_api_url">Azure OpenAI Base URL:</label>
+                                            <input type="text" id="azure_openai_api_url" name="azure_openai_api_url" disabled>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="azure_openai_api_key">Azure OpenAI GPT Key:</label>
+                                            <input type="text" id="azure_openai_api_key" name="azure_openai_api_key" disabled>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="azure_openai_deployment_name">Azure OpenAI GPT Deployment Name:</label>
+                                            <input type="text" id="azure_openai_deployment_name" name="azure_openai_deployment_name" disabled>
+                                        </div>
+                                        <br>
+                                    </form>
+
+                                    <!--Advanced Settings Section Begins-->
+                                    <a href="#" class="btn btn-link btn-primary llm-adv-set-toggle" id="advancedLlmSettingsToggle" data-bs-toggle="collapse" data-bs-target="#advancedLlmSettings" aria-expanded="false" aria-controls="advancedLlmSettings" style="display: none;">
+                                        Advanced Settings >>>
+                                    </a>
+
+                                    <div class="collapse" id="advancedLlmSettings">
+                                        <div class="card card-body" style="background-color: #181A1B; border: none;">
+                                            
+                                            <!-- Add options here | TODO: style "Advanced Settings" button! -->
+
+                                            <button class="btn btn-primary" type="button" id="resetLlmAdvancedDefaults">Reset to Defaults</button>
+
+                                            <br>
+
+                                            <div class="settings-requiring-restart-container">
+
+                                                <div id="gpu_choice" class="restart-settings-group">
+                                                    <label>Use GPU?</label>
+                                                    <input type="radio" id="gpu_radio_yes" name="use_gpu" value="y" style="margin-left: 7px;"> Yes (NvCUDA)
+                                                    <input type="radio" id="gpu_radio_no" name="use_gpu" value="n" style="margin-left: 7px;"> No
+                                                    <br><label for="NumbGpuLayers">Number of Model-layers to offload to the GPU (-ngl): </label>
+                                                    <input type="number" id="NumbGpuLayers" name="NumbGpuLayers" min="-1" style="width: 15%;" value="47">
+                                                </div>
+    
+                                                <br>
+    
+                                                <div id="ctx_length" class="restart-settings-group">
+                                                    <label for="LlmCtxLgt">Context-Length (-c): </label>
+                                                    <input type="number" id="LlmCtxLgt" name="LlmCtxLgt" min="128" style="width: 15%;" value="8192">
+                                                </div>
+    
+                                                <br>
+    
+                                                <div id="llm_max_new_tokens" class="restart-settings-group">
+                                                    <label for="MaxNewToks">Maximum tokens to predict (-n): </label>
+                                                    <input type="number" id="MaxNewToks" name="MaxNewToks" min="-1" style="width: 15%;" value="2048">
+                                                </div>
+
+                                                <br>
+
+                                                <div class="restart-warning">
+                                                    <i class="fa-solid fa-exclamation-triangle"></i> Changes trigger restart!
+                                                </div>
+
+                                            </div>
+
+                                            <br>
+
+                                            <div id="temperature_value">
+                                                <label for="tempSlider">Temperature (Randomness of generated text): </label>
+                                                <input type="range" id="tempSlider" name="tempSlider" min="0" max="2" step="0.1" value="0.8">
+                                                <span id="tempSliderValue">0.8</span>
+                                            </div>
+
+                                            <br>
+
+                                            <div id="topk_value">
+                                                <label for="topkSlider">Limit to K most probable tokens (top_k): </label>
+                                                <input type="range" id="topkSlider" name="topkSlider" min="-1" max="100" step="1" value="40">
+                                                <span id="topkSliderValue">40</span>
+                                            </div>
+
+                                            <br>
+
+                                            <div id="topp_value">
+                                                <label for="toppSlider">Limit to a subset of tokens with a cumulative probability above (top_p): </label>
+                                                <input type="range" id="toppSlider" name="toppSlider" min="0" max="1" step="0.01" value="0.95">
+                                                <span id="toppSliderValue">0.95</span>
+                                            </div>
+
+                                            <br>
+
+                                            <div id="minp_value">
+                                                <label for="minpSlider">Minimum probability for considering a token, relative to most likely (min_p): </label>
+                                                <input type="range" id="minpSlider" name="minpSlider" min="0" max="1" step="0.01" value="0.05">
+                                                <span id="minpSliderValue">0.05</span>
+                                            </div>
+
+                                            <br>
+
+                                            <div id="nkeep_value">
+                                                <label for="nkeepSlider">Prompt-tokens retained when context-size exceeded (n_keep, -1 to retain all): </label>
+                                                <input type="number" id="nkeepSlider" name="nkeepSlider" min="-1" style="width: 15%;" value="0">
+                                            </div>
+                                            
+                                        </div>
+                                    </div>
+
+                                </div>
+
+                                <div id="option2" class="d-none">
+                                    <!--Option 2 Content-->
+                                    <h5>Switch Between Available Embedding Models</h5>
+
+                                    <br>
+
+                                    <div id="embed_model_choice">
+                                        <label style="margin-bottom: 3px;">Select an Embedding Model:</label>
+                                        <br>
+                                        <select class="modal-selects" name="specify_embedding_model" id="embedding_model_dropdown">
+                                            <option value="bge_large">BGE-Large</option>
+                                            <option value="bge_base">BGE-Base</option>
+                                            <option value="sbert_mpnet_base_v2">SBERT: all-mpnet-base-v2</option>
+                                            <option value="openai_text_ada">OpenAI: Text-Ada</option>
+                                            <!-- Add more embedding models here!-->
+                                        </select>
+                                    </div>
+
+                                    <br>
+
+                                    <form action="" class="api_form" id="azure_openai_text_ada_api_form" style="display: none;">
+                                        <div class="form-group">
+                                            <input type="checkbox" id="update_azure_ada" name="update_azure_ada">
+                                            <label for="update_azure_ada">Update Configuration</label>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="azure_openai_text_ada_api_url">Azure OpenAI Base URL:</label>
+                                            <input type="text" id="azure_openai_text_ada_api_url" name="azure_openai_text_ada_api_url" disabled>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="azure_openai_text_ada_api_key">Azure OpenAI Text-Ada Key:</label>
+                                            <input type="text" id="azure_openai_text_ada_api_key" name="azure_openai_text_ada_api_key" disabled>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="azure_openai_text_ada_deployment_name">Azure OpenAI Text-Ada Deployment Name:</label>
+                                            <input type="text" id="azure_openai_text_ada_deployment_name" name="azure_openai_text_ada_deployment_name" disabled>
+                                        </div>
+                                        <br>
+                                    </form>
+                                    
+                                    <label>Documents Embedded into VectorDB with this Model:</label>
+
+                                    <br>
+                                    <br>
+
+                                    <div id="vector_embeddings_details">
+                                        
+                                        <table id="docs_loaded_details_table">  <!--TODO: table wrap per div width-->
+                                            <tr>
+                                                <th>Document Name</th>
+                                                <th>VectorDB Location</th>
+                                                <th>Chunk Size</th>
+                                                <th>Chunk Overlap</th>
+                                            </tr>
+                                            <tr>
+                                                <td>placeholder</td>
+                                                <td>placeholder</td>
+                                                <td>placeholder</td>
+                                                <td>placeholder</td>
+                                            </tr>
+                                        </table>
+
+                                        <br>
+
+                                        <button class="btn btn-primary" type="button" id="resetVectorDB">Reset VectorDB</button>    <!--TODO: confirmation dialogue: are you sure you want to reset?-->
+
+                                    </div>
+
+                                </div>
+
+                                <div id="option3" class="d-none">
+                                    <!--Option 3 Content-->
+                                    <h5>Edit System Prompt</h5>
+
+                                    <!--Dropdown-->
+                                    <div class="dropdown">
+                                        <button class="btn btn-secondary dropdown-toggle" type="button" id="templateDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                                            Default
+                                        </button>
+                                        <ul class="dropdown-menu" aria-labelledby="templateDropdown">
+                                            <li><a class="dropdown-item" id="template_dropdown_default" href="#" data-readonly="true" data-template="">Default</a></li>
+                                            <li><a class="dropdown-item" id="template_dropdown_custom" href="#" data-readonly="false" data-template="">Custom</a></li>
+                                        </ul>
+                                    </div>
+
+                                    <!-- <textarea class="form-control mt-2" rows="5" readonly>Use the context and question below of to answer the user's question. Answer in as much detail as possible. Context: {context} Question: {question}</textarea> -->
+                                    <textarea id="templateContent" class="form-control mt-2" rows="5" readonly></textarea>
+                                </div>
+
+                                <div id="option4" class="d-none">
+                                    <!--Option 4 Content-->
+                                    <h5>RAG Settings:</h5>
+                                    <br>
+                                    <div>
+                                        <input type="checkbox" id="force_enable_rag_checkbox" name="force_enable_rag">
+                                        <label for="force_enable_rag_checkbox">Force Enable RAG</label>
+                                    </div>
+                                    
+                                    <br>
+                    
+                                     <div>
+                                        <input type="checkbox" id="force_disable_rag_checkbox" name="force_disable_rag">
+                                        <label for="force_disable_rag_checkbox">Force Disable RAG</label>
+                                    </div>
+                                    
+                                    <br>
+                    
+                                    <div>
+                                        <input type="checkbox" id="default_rag_checkbox" name="default_rag" checked>
+                                        <label for="default_rag_checkbox">Default RAG Setting (select this if unsure; implements RAG when necessary)</label>
+                                    </div>
+                                    
+                                    <br>
+                                </div>
+
+                                <div id="option5" class="d-none">
+                                    <!--Option 1 Content-->
+                                    <h5>Optical Character Recognition (OCR): Specify Usage & Service</h5>
+
+                                    <br>
+                                    
+                                    <div id="ocr_use_choice" class="modal-selection-radios">
+                                        <label for="ocr_yes_radio_button" style="flex: 1;">
+                                            <input type="radio" id="ocr_yes_radio_button" name="specify_ocr_and_service" value="ocr"> Use OCR Service Specified Below
+                                        </label>
+                                        <label for="ocr_no_radio_button" style="flex: 1;">
+                                            <input type="radio" id="ocr_no_radio_button" name="specify_ocr_and_service" value="pypdf" checked> Do NOT use OCR (scanned docs not supported) 
+                                        </label>
+                                    </div>
+
+                                    <br>
+
+                                    <div id="apiOcrSelection" style="display: none;">
+                                        <label style="margin-bottom: 3px;">Select an OCR Service:</label>
+                                        <br>
+                                        <select class="modal-selects" name="ocr_api_choice" id="ocrApiDropdown">
+                                            <option value="">Please select</option>
+                                            <option value="AzureVision">Azure Vision Service OCR</option>
+                                            <option value="AzureDocAi">Azure Document Intelligence AI OCR</option>
+                                            <!-- Add more OCR services here!-->
+                                        </select>
+                                    </div>
+                                    
+                                    <br>
+
+                                    <form action="" class="api_form" id="azure_vision_api_form" style="display: none;">
+                                        <div class="form-group">
+                                            <input type="checkbox" id="update_azure_vision" name="update_azure_vision">
+                                            <label for="update_azure_vision">Update Configuration</label>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="azure_vision_api_url">Azure Vision OCR Endpoint:</label>
+                                            <input type="text" id="azure_vision_api_url" name="azure_vision_api_url" disabled>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="azure_vision_api_key">Azure Vision OCR Key:</label>
+                                            <input type="text" id="azure_vision_api_key" name="azure_vision_api_key" disabled>
+                                        </div>
+                                        <br>
+                                    </form>
+
+                                    <form action="" class="api_form" id="azure_doc_ai_api_form" style="display: none;">
+                                        <div class="form-group">
+                                            <input type="checkbox" id="update_azure_doc_ai" name="update_azure_doc_ai">
+                                            <label for="update_azure_doc_ai">Update Configuration</label>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="azure_doc_ai_api_url">Azure Document-Intelligence AI OCR Endpoint:</label>
+                                            <input type="text" id="azure_doc_ai_api_url" name="azure_doc_ai_api_url" disabled>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="azure_doc_ai_api_key">Azure Document-Intelligence AI OCR Key:</label>
+                                            <input type="text" id="azure_doc_ai_api_key" name="azure_doc_ai_api_key" disabled>
+                                        </div>
+                                        <br>
+                                    </form>
+
+                                </div>
+
+                                <div id="option6" class="d-none">
+                                    <!--Option 6 Content-->
+                                    <h5>Additional Settings</h5>
+                                    <br>
+                                    <p>Look forward to future updates!</p>
+                                </div>
+
+                                <!--Add as Needed-->
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        <button type="button" id="saveChangesButton" class="btn btn-primary" data-bs-dismiss="modal">Save Changes</button>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+        <!--
+            NOTES ON ABOVE:
+            1) tabindex="-1"
+                This attrib indicates if elements can receive keyboard input focus, i.e. are reachable via the tab key
+                0 means they can be included in the natural order
+                -1 makes sure the modal does nnot get focus when tabbing through the page, instead waiting for the modal to be opened
+            2) aria-labelledby="settingsModalLabel"
+                An ARIA (Accessible Rich Internet Apps) attrib that establishes relations between elements and the text labelling them
+                The value of the aria-labelledby attribute is the ID of another element that provides a label for this element. 
+                In this case, it suggests that there is an element with the ID settingsModalLabel that provides a label (probably a title) for the modal.
+                This helps screen readers to announce the modal's title (or label) when the modal is opened, providing a context for users with visual disabilities.
+            3) aria-hidden="true":
+                aria-hidden is another ARIA attribute. When set to "true", it indicates that the element and its children are not visible or perceivable to screen readers, even if they are visually shown on the page.
+                For a Bootstrap modal, this attribute is typically toggled between true and false. When the modal is not displayed (closed), aria-hidden="true" ensures that screen readers ignore it. When the modal is open, this attribute is usually set to false, making it perceivable to screen readers.
+                It's an important attribute to ensure that visually hidden content doesn't confuse or interfere with the experience of screen reader users.
+            4) data-bs-dismiss="modal":
+                used to close the modal when the element with this attribute is clicked
+                Typically, you'll see this attribute on a button or a close icon inside the modal. When a user clicks this button/icon, the modal will close. The value "modal" specifies the type of component to dismiss.
+                It's a part of Bootstrap's JavaScript functionalities, meaning Bootstrap's scripts detect this attribute and automatically bind the necessary event handlers.
+            5) aria-label="Close":
+                used to define a string that labels the current element
+                In the context of a close button or icon in a modal, aria-label="Close" provides an accessible name for the button or icon so that assistive technologies, like screen readers, can announce it appropriately.
+                This is especially important for elements that don't have visible text
+            -->
+
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script>
+    
+        <script>
+
+            let CHAT_ID;
+            let SEQUENCE_ID;
+            let ascending = true;
+            let LLM_MODEL;
+
+            const forceEnableRagCheckbox = document.getElementById('force_enable_rag_checkbox');
+            const forceDisableRagCheckbox = document.getElementById('force_disable_rag_checkbox');
+            const defaultRag = document.getElementById('default_rag_checkbox');
+
+            //Listeners for Checkbox Changes
+            forceEnableRagCheckbox.addEventListener('change', function() {
+                if (this.checked) {
+                    forceDisableRagCheckbox.checked = false;
+                    defaultRag.checked = false;
+                }
+            });
+            forceDisableRagCheckbox.addEventListener('change', function() {
+                if (this.checked) {
+                    forceEnableRagCheckbox.checked = false;
+                    defaultRag.checked = false;
+                }
+            });
+            defaultRag.addEventListener('change', function() {
+                if (this.checked) {
+                    forceEnableRagCheckbox.checked = false;
+                    forceDisableRagCheckbox.checked = false;
+                }
+            });
+
+            
+            function openNav() {
+                document.getElementById("sidenav").style.width = "250px";
+            }
+
+            function closeNav() {
+                document.getElementById("sidenav").style.width = "0";
+            }
+
+
+            function sortNavItems() {
+                
+                // Get all nav-items
+                const nodeList = document.querySelectorAll('.nav-item');
+
+                // Reverse nav-items
+                const reversedNodes = Array.prototype.slice.call(nodeList).reverse();
+                // Explanation:
+                // querySelectorAll returns a NodeList, which is different from an array and thus does not have array methods available to it, such as reverse()
+                // To use reverse(), we must call array methods on our NodeList as if it were an array
+                // To do so, we use 'Array.prototype' as all JS objects have a prototype, which is itself an object, and thus inherits all props and methods of the JS object, such as arrays in this case
+                // The slice() method returns a shallow copy of a protion of an array. If no bounds are specified, it returns the entire array
+                // Every function in JS has a call() method, allowing you to set the value of 'this' for the duration of the function's execution
+                // This effectively let's you borrow a function, using it as if it belongs to a different object than the one it's actually attached to
+                // This lets us call Array's reverse() on our NodeList!
+                
+                // Get parent <div> container
+                const parent = document.getElementById('sidenav-content');
+
+                // Reverse and append nav-items:
+                reversedNodes.forEach(node => parent.appendChild(node));
+                // When calling appendChild on an element that's already part of the DOM, a duplicate will not be created, it'll simply be moved to a new position
+                // This allows us to reverse and reinsert without clearing all nav-items first!
+                
+            }
+
+
+            function loadChatHistoryMenu() {
+                
+                //Make a GET request to the server
+                fetch('/load_chat_history_list')
+                    .then(response => {
+                        if (!response.ok) {
+                            return response.json().then(err => { throw new Error(err.error)});
+                        }
+                        return response
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+
+                            history_list = data.history_list
+                            //console.log(data)
+
+                            let sidenav = document.getElementById('sidenav-content');
+
+                            for(let i = 0; i < history_list.length; i++) {
+                                let newDiv = document.createElement('div');
+                                newDiv.className = 'nav-item';
+                                newDiv.textContent = `Chat ${history_list[i]}`
+                                newDiv.setAttribute('data-chat-id', history_list[i])
+                                newDiv.addEventListener('click', function() {
+                                    console.log("clicked")
+                                    let chatID = this.getAttribute('data-chat-id');
+                                    loadChatHistory(chatID);
+                                });
+                                sidenav.appendChild(newDiv);
+                            }
+                        } else {
+                            throw new Error('Error when fetching history-menu list');
+                        }
+                    })
+                    .catch(error => {
+                        let full_error_message = "There was an error in fetching the history-menu list: " + String(error.message);
+                        console.error(full_error_message);
+                        alert(full_error_message);
+                    });
+            }
+            
+
+            function setDefaultTemplate() {
+                let defaultTemplate = `Answer the user's question in as much detail as possible. Be very helpful, witty and precise. Do not make up answers or fabricate false information!`;
+
+                document.getElementById('templateContent').value = defaultTemplate;     // set prompt-textarea value
+                document.getElementById('template_dropdown_default').setAttribute('data-template', defaultTemplate);    // set 'Default' list-item attribute value
+
+                document.getElementById('templateDropdown').textContent = 'Default';    //Set default dropdown button text
+            }
+
+            
+            function resetLlmAdvancedDefaults() {
+                document.getElementById('gpu_radio_yes').checked = true;
+                document.getElementById('gpu_radio_no').checked = false;
+                document.getElementById("NumbGpuLayers").disabled = false;
+                document.getElementById('NumbGpuLayers').value = "47";
+                document.getElementById('LlmCtxLgt').value = "8192";
+                document.getElementById('MaxNewToks').value = "2048";
+                document.getElementById('tempSlider').value = "0.8";
+                document.getElementById('tempSliderValue').textContent = "0.8"
+                document.getElementById('topkSlider').value = "40";
+                document.getElementById('topkSliderValue').textContent = "40";
+                document.getElementById('toppSlider').value = "0.95";
+                document.getElementById('toppSliderValue').textContent = "0.95";
+                document.getElementById('minpSlider').value = "0.05";
+                document.getElementById('minpSliderValue').textContent = "0.05";
+                document.getElementById('nkeepSlider').value = "0";
+            }
+
+
+            function clearDocsLoadedTable() {
+                var table = document.getElementById('docs_loaded_details_table');
+
+                for (var i = table.rows.length - 1; i > 0; i--) {   // HTML tables start at row 0, so the header row is 0 and won't be deleted thanks to the i > 0 condition. The length-1 is to account for 0-indexing as length may be 10, but max row index will be 9. 
+                    table.deleteRow(i);
+                }
+            }
+
+
+            function populateDocsLoadedTable() {
+                
+                let formData = new FormData();
+                formData.append('embedding_model_choice', document.getElementById('embedding_model_dropdown').value);
+
+                fetch('/fetch_file_list_for_vector_db', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        return response.json().then(err => { throw new Error(err.error)});
+                    }
+                    return response
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+
+                        clearDocsLoadedTable(); // clear the table since we now have new data
+
+                        row_list = data.file_row_list;
+
+                        var table = document.getElementById('docs_loaded_details_table');
+
+                        for (var i = 0; i < row_list.length; i++) {
+                            // var rowCount = table.rows.length;   // get the number of rows in the table
+                            // var row = table.insertRow(rowCount);    // since HTML tables are initialized with row 0, rowCount will specify the current position to insert the new row
+
+                            var row = table.insertRow(-1);    // Or simply, use -1 to auto-append at the end of the table!
+
+                            // Now create and insert new cells into the row while simulataneously setting their content:
+                            row.insertCell(0).innerHTML = row_list[i][0];   // Name
+                            row.insertCell(1).innerHTML = row_list[i][1];   // VectorDB
+                            row.insertCell(2).innerHTML = row_list[i][2];   // Chunk Size
+                            row.insertCell(3).innerHTML = row_list[i][3];   // Chunk Overlap
+                        }
+                    } else {
+                        throw new Error('data.success=false error when fetching file-list for vector database. ')
+                    }
+                })
+                .catch(error => {
+                    let full_error_message = "There was an error when fetching the file-list for the selected vector database.: " + String(error.message);
+                    console.error(full_error_message);
+                    alert(full_error_message);
+                });
+            }
+
+            
+            function resetVectorDBtoBlank() {
+
+                // Ask for user confirmation:
+                if (!confirm("Are you sure you want to reset the VectorDB? The database will not be deleted from disk, and can be reverted to by manually modifying config.json")) {
+                    return; // If cancelled by the user, exit the function!
+                }
+
+                let formData = new FormData();
+                formData.append('embedding_model_choice', document.getElementById('embedding_model_dropdown').value);
+
+                fetch('/reset_vector_db_on_disk', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        return response.json().then(err => { throw new Error(err.error)});
+                    }
+                    return response
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        clearDocsLoadedTable();
+                        if (data.restart_required) {    // Refresh the page to reset the vectorDB
+                            location.reload();
+                        }
+                    } else {
+                        throw new Error('data.success=false error when resetting the specified vector database. ');
+                    }
+                })
+                .catch(error => {
+                    let full_error_message = "There was an error in resetting the specified vector database: " + String(error.message);
+                    console.error(full_error_message);
+                    alert(full_error_message);
+                });
+            }
+
+
+            function openImageInNewTab(imageUrl) {
+                window.open(imageUrl, '_blank');
+            }
+
+            function attachClickListeners() {
+                document.querySelectorAll('.gallery-thumbnail').forEach(function(iframe) {
+                    iframe,addEventListener('click', function() {
+                        console.log('Clicked element:', iframe);
+                        openImageInNewTab(iframe.src)
+                    });
+                });
+            }
+
+            function openImageGalleryModal(modalId) {
+                document.getElementById(modalId).style.display = 'block';
+                //attachClickListeners();
+            }
+
+            function closeImageGalleryModal(modalId) {
+                document.getElementById(modalId).style.display = 'none';
+            }
+
+
+            /////////////---------DOMContentLoaded---------/////////////
+            document.addEventListener("DOMContentLoaded", function() {
+
+                var currentUrl = window.location.href;
+                var chatLink = document.getElementById('dynamicChatLink');
+                // chatLink.href = currentUrl + '/chat';
+                chatLink.href = currentUrl;
+
+                // document.body.addEventListener('click', function(event) {
+                //     console.log('Clicked element:', event.target);
+                // });
+
+                //Start initializing the chat session
+                document.getElementById('ModelAndDBLoading').style.display = 'block';
+
+                // Get & Set Core Values - for the Settings dialog and subsequent app-loading functions
+                const initKeysToRead = ['model_choice', 'use_local_llm', 'use_gpu', 'embedding_model_choice', 'use_ocr', 'ocr_service_choice', 'local_llm_chat_template_format', 'force_enable_rag', 'force_disable_rag', 'base_template', 'local_llm_gpu_layers', 'local_llm_context_length', 'local_llm_max_new_tokens', 'local_llm_temperature', 'local_llm_top_k', 'local_llm_top_p', 'local_llm_min_p', 'local_llm_n_keep']
+                fetch('/config_reader_api', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({keys: initKeysToRead})
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        return response.json().then(err => { throw new Error(err.error)});
+                    }
+                    return response
+                })
+                .then(response => response.json())
+                .then(data => {
+                    // console.log(data);
+                    // console.log("embedding_model_choice: ", data.embedding_model_choice);
+                    var values = data.values;
+                    var model_choice = values.model_choice;
+                    var use_gpu = values.use_gpu;
+                    var use_local_llm = values.use_local_llm;
+                    var embedding_model_choice = values.embedding_model_choice;
+                    var use_ocr = values.use_ocr;
+                    var ocr_service_choice = values.ocr_service_choice;
+                    var local_llm_chat_template_format = values.local_llm_chat_template_format;
+                    var force_enable_rag = values.force_enable_rag;
+                    var force_disable_rag = values.force_disable_rag;
+                    var base_template = values.base_template;
+                    document.getElementById('NumbGpuLayers').value = values.local_llm_gpu_layers;
+                    document.getElementById('LlmCtxLgt').value = values.local_llm_context_length;
+                    document.getElementById('MaxNewToks').value = values.local_llm_max_new_tokens;
+                    document.getElementById('tempSlider').value = values.local_llm_temperature;
+                    document.getElementById('tempSliderValue').textContent = values.local_llm_temperature;
+                    document.getElementById('topkSlider').value = values.local_llm_top_k;
+                    document.getElementById('topkSliderValue').textContent = values.local_llm_top_k;
+                    document.getElementById('toppSlider').value = values.local_llm_top_p;
+                    document.getElementById('toppSliderValue').textContent = values.local_llm_top_p;
+                    document.getElementById('minpSlider').value = values.local_llm_min_p;
+                    document.getElementById('minpSliderValue').textContent = values.local_llm_min_p;
+                    document.getElementById('nkeepSlider').value = values.local_llm_n_keep;
+                    
+                    // console.log('model_choice:', model_choice);
+
+                    // 0 - Function to trigger change events as values are loaded and set
+                    function triggerChangeEvent(element) {
+                        var event = new Event('change', {
+                            bubbles: true,  // ensures event bubbles up through the DOM, allowing elements higher up in the DOM tree to listen and react
+                            cancelable: true   // cancellable events allow preventDefault() calls to prevent default behavoir, such as form submissions
+                        });
+                        element.dispatchEvent(event);
+                    }
+                    
+                    // 1. Set LLM Tab Details:
+
+                    // a. Fetch model list
+                    fetch('/load_local_models')
+                    .then(response => {
+                        if (!response.ok) {
+                            return response.json().then(err => { throw new Error(err.error)});
+                        }
+                        return response
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            //console.log('model_choice:', model_choice);
+                            const dropdown = document.getElementById('modelDropdown');
+                            data.models.forEach(model => {
+                                const option = document.createElement('option');
+                                option.value = model;
+                                option.textContent = model;
+                                //console.log('Model:', model);
+
+                                if (typeof model !== 'undefined' && typeof model_choice !== 'undefined') {
+                                    if (model.toLowerCase() == model_choice.toLowerCase()) {
+                                        option.selected = true;
+                                    }
+                                }
+                                dropdown.appendChild(option);
+                            });
+                        } else {
+                            throw new Error('Data error when fetching model list');
+                        }
+                    })
+                    .catch(error => {
+                        let full_error_message = "There was an error in fetching the model list: " + String(error.message);
+                        console.error(full_error_message);
+                        alert(full_error_message);
+                    });
+
+                    // b. set LLM System-Prompt Template:
+                    const llmTempDd = document.getElementById('llmTemplateDropdown');
+
+                    for (let option of llmTempDd.options) {
+                        if (option.value == local_llm_chat_template_format) {
+                            option.selected = true;
+                            break;
+                        }
+                    }
+
+                    
+                    // c. Set LLM's gpu_choice Radio button
+                    var gpuYes = document.getElementById('gpu_radio_yes');
+                    var gpuNo = document.getElementById('gpu_radio_no');
+
+                    if (use_gpu) {
+                        gpuYes.checked = true;
+                        gpuNo.checked = false;
+                    } else {
+                        gpuYes.checked = false;
+                        gpuNo.checked = true;
+                    }
+
+
+                    // d. LLM  Radio button
+                    var useLocalLlm = document.getElementById('local_llm_radio_button');
+                    var useApiLlm = document.getElementById('api_llm_radio_button');
+
+                    if (use_local_llm) {
+                        useLocalLlm.checked = true;
+                        useApiLlm.checked = false;
+                    } else {
+                        useLocalLlm.checked = false;
+                        
+                        // select API service from dropwdown
+                        var selectLlmApiForDropdown = document.getElementById('llmApiDropdown');
+
+                        for (var i = 0; i < selectLlmApiForDropdown.length; i++) {
+                            if (selectLlmApiForDropdown.options[i].value === model_choice) {
+                                selectLlmApiForDropdown.options[i].selected = true;
+                                break;
+                            }
+                        }
+
+                        useApiLlm.checked = true;
+                    }
+
+                    // Now that all dets for the LLM tab are loaded, update UI:
+
+                    // 1a. Show or hide local-LLM selection:
+                    function toggleLocalLlmSelection() {
+                        var selection = document.querySelector('input[name="use_local_or_api_llm"]:checked').value;
+                        
+                        document.getElementById('localLlmSelection').style.display = selection === 'local' ? 'block' : 'none';
+                        document.getElementById('localLlmTemplateSelection').style.display = selection === 'local' ? 'block' : 'none';
+                        // document.getElementById('advancedLlmSettingsToggle').style.display = selection === 'local' ? 'inline-block' : 'none';
+                        document.getElementById('apiLlmSelection').style.display = selection === 'api' ? 'block' : 'none';
+                        
+                        var advancedLlmSettingsToggle = document.getElementById('advancedLlmSettingsToggle');
+                        var advancedLlmSettings = document.getElementById('advancedLlmSettings');
+
+                        if (selection === 'local') {
+                            document.getElementById('azure_openai_api_form').style.display = 'none'; //Hide API-Details-Form if local selected
+                            advancedLlmSettingsToggle.style.display = 'inline-block';
+                        } else {
+                            advancedLlmSettingsToggle.style.display = 'none';
+                            // Collapse Advanced Settings if it's expanded
+                            if (advancedLlmSettings.classList.contains('show')) {
+                                var bsCollapse = new bootstrap.Collapse(advancedLlmSettings, {
+                                    toggle: false
+                                });
+                                bsCollapse.hide();
+                            }
+                        }
+                    }
+
+                    // 1b. Show or hide API form:
+                    function toggleLlmApiForm() {
+                        var selection = document.getElementById('llmApiDropdown').value;
+                        document.getElementById('azure_openai_api_form').style.display = selection === 'AzureOpenAI' ? 'block' : 'none';
+                        //Add more API form selectors here
+                    }
+
+                    // 1c. enable or disable ngl based on use_gpu
+                    function toggleNGL() {
+                        var selection = document.querySelector('input[name="use_gpu"]:checked').value;
+                        if(selection === 'y') {
+                            document.getElementById("NumbGpuLayers").disabled = false;
+                        } else {
+                            document.getElementById("NumbGpuLayers").disabled = true;
+                        }
+                    }
+
+                    // 1d. Event listener for radio buttons:
+                    document.getElementById('local_llm_radio_button').addEventListener('change', toggleLlmApiForm);
+                    document.getElementById('local_llm_radio_button').addEventListener('change', toggleLocalLlmSelection);
+
+                    document.getElementById('api_llm_radio_button').addEventListener('change', toggleLlmApiForm);
+                    document.getElementById('api_llm_radio_button').addEventListener('change', toggleLocalLlmSelection);
+
+                    // 1e. Event listener for API dropdown:
+                    document.getElementById('llmApiDropdown').addEventListener('change', toggleLlmApiForm);
+
+                    // 1f. Event Listener for toggle GPU:
+                    document.getElementById('gpu_radio_yes').addEventListener('change', toggleNGL);
+                    document.getElementById('gpu_radio_no').addEventListener('change', toggleNGL);
+
+                    // 1g. Event listener for Reset Defaults button:
+                    document.getElementById('resetLlmAdvancedDefaults').addEventListener('click', resetLlmAdvancedDefaults);    //aparently, adding parenthesis () here will cause resetLlmAdvancedDefaults to run immediately when the script executes, not on button click. Removing them allows the function to be passed as a reference correctly on click.
+
+                    // 1h. Initial state check:
+                    toggleLocalLlmSelection();
+                    toggleLlmApiForm();
+                    toggleNGL();
+
+                    // 1i. Slider listeners
+                    document.getElementById('tempSlider').addEventListener('input', function() {
+                        document.getElementById('tempSliderValue').textContent = this.value;
+                    });
+
+                    document.getElementById('topkSlider').addEventListener('input', function() {
+                        document.getElementById('topkSliderValue').textContent = this.value;
+                    });
+
+                    document.getElementById('toppSlider').addEventListener('input', function() {
+                        document.getElementById('toppSliderValue').textContent = this.value;
+                    });
+
+                    document.getElementById('minpSlider').addEventListener('input', function() {
+                        document.getElementById('minpSliderValue').textContent = this.value;
+                    });
+
+
+
+                    // 2 - Embedding Model
+                    var selectEmbedModelForDropdown = document.getElementById('embedding_model_dropdown');
+
+                    for (var i = 0; i < selectEmbedModelForDropdown.length; i++) {
+                        if (selectEmbedModelForDropdown.options[i].value === embedding_model_choice) {
+                            selectEmbedModelForDropdown.options[i].selected = true;
+                            clearDocsLoadedTable();
+                            populateDocsLoadedTable();
+                            break;
+                        }
+                    }
+
+                    // Now that all dets for the Embedding-Model tab are loaded, update UI:
+
+                    // 2a. Show or hide API form:
+                    function toggleAzureAdaApiForm() {
+                        var selection = document.getElementById('embedding_model_dropdown').value;
+                        document.getElementById('azure_openai_text_ada_api_form').style.display = selection === 'openai_text_ada' ? 'block' : 'none';
+                        //Add more API form selectors here
+                    }
+
+                    // 2b. Event listener for API dropdown:
+                    document.getElementById('embedding_model_dropdown').addEventListener('change', function() {
+                        populateDocsLoadedTable();
+                        toggleAzureAdaApiForm();
+                    });
+
+                    // 2b. Add Event Listener for ResetDB button:
+                    document.getElementById('resetVectorDB').addEventListener('click', resetVectorDBtoBlank);
+
+                    // 2c. Check init
+                    toggleAzureAdaApiForm();
+
+
+                    // 3 - Prompt Template Stuff:
+
+                    // 3a. Set the default template when the page loads
+                    setDefaultTemplate();
+                    let default_system_template = document.getElementById('template_dropdown_default').getAttribute('data-template');
+
+                    if (base_template.toLowerCase().trim() != default_system_template.toLowerCase().trim()) {
+                        document.getElementById('template_dropdown_custom').setAttribute('data-template', base_template);
+                        document.getElementById('templateContent').value = base_template;
+                        document.getElementById('templateContent').readOnly = false;
+                        document.getElementById('templateDropdown').textContent = 'Custom';
+                    }
+
+                    // 3b. Set event-listeners for the template-choices:
+                    let dropdownItems = document.querySelectorAll('.dropdown-item');    // Get a reference to the dropdown items and the textarea
+                    let textarea = document.getElementById('templateContent');
+
+                    // 3c. Loop through each dropdown item
+                    dropdownItems.forEach(function(item) {
+                        item.addEventListener('click', function(event) {
+
+                            event.preventDefault();
+
+                            // Get the template content from the clicked dropdown item's data-template attribute
+                            let templateContent = event.target.getAttribute('data-template');
+                            let isReadonly = event.target.getAttribute('data-readonly') === 'true'; // Convert string to boolean via '===' strict equality check: if the data-readonly attribute is true, the boolean isReadonly will be true, else false!
+
+                            // Set the textarea value to the template content
+                            textarea.value = templateContent;
+
+                            // Set readonly attribute and placeholder
+                            textarea.readOnly = isReadonly;
+                            textarea.placeholder = isReadonly ? "" : "Use this space to enter your own prompt"; // No placeholder if readonly
+
+                            // Change the dropdown button text to reflect the chosen template
+                            document.getElementById('templateDropdown').textContent = event.target.textContent;
+
+                        });
+                    });
+
+
+                    // 4 - Set RAG-Checkbox
+                    const forceEnableRagCheckbox = document.getElementById('force_enable_rag_checkbox');
+                    const forceDisableRagCheckbox = document.getElementById('force_disable_rag_checkbox');
+                    const defaultRag = document.getElementById('default_rag_checkbox');
+
+                    if (force_enable_rag) {
+                        console.log("Force enabling RAG")
+                        forceEnableRagCheckbox.checked = true
+                        forceDisableRagCheckbox.checked = false;
+                        defaultRag.checked = false;
+                    } else if (force_disable_rag) {
+                        console.log("Force disabling RAG")
+                        forceEnableRagCheckbox.checked = false
+                        forceDisableRagCheckbox.checked = true;
+                        defaultRag.checked = false;
+                    } else if (!force_enable_rag && !force_disable_rag) {
+                        forceEnableRagCheckbox.checked = false
+                        forceDisableRagCheckbox.checked = false;
+                        defaultRag.checked = true;
+                    }
+
+
+                    // 5 - OCR Stuff
+                    var useOcr = document.getElementById('ocr_yes_radio_button');
+                    var usePypdf = document.getElementById('ocr_no_radio_button');
+
+                    if (use_ocr) {
+                        useOcr.checked = true;
+
+                        // select API service from dropwdown
+                        var selectOcrApiForDropdown = document.getElementById('ocrApiDropdown');
+
+                        for (var i = 0; i < selectOcrApiForDropdown.length; i++) {
+                            if (selectOcrApiForDropdown.options[i].value === ocr_service_choice) {
+                                selectOcrApiForDropdown.options[i].selected = true;
+                                break;
+                            }
+                        }
+
+                        usePypdf.checked = false;
+                    } else {
+                        useOcr.checked = false;
+                        usePypdf.checked = true;
+                    }
+
+                    document.getElementById('update_azure_gpt').addEventListener('change', function() {
+                        document.getElementById('azure_openai_api_url').disabled = !this.checked;   
+                        document.getElementById('azure_openai_api_key').disabled = !this.checked;   
+                        document.getElementById('azure_openai_deployment_name').disabled = !this.checked;
+                    });
+                    document.getElementById('update_azure_ada').addEventListener('change', function() {
+                        document.getElementById('azure_openai_text_ada_api_url').disabled = !this.checked;    
+                        document.getElementById('azure_openai_text_ada_api_key').disabled = !this.checked;   
+                        document.getElementById('azure_openai_text_ada_deployment_name').disabled = !this.checked;   
+                    });
+                    document.getElementById('update_azure_vision').addEventListener('change', function() {
+                        document.getElementById('azure_vision_api_url').disabled = !this.checked;    
+                        document.getElementById('azure_vision_api_key').disabled = !this.checked;   
+                    });
+                    document.getElementById('update_azure_doc_ai').addEventListener('change', function() {
+                        document.getElementById('azure_doc_ai_api_url').disabled = !this.checked;   // !this.check -> logical NOT to flip boolean. this.checked will be true when the box is checked, so !this.checked will be false... 
+                        document.getElementById('azure_doc_ai_api_key').disabled = !this.checked;   // ...and so disabled will be false. So if Update-Config is checked, the fields are enabled.
+                    });
+
+                    // Now that all dets for the OCR tab are loaded, update UI:
+                   
+                    // 5a. Show or hide OCR-Service selection:
+                    function toggleOcrSelection() {
+                        var selection = document.querySelector('input[name="specify_ocr_and_service"]:checked').value;
+                        document.getElementById('apiOcrSelection').style.display = selection === 'ocr' ? 'block' : 'none';
+                        if (selection === 'pypdf') {    //Hide API-Details-Form 
+                            document.getElementById('azure_vision_api_form').style.display = 'none'; 
+                            document.getElementById('azure_doc_ai_api_form').style.display = 'none';
+                        } else {
+                            if (document.getElementById('ocrApiDropdown').value != 'AzureVision') {
+                                document.getElementById('azure_vision_api_form').style.display = 'none'; //Hide API-Details-Form
+                            } else if (document.getElementById('ocrApiDropdown').value != 'AzureDocAi') {
+                                document.getElementById('azure_doc_ai_api_form').style.display = 'none';
+                            }
+                        }
+                    }
+
+                    // 5b. Show or hide API form:
+                    function toggleOcrApiForm() {
+                        var selection = document.getElementById('ocrApiDropdown').value;
+                        document.getElementById('azure_vision_api_form').style.display = selection === 'AzureVision' ? 'block' : 'none';
+                        document.getElementById('azure_doc_ai_api_form').style.display = selection === 'AzureDocAi' ? 'block' : 'none';
+                        //Add more API form selectors here
+                    }
+
+                    // 5c. Event listener for radio buttons:
+                    document.getElementById('ocr_yes_radio_button').addEventListener('change', toggleOcrApiForm);
+                    document.getElementById('ocr_yes_radio_button').addEventListener('change', toggleOcrSelection);
+
+                    document.getElementById('ocr_no_radio_button').addEventListener('change', toggleOcrApiForm);
+                    document.getElementById('ocr_no_radio_button').addEventListener('change', toggleOcrSelection);
+
+                    // 5d. Initial state check:
+                    toggleOcrSelection();
+                    toggleOcrApiForm();
+
+                    // 5e. Event listener for API dropdown:
+                    document.getElementById('ocrApiDropdown').addEventListener('change', toggleOcrApiForm);
+
+                })
+                .catch(error => {
+                    let full_error_message = "There was an error in reading config.json: " + String(error.message);
+                    console.error(full_error_message);
+                    alert(full_error_message);
+                }); //END config_reader_api call
+
+
+                // Now that all on-load setup for Modal-Setting's Tabs based on config.json is completed, set listeners to cycle between tabs:
+                let options = document.querySelectorAll('[data-content]');
+
+                options.forEach(function(option) {
+                    option.addEventListener('click', function(e) {
+                        e.preventDefault();
+
+                        // 1) Deavtivate all options: Make the clicked option active, by first marking all options as inactive
+                        options.forEach(function(opt) {
+                            opt.classList.remove('active');
+                        });
+                        option.classList.add('active'); //2) Activate the clicked option
+
+                        // 3) Hide all detail panels on the right
+                        // w-75 > div selects all div elements that are direct children of an element of class w-75. CSS selector syntax, with > denoting a direct child relationship
+                        let details = document.querySelectorAll('.w-75 > div');
+                        details.forEach(function(detail) {
+                            detail.classList.add('d-none');
+                        });
+
+                        // 4) Reveal details for clicked option, by first hiding the detail divs for all options
+                        let selectDetail = document.getElementById(option.getAttribute('data-content'));
+                        selectDetail.classList.remove('d-none');
+
+                    });
+                });
+
+
+                // Finally, trigger the LLM & vectorDB starter!
+                fetch('/llama_cpp_server_starter')
+                .then(response => {
+                    if (!response.ok) {
+                        return response.json().then(err => { throw new Error(err.error)});
+                    }
+                    return response
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+
+                        llm_model = data.llm_model
+                        LLM_MODEL = String(data.llm_model)
+
+
+                        // Once the llama.cpp server is up (the LLM is loaded), load the VectorDB
+                        fetch('/load_vectordb')
+                        .then(response => {
+                            if (!response.ok) {
+                                return response.json().then(err => { throw new Error(err.error)});
+                            }
+                            return response
+                        })
+                        .catch(error => {
+                            let full_error_message = "There was an error when loading the VectorDB: " + String(error.message);
+                            console.error(full_error_message);
+                            alert(full_error_message);
+                        });
+                        
+
+                        // Once the llama.cpp server is up (the LLM is loaded), init the chat history DB 
+                        fetch('/init_chat_history_db')
+                            .then(response => {
+                                if (!response.ok) {
+                                    return response.json().then(err => { throw new Error(err.error)});
+                                }
+                                return response
+                            })
+                            .then(response => response.json())
+                            .then(data => {
+                                if (data.success) {
+                                    // If LLM, VectorDB and chat history DB initialized successfully, continue
+
+                                    CHAT_ID = data.chat_id;
+
+                                    curr_chat_id = data.chat_id
+                                    curr_chat_id = " Chat ".concat(String(curr_chat_id))
+
+                                    display_chatid_and_model = String(curr_chat_id).concat(": ", String(llm_model))
+
+                                    document.getElementById('model_header').innerHTML = display_chatid_and_model;
+                                    document.getElementById('model_header').style.display = 'block';
+
+                                    // Load menu items for the chat history menu
+                                    loadChatHistoryMenu();
+                                    document.getElementById('ModelAndDBLoading').style.display = 'none';
+                                    document.getElementById('ReadyToChat').style.display = 'block';
+                                    
+                                    var timeoutDelayInMilliseconds = 1500; //1.5 seconds
+                                    setTimeout(function() {
+                                        document.getElementById('ReadyToChat').style.display = 'none';
+                                    }, timeoutDelayInMilliseconds);
+                                    
+                                } else {
+                                    throw new Error('Error when initializing the chat history DB');
+                                }
+                            })
+                            .catch(error => {
+                                let full_error_message = "There was an error in initializing the chat history DB: " + String(error.message);
+                                console.error(full_error_message);
+                                alert(full_error_message);
+                            });
+                    } else {
+                        throw new Error('Data error when loading the model or vectorDB');
+                    }
+                })
+                .catch(error => {
+                    let full_error_message = "There was an error in loading the model or vectorDB: " + String(error.message);
+                    console.error(full_error_message);
+                    alert(full_error_message);
+                })
+                .finally(() => {
+                    document.getElementById('ModelAndDBLoading').style.display = 'none';
+                });
+
+
+                //Make a GET request to the server to load the LLM & vectorDB
+                // fetch('/load_model_and_vectordb')
+                // .then(response => {
+                //     if (!response.ok) {
+                //         return response.json().then(err => { throw new Error(err.error)});
+                //     }
+                //     return response
+                // })
+                // .then(response => response.json())
+                // .then(data => {
+                //     if (data.success) {
+
+                //         llm_model = data.llm_model
+                //         LLM_MODEL = String(data.llm_model)
+                        
+                //         // If LLM & VectorDB loaded successfully, init the chat history DB 
+                //         fetch('/init_chat_history_db')
+                //             .then(response => {
+                //                 if (!response.ok) {
+                //                     return response.json().then(err => { throw new Error(err.error)});
+                //                 }
+                //                 return response
+                //             })
+                //             .then(response => response.json())
+                //             .then(data => {
+                //                 if (data.success) {
+                //                     // If LLM, VectorDB and chat history DB initialized successfully, continue
+
+                //                     curr_chat_id = data.chat_id
+
+                //                     curr_chat_id = " Chat ".concat(String(curr_chat_id))
+
+                //                     display_chatid_and_model = String(curr_chat_id).concat(": ", String(llm_model))
+
+                //                     document.getElementById('model_header').innerHTML = display_chatid_and_model;
+                //                     document.getElementById('model_header').style.display = 'block';
+
+                //                     // Load menu items for the chat history menu
+                //                     loadChatHistoryMenu();
+                //                     document.getElementById('ModelAndDBLoading').style.display = 'none';
+                //                     document.getElementById('ReadyToChat').style.display = 'block';
+                                    
+                //                     var timeoutDelayInMilliseconds = 1500; //1.5 seconds
+                //                     setTimeout(function() {
+                //                         document.getElementById('ReadyToChat').style.display = 'none';
+                //                     }, timeoutDelayInMilliseconds);
+                                    
+                //                 } else {
+                //                     throw new Error('Error when initializing the chat history DB');
+                //                 }
+                //             })
+                //             .catch(error => {
+                //                 let full_error_message = "There was an error in initializing the chat history DB: " + String(error.message);
+                //                 console.error(full_error_message);
+                //                 alert(full_error_message);
+                //             });
+                //     } else {
+                //         throw new Error('Data error when loading the model or vectorDB');
+                //     }
+                // })
+                // .catch(error => {
+                //     let full_error_message = "There was an error in loading the model or vectorDB: " + String(error.message);
+                //     console.error(full_error_message);
+                //     alert(full_error_message);
+                // });
+                
+                
+                //Scroll all the way down button:
+                const scrollDownButton = document.getElementById('scrollDownButton');
+                const chatArea = document.getElementById('chat-area');
+
+                scrollDownButton.addEventListener('click', () => {
+                    chatArea.scrollTop = chatArea.scrollHeight;
+                });
+
+            });//########### End DOMContentLoaded !
+
+
+            document.getElementById('saveChangesButton').addEventListener('click', function() {
+
+                // console.log(document.getElementById('templateContent').value);
+                
+                //######### 1 - Save Prompt Template: Get the value of the dropdown from it's associated button
+                let selectedTemplateName = document.getElementById('templateDropdown').textContent.trim();
+
+                let prompt_template;
+
+                switch(selectedTemplateName) {
+                    case 'Default':
+                        prompt_template = document.getElementById('template_dropdown_default').getAttribute('data-template');
+                        break;
+                    case 'Custom':
+                        prompt_template = String(document.getElementById('templateContent').value);
+                        break;
+                    // case 'None':
+                    //     prompt_template = ""
+                    //     break;
+                    // case 'Zero-Shot Prompt':
+                    //     prompt_template = "Analyze the user's query and respond to the best of your knowledge using the given context."
+                    //     break;
+                }
+
+
+                ////######### 2 - Save RAG Options:
+                let force_enable_rag = false;
+                let force_disable_rag = false;
+
+                const forceEnableRagCheckbox = document.getElementById('force_enable_rag_checkbox');
+                const forceDisableRagCheckbox = document.getElementById('force_disable_rag_checkbox');
+                const defaultRag = document.getElementById('default_rag_checkbox');
+
+                if (forceEnableRagCheckbox.checked) {
+                    console.log("Force enabling RAG")
+                    force_enable_rag = true;
+                    force_disable_rag = false;
+                } else if (forceDisableRagCheckbox.checked) {
+                    console.log("Force disabling RAG")
+                    force_enable_rag = false;
+                    force_disable_rag = true;
+                } else if (defaultRag.checked) {
+                    force_enable_rag = false;
+                    force_disable_rag = false;
+                }
+
+                let additional_settings = {}
+
+                ////######### 3 - Save LLM Options:
+                let use_local_llm = false;
+                let use_azure_open_ai = false;
+                let use_gpu = false;
+                let model_choice = "";
+                let local_llm_chat_template_format = "";
+
+                const useLocalLlmRadioButton = document.getElementById('local_llm_radio_button');
+                const useApiRadioButton = document.getElementById('api_llm_radio_button');
+                const useGpuForLocalLlm = document.getElementById('gpu_radio_yes');
+                const noGpuForLocalLlm = document.getElementById('gpu_radio_no');
+                var update_azure_gpt_config = document.getElementById('update_azure_gpt').checked;
+
+
+                if (useLocalLlmRadioButton.checked) {
+
+                    use_local_llm = true;
+                    use_azure_open_ai = false;
+
+                    var selectedLocalLlm = document.getElementById('modelDropdown').value;
+                    model_choice = selectedLocalLlm;
+
+                    var selectedTemplateFormat = document.getElementById('llmTemplateDropdown').value;
+                    local_llm_chat_template_format = selectedTemplateFormat;
+
+                    if (useGpuForLocalLlm.checked) {
+                        use_gpu = true;
+                    } else if (noGpuForLocalLlm.checked) {
+                        use_gpu = false;
+                    }
+                } else if (useApiRadioButton.checked) {
+
+                    use_local_llm = false;
+
+                    model_choice = document.getElementById('llmApiDropdown').value;
+
+                    if (model_choice === "AzureOpenAI") {
+                        use_azure_open_ai = true;
+                        if (update_azure_gpt_config) {
+                            additional_settings['azure_openai_base_url'] = document.getElementById("azure_openai_api_url").value;
+                            additional_settings['azure_openai_api_key'] = document.getElementById("azure_openai_api_key").value;
+                            additional_settings['azure_openai_deployment_name'] = document.getElementById("azure_openai_deployment_name").value;
+                        }
+                    }
+
+                    use_gpu = false;
+                }
+
+
+                ////######### 4 - Save Embedding-Model Options:
+                let embedding_model_choice = document.getElementById('embedding_model_dropdown').value;
+                let use_openai_embeddings = false;
+                let use_bge_large_embeddings = false;
+                let use_bge_base_embeddings = false;
+                let use_sbert_embeddings = true;
+                var update_azure_ada_config = document.getElementById('update_azure_ada').checked;
+                
+                if (embedding_model_choice == 'bge_large') {
+                    use_openai_embeddings = false;
+                    use_bge_large_embeddings = true;
+                    use_bge_base_embeddings = false;
+                    use_sbert_embeddings = false;
+                } else if (embedding_model_choice == 'bge_base') {
+                    use_openai_embeddings = false;
+                    use_bge_large_embeddings = false;
+                    use_bge_base_embeddings = true;
+                    use_sbert_embeddings = false;
+                } else if (embedding_model_choice == 'sbert_mpnet_base_v2') {
+                    use_openai_embeddings = false;
+                    use_bge_large_embeddings = false;
+                    use_bge_base_embeddings = false;
+                    use_sbert_embeddings = true;
+                } else if (embedding_model_choice == 'openai_text_ada') {
+                    if (update_azure_ada_config) {
+                        additional_settings['azure_openai_text_ada_api_url'] = document.getElementById("azure_openai_text_ada_api_url").value;
+                        additional_settings['azure_openai_text_ada_api_key'] = document.getElementById("azure_openai_text_ada_api_key").value;
+                        additional_settings['azure_openai_text_ada_deployment_name'] = document.getElementById("azure_openai_text_ada_deployment_name").value;
+                    }
+                    use_openai_embeddings = true;
+                    use_bge_large_embeddings = false;
+                    use_bge_base_embeddings = false;
+                    use_sbert_embeddings = false;
+                }
+
+
+                let config_updates = {
+                    'use_local_llm': use_local_llm,
+                    'use_azure_open_ai':use_azure_open_ai,
+                    'use_gpu': use_gpu,
+                    'model_choice':model_choice,
+                    'local_llm_chat_template_format':local_llm_chat_template_format,
+                    'force_enable_rag': force_enable_rag,
+                    'force_disable_rag':force_disable_rag,
+                    'base_template':prompt_template,
+                    'use_sbert_embeddings': use_sbert_embeddings,
+                    'use_bge_base_embeddings': use_bge_base_embeddings,
+                    'use_bge_large_embeddings': use_bge_large_embeddings,
+                    'use_openai_embeddings': use_openai_embeddings,
+                    'embedding_model_choice': embedding_model_choice,
+                    'local_llm_gpu_layers': document.getElementById('NumbGpuLayers').value,
+                    'local_llm_context_length': document.getElementById('LlmCtxLgt').value,
+                    'local_llm_max_new_tokens': document.getElementById('MaxNewToks').value,
+                    'local_llm_temperature': document.getElementById('tempSlider').value,
+                    'local_llm_top_k': document.getElementById('topkSlider').value,
+                    'local_llm_top_p': document.getElementById('toppSlider').value,
+                    'local_llm_min_p': document.getElementById('minpSlider').value,
+                    'local_llm_n_keep': document.getElementById('nkeepSlider').value
+                }
+
+
+                if (Object.keys(additional_settings).length > 0) {  // If additional API config options exist
+                    Object.assign(config_updates, additional_settings); // Merge additional_settings into config_updates
+                }
+
+
+                ////######### 5 - Save OCR Options:
+                var azzure_ocr_modal_form = document.getElementById("azure_vision_api_form");
+                var azure_ocr_form_style = window.getComputedStyle(azzure_ocr_modal_form);
+                var azzure_doc_ai_modal_form = document.getElementById("azure_doc_ai_api_form");
+                var azure_doc_ai_form_style = window.getComputedStyle(azzure_doc_ai_modal_form);
+                var update_azure_vision_config = document.getElementById('update_azure_vision').checked;
+                var update_azure_doc_ai_config = document.getElementById('update_azure_doc_ai').checked;
+                
+                if (azure_ocr_form_style.display != 'none') {
+                    if (update_azure_vision_config) {
+                        config_updates['azure_ocr_endpoint'] = document.getElementById("azure_vision_api_url").value;
+                        config_updates['azure_ocr_subscription_key'] = document.getElementById("azure_vision_api_key").value;
+                    }
+                    config_updates['ocr_service_choice'] = 'AzureVision';
+                    config_updates['use_ocr'] = true;
+                } else if (azure_doc_ai_form_style.display != 'none') {
+                    if (update_azure_doc_ai_config) {
+                        config_updates['azure_doc_ai_endpoint'] = document.getElementById("azure_doc_ai_api_url").value;
+                        config_updates['azure_doc_ai_subscription_key'] = document.getElementById("azure_doc_ai_api_key").value;
+                    }
+                    config_updates['ocr_service_choice'] = 'AzureDocAi';
+                    config_updates['use_ocr'] = true;
+                } else {
+                    config_updates['ocr_service_choice'] = 'None';
+                    config_updates['use_ocr'] = false;
+                }
+                
+
+                fetch('/config_writer_api', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        'config_updates': config_updates
+                    })
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        return response.json().then(err => { throw new Error(err.error)});
+                    }
+                    return response
+                })
+                .then(response => response.json())
+                .then(data => {
+                    console.log(data);
+                    if (data.restart_required) {    // Refresh the page
+                        location.reload();
+                    }
+                })
+                .catch(error => {
+                    let full_error_message = "There was an error in writing to config.json: " + String(error.message);
+                    console.error(full_error_message);
+                    alert(full_error_message);
+                }); //END config_writer_api call
+
+
+            });
+
+
+            function loadChatHistory(chatID) {
+
+                CHAT_ID = chatID;
+
+                document.getElementById('model_header').innerHTML = '';
+                history_chat_id = chatID
+                history_chat_id = " Chat ".concat(String(history_chat_id))
+                display_chatid_and_model = String(history_chat_id).concat(": ", String(LLM_MODEL))
+                document.getElementById('model_header').innerHTML = display_chatid_and_model;
+
+                console.log("Loading chat history")
+
+                document.getElementById('chat-area').innerHTML = '';
+
+                let formData = new FormData();
+                formData.append('chat_id', chatID);
+
+                //Make a POST request to the server
+                fetch('/load_chat_history', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        return response.json().then(err => { throw new Error(err.error)});
+                    }
+                    return response
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        
+                        old_chat_model = data.old_chat_model
+                        old_chat_model = " Last LLM on this chat: ".concat(String(old_chat_model))
+                        document.getElementById('old_model_header').innerHTML = old_chat_model;
+                        document.getElementById('old_model_header').style.display = 'block';
+
+                        chat_history_data = data.chat_history
+                        console.log(data)
+
+                        for (let i = 0; i < chat_history_data.length; i++) {
+                            document.getElementById('chat-area').innerHTML += chat_history_data[i]
+                        }
+
+                    } else {
+                        throw new Error('Error fetching chat history data');
+                    }
+                })
+                .catch(error => {
+                    let full_error_message = "There was an error in fetching chat history data: " + String(error.message);
+                    console.error(full_error_message);
+                    alert(full_error_message);
+                });
+                closeNav();
+            }
+
+            
+            function formatTabsAndSpaces(text, tabSize = 4) {
+                // Replace each tab with tabSize number of &nbsp;
+                text = text.replace(/\t/g, '&nbsp;'.repeat(tabSize));
+
+                // Replace multiple spaces (2 or more) with equivalent number of &nbsp;
+                text = text.replace(/ {2,}/g, (match) => '&nbsp;'.repeat(match.length));
+
+                // Replace newlines with <br>
+                text = text.replace(/\n/g, '<br>');
+
+                return text;
+                //return "test";
+            }
+
+
+
+            function requestFormattedPrompt() {
+
+                //Firstly, immediately disable send functionality!
+                const sendButton = document.getElementById('sendButton');
+                sendButton.disabled = true;
+
+                let do_rag = true;
+                let stream_session_id = "";
+                let formatted_user_prompt = "";
+                let llm_response = "";
+
+                document.getElementById('processingQnS').innerHTML = 'Reading documents...';
+                document.getElementById('processingQnS').style.display  = 'block';
+
+                var userInput = document.getElementById('user-input').value;
+                let userInputForHtml = formatTabsAndSpaces(userInput);
+
+                // Clear the input field
+                document.getElementById('user-input').value = '';
+
+                // Append user input to the chat area
+                document.getElementById('chat-area').innerHTML += '<div class="user-message">' + userInputForHtml + '</div>';
+
+                document.getElementById('chat-area').scrollTop = document.getElementById('chat-area').scrollHeight;     //Scroll to the bottom of the page
+
+                // AJAX call to send user query and receive the formatted prompt
+                fetch('/setup_for_llama_cpp_response', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({'user_query': userInput, 'chat_id': CHAT_ID})
+                }).then(response => {
+                    if (!response.ok) {
+                        return response.json().then(err => { throw new Error(err.error)});
+                    }
+                    return response
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+
+                        do_rag = data.do_rag;
+                        stream_session_id = data.stream_session_id;
+                        formatted_user_prompt = data.formatted_user_prompt;
+                        SEQUENCE_ID = data.sequence_id;
+                        
+                        console.log("do_rag: ", do_rag);
+                        console.log("stream_session_id: ", stream_session_id);
+                        console.log("formatted_user_prompt: \n", formatted_user_prompt);
+
+                         
+                        const responseWrapperID = "ResponseWrapper" + String(stream_session_id);
+                        const responseContentID = "ResponseContent" + String(stream_session_id)
+                        const masterWrapperID = "MasterWrapper" + String(stream_session_id);
+
+                        document.getElementById('chat-area').innerHTML += `
+                        <div class="response-and-viewer-container" id="${masterWrapperID}">
+                            <div class="llm-wrapper" style="display:none;" id="${responseWrapperID}">
+                            
+                                <div class="llm-response" id="${responseContentID}">
+                                </div>
+                            </div>
+                        </div>
+                        `
+
+                        let chat_container = document.getElementById('chat-area');
+                        let isResponseDisplayed = false;
+                        const responseContentElement = document.getElementById(responseContentID);
+
+                        if (!isResponseDisplayed) {
+                            document.getElementById('processingQnS').innerHTML = 'Generating...';
+                            document.getElementById(responseWrapperID).style.display  = 'block';
+                            isResponseDisplayed = true;
+                        }
+
+
+                        async function fetchEventStream() {
+                            const url = "http://localhost:8080/completion";
+                            const requestData = {
+                                prompt: formatted_user_prompt,
+                                stream: true,
+                                temperature: document.getElementById('tempSlider').value,
+                                top_k: document.getElementById('topkSlider').value,
+                                top_p: document.getElementById('toppSlider').value,
+                                min_p: document.getElementById('minpSlider').value,
+                                n_keep: document.getElementById('nkeepSlider').value
+                            };
+
+                            try {
+
+                                const response = await fetch(url, {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json'
+                                    },
+                                    body: JSON.stringify(requestData)
+                                });
+
+                                document.getElementById('chat-area').scrollTop = document.getElementById('chat-area').scrollHeight;     //Scroll to the bottom of the page
+
+                                const reader = response.body.getReader();   // To handle the Fetch API's 'Response' object when involving a ReadableStream.  By calling getReader(), a 'ReadableStreamDefaultReader' object is obtained
+                                let totalContent = '';  //String to accumulate content
+                                let receivedComplete = false;
+
+                                // Function to process each text chunk
+                                async function processChunk() {
+                                    let partialData = '';   // Holds partially received JSON strings
+
+                                    while (true) {
+                                        const { done, value } = await reader.read();
+                                        if (done) {
+                                            console.log("Stream complete");
+                                            break;
+                                        }
+
+                                        const textChunk = new TextDecoder("utf-8").decode(value);   //When reading a stream with 'ReadableStreamDefaultReader', Uint8Array binary-data objects are received. TextDecoder decodes these byte streams into human readable text strings. UTF-8 encodes all possible chars in Unicode, and is the std text encoding in most network comms, thus is used here.
+                                        const messages = textChunk.split('\n'); //one streamed data-message at a time, newlines are standard for seperating SSE-messages which may arrive bunched-up in chunks or partially
+                                        messages.forEach(message => {
+
+                                            if (message.startsWith('data: ')) {
+                                                const jsonStr = message.slice(6);   // remove 6 chars to get rid of the 'data: ' prefix!
+                                                try {
+                                                    const dataObj = JSON.parse(jsonStr);
+                                                    //console.log(dataObj.content);   // Log only the content
+                                                    let streamed_content = dataObj.content.replace(/\n\n/g, '<br><br>').replace(/\n/g, '<br>'); // /g - global - replace throughout string, not just the first occurance
+
+                                                    if (!['', '<|eot_id|>', '</s>', '<|im_end|>', '<|end_of_turn|>', '<|EOT|>', '|END_OF_TURN_TOKEN|>', '<|end|>'].includes(streamed_content)) {
+                                                        totalContent += streamed_content;
+                                                        let tempDiv = document.createElement('div');
+                                                        tempDiv.innerHTML = streamed_content;
+
+                                                        while (tempDiv.firstChild) {
+                                                            responseContentElement.appendChild(tempDiv.firstChild); // When 'appendChild' is used on an element already part of the DOM, a copy isn't created, rather it's moved to the new position thus removing that first child from tempDiv here!
+                                                        }
+                                                    }
+
+                                                    const scrollThreshold = 100; //100px towards the bottom
+                                                    const isNearBottom =  chat_container.scrollHeight - chat_container.clientHeight - chat_container.scrollTop < scrollThreshold;   //by calculating this way, we're finding the difference between the total height of the chat area including the invisble part that's overflown (scrollHeight), the visible height of the chat area (clientHeight), and how far down the chat area has been scrolled (scrollTop). If less than the threshold, auto-scroll engages!
+                                                    // For example: if the total height is 100px(scrollHeight), 70px is visible (clientHeight), scrollTop increases as we scroll down, so it's 0 at the top and at the very bottom, scrollTop will be equal to scrollHeight - clientHeight = 30px, so the math would equal to 0px and thus within the threshold!
+                                                    if (isNearBottom) {
+                                                        //console.log("is scrolled to bottom")
+                                                        chat_container.scrollTop = chat_container.scrollHeight;
+                                                    }
+
+                                                    if (dataObj.stop) {
+                                                        receivedComplete = true;
+                                                        llm_response = totalContent;
+                                                        //console.log("Stop received, final content: ", totalContent);
+                                                    }
+                                                } catch (error) {
+                                                    console.error('Error parsing JSON: ', error);
+                                                }
+                                            }
+                                        });
+
+                                        responseContentElement.innerHTML = totalContent;
+
+                                        if (receivedComplete) break;
+                                    }
+                                }
+
+                                await processChunk();   // processChunk() is an async-Fn and thus returns a promise. Here, via await, we pause execution until the promise is resolved or rejected.
+                            } catch (error) {
+                                console.error('Failed to fetch streaming response: ', error);
+                            }
+                        }
+
+                        // Cannot use await here as fetchEventStream() is not within another async-Fn, but rather is the top-level async-Fn! Use .then() as with a fetch call if you must await fetchEventStream(), or else simply fire-and-forget!
+                        fetchEventStream().then(() => {
+                            console.log('Event stream has completed');
+                            // /get_ref here!
+                            console.log("llm_response post stream: ", llm_response);
+                            // Having received the LLM response stream, fetch relevant pages, documents, and images, if any
+                            if (do_rag) {
+                                document.getElementById('processingQnS').innerHTML = 'Fetching any references...';
+                            }
+                            fetch('/get_references', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json'
+                                },
+                                body: JSON.stringify({'chat_id':CHAT_ID, 'sequence_id': SEQUENCE_ID, 'stream_session_id': stream_session_id, 'user_query': userInput, 'llm_response': llm_response, 'formatted_user_prompt': formatted_user_prompt})
+                            }).then(response => {
+                                if (!response.ok) {
+                                    return response.json().then(err => { throw new Error(err.error)});
+                                }
+                                return response
+                            })
+                            .then(response => response.json())
+                            .then(data => {
+                                
+                                if (data.success) {
+
+                                    console.log("get_references data: ", data);
+
+                                    if (do_rag) {
+                                        document.getElementById(responseContentID).innerHTML += `
+                                        </br> 
+                                        ${data.response}
+                                        ` 
+                                    }
+                                    
+                                    document.getElementById(responseContentID).innerHTML += `
+                                    <div class="star-rating" data-rated="False" rating-chat-id=${CHAT_ID} rating-sequence-id=${SEQUENCE_ID}>
+                                        <i class="far fa-star" data-rate="1"></i>
+                                        <i class="far fa-star" data-rate="2"></i>
+                                        <i class="far fa-star" data-rate="3"></i>
+                                        <i class="far fa-star" data-rate="4"></i>
+                                        <i class="far fa-star" data-rate="5"></i>
+                                    </div>
+                                    `
+                                    if (do_rag) {
+                                        document.getElementById(masterWrapperID).innerHTML += data.pdf_frame;
+                                    }
+                                } else {
+                                    throw new Error('Error fetching relevant reference material');
+                                }
+                            })
+                            .catch(error => {
+                                let full_error_message = "There was an error in fetching relevant reference material: " + String(error.message);
+                                console.error(full_error_message);
+                                alert(full_error_message);
+                            })
+                            .finally(() => {
+                                document.getElementById('processingQnS').style.display  = 'none';
+                                document.getElementById('processingQnS').innerHTML = '';
+                            });
+
+                        }).catch(error => {
+                            let full_error_message = "Error with event stream: " + String(error.message);
+                            console.error(full_error_message);
+                            alert(full_error_message);
+                        });
+
+
+                    } else {
+                        throw new Error('Error in setting up the streaming response');
+                    }
+                })
+                .catch(error => {
+                    let full_error_message = "There was an error in setting up the streaming response: " + String(error.message);
+                    console.error(full_error_message);
+                    alert(full_error_message);
+                })
+                .finally(() => {
+                    sendButton.disabled = false; // Re-enable the send button
+                });
+            }
+
+
+
+            function sendMessageAndProcessResponseStream() {
+
+                document.getElementById('processingQnS').innerHTML = 'Reading documents...';
+                document.getElementById('processingQnS').style.display  = 'block';
+
+                var userInput = document.getElementById('user-input').value;
+                //let userInputForHtml = userInput.replace(/\n/g, '<br>');
+                let userInputForHtml = formatTabsAndSpaces(userInput);
+                
+                // Clear the input field
+                document.getElementById('user-input').value = '';
+
+                // Append user input to the chat area
+                document.getElementById('chat-area').innerHTML += '<div class="user-message">' + userInputForHtml + '</div>';
+
+                // AJAX call to send user query and receive the response
+                fetch('/setup_for_streaming_response', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({'message': userInput})
+                }).then(response => {
+                    if (!response.ok) {
+                        return response.json().then(err => { throw new Error(err.error)});
+                    }
+                    return response
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // At this stage, we've passed the user's query to the server and have received an stream_session ID, now we handle the stream
+                        let stream_session_id = data.stream_session_id;
+                        let do_rag = data.do_rag;
+                        //console.log(do_rag);
+                        
+                        const responseWrapperID = "ResponseWrapper" + String(stream_session_id);
+                        const responseContentID = "ResponseContent" + String(stream_session_id)
+                        const masterWrapperID = "MasterWrapper" + String(stream_session_id);
+
+                        document.getElementById('chat-area').innerHTML += `
+                        <div class="response-and-viewer-container" id="${masterWrapperID}">
+                            <div class="llm-wrapper" style="display:none;" id="${responseWrapperID}">
+                            
+                                <div class="llm-response" id="${responseContentID}">
+                                </div>
+                            </div>
+                        </div>
+                        `
+                        let chat_container = document.getElementById('chat-area');
+                        let isResponseDisplayed = false;
+                        const responseContentElement = document.getElementById(responseContentID);
+                        const encodedUserInput = encodeURIComponent(userInput);
+                        const evtSource = new EventSource("/stream/" + stream_session_id + "?input=" + encodedUserInput);
+                        evtSource.onmessage = function(event) {
+
+                            if (!isResponseDisplayed) {
+                                document.getElementById('processingQnS').innerHTML = 'Generating...';
+                                document.getElementById(responseWrapperID).style.display  = 'block';
+                                isResponseDisplayed = true;
+                            }
+                            
+                            // document.getElementById(responseContentID).innerHTML += event.data;
+                            
+                            // 'innerHTML' is very inefficent to do repeatedly, as it doesn't simply append but rather re-parses & rebuilds the entire inner content every time! 
+                            // Instead, using the DOM API as below to create & append elements is much more efficient as it manipulates the DOM by adding a new node, leaving existing nodes untouched. 
+                            // This is also better from a security perspective as recreating DOM elements via innerHTML can be exploited for XSS!
+
+                            let tempDiv = document.createElement('div');
+                            tempDiv.innerHTML = event.data;
+
+                            // streaming response from LLM starts, begin appending to chat-area
+                            while (tempDiv.firstChild) {
+                                //console.log("appending")
+                                responseContentElement.appendChild(tempDiv.firstChild); // When 'appendChild' is used on an element already part of the DOM, a copy isn't created, rather it's moved to the new position thus removing that first child from tempDiv here!
+                            }
+
+                            // chatContainer.scrollHeight is the total height of the content within the chat container.
+                            // chatContainer.clientHeight is the visible height of the chat container.
+                            // chatContainer.scrollTop is the distance from the top of the chat container to the top of the visible content.
+                            
+                            const scrollThreshold = 100; //100px towards the bottom
+                            const isNearBottom =  chat_container.scrollHeight - chat_container.clientHeight - chat_container.scrollTop < scrollThreshold;   //by calculating this way, we're finding the difference between the total height of the chat area including the invisble part that's overflown (scrollHeight), the visible height of the chat area (clientHeight), and how far down the chat area has been scrolled (scrollTop). If less than the threshold, auto-scroll engages!
+                            // For example: if the total height is 100px(scrollHeight), 70px is visible (clientHeight), scrollTop increases as we scroll down, so it's 0 at the top and at the very bottom, scrollTop will be equal to scrollHeight - clientHeight = 30px, so the math would equal to 0px and thus within the threshold!
+                            if (isNearBottom) {
+                                console.log("is scrolled to bottom")
+                                chat_container.scrollTop = chat_container.scrollHeight;
+                            }
+                        }
+                        evtSource.onerror = function(error) {
+                            console.error("EventSource failed: ", error);
+                            evtSource.close();
+                        }
+                        evtSource.addEventListener("END", function(event) {
+                            evtSource.close();
+
+                            // Having received the LLM response stream, fetch relevant pages, documents, and images, if any
+                            if (do_rag) {
+                                document.getElementById('processingQnS').innerHTML = 'Fetching any references...';
+                            }
+                            fetch('/lc_get_references', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json'
+                                },
+                                body: JSON.stringify({'stream_session_id': stream_session_id, 'message': userInput})
+                            }).then(response => {
+                                if (!response.ok) {
+                                    return response.json().then(err => { throw new Error(err.error)});
+                                }
+                                return response
+                            })
+                            .then(response => response.json())
+                            .then(data => {
+                                
+                                if (data.success) {
+                                    //CHAT_ID = data.chat_id;
+                                    SEQUENCE_ID = data.sequence_id;
+
+                                    if (do_rag) {
+                                        document.getElementById(responseContentID).innerHTML += `
+                                        </br> 
+                                        ${data.response}
+                                        ` 
+                                    }
+                                    
+                                    document.getElementById(responseContentID).innerHTML += `
+                                    <div class="star-rating" data-rated="False" rating-chat-id=${data.chat_id} rating-sequence-id=${data.sequence_id}>
+                                        <i class="far fa-star" data-rate="1"></i>
+                                        <i class="far fa-star" data-rate="2"></i>
+                                        <i class="far fa-star" data-rate="3"></i>
+                                        <i class="far fa-star" data-rate="4"></i>
+                                        <i class="far fa-star" data-rate="5"></i>
+                                    </div>
+                                    `
+                                    if (do_rag) {
+                                        document.getElementById(masterWrapperID).innerHTML += data.pdf_frame;
+                                    }
+
+                                    document.getElementById('processingQnS').style.display  = 'none';
+                                    document.getElementById('processingQnS').innerHTML = '';
+                                } else {
+                                    throw new Error('Error fetching relevant reference material');
+                                }
+                            })
+                            .catch(error => {
+                                let full_error_message = "There was an error in fetching relevant reference material: " + String(error.message);
+                                console.error(full_error_message);
+                                alert(full_error_message);
+                            });
+                        });
+                    } else {
+                        throw new Error('Error in setting up the streaming response');
+                    }
+                })
+                .catch(error => {
+                    let full_error_message = "There was an error in setting up the streaming response: " + String(error.message);
+                    console.error(full_error_message);
+                    alert(full_error_message);
+                });
+            }
+
+
+            function goToPage(viewerId, src) {
+                // console.log("Viewer ID: ", viewerId);
+                // console.log("src: ", src);
+                // document.getElementById(viewerId).src = src;
+
+                let iframe = document.getElementById(viewerId)
+                // Set src to blank and then to desired src to prevent the browser from ignoring clicks!
+                iframe.src = 'about:blank';
+                setTimeout(() => iframe.src = src, 100); // Set a slight delay to ensure the reload
+            }
+
+
+            function sendMessage() {
+    
+                document.getElementById('processingQ').style.display = 'block';
+    
+                let userInput = document.getElementById('user-input').value;
+    
+                // Append user input to the chat area
+                document.getElementById('chat-area').innerHTML += '<div class="user-message">' + userInput + '</div>';
+    
+                // Make AJAX call to the app.py server to get the models response
+                fetch('/get_response', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({'message': userInput})
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`Server-side error! Status: ${response.status}`);
+                    }
+                    return response
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        CHAT_ID = data.chat_id;
+                        SEQUENCE_ID = data.sequence_id;
+
+                        document.getElementById('processingQ').style.display = 'none';
+                        const responseAndRating = `
+                        <div class="llm-wrapper">
+                            <div class="llm-response">
+                                ${data.response}
+                            </div>
+                            <div class="star-rating" data-rated="False" rating-chat-id=${data.chat_id} rating-sequence-id=${data.sequence_id}>
+                                <i class="far fa-star" data-rate="1"></i>
+                                <i class="far fa-star" data-rate="2"></i>
+                                <i class="far fa-star" data-rate="3"></i>
+                                <i class="far fa-star" data-rate="4"></i>
+                                <i class="far fa-star" data-rate="5"></i>
+                            </div>
+                        </div>
+                        `;
+                        document.getElementById('chat-area').innerHTML += responseAndRating;
+                        //document.getElementById('chat-area').innerHTML += '<div class="llm-response">' + data.response + '</div>';
+                    } else {
+                        throw new Error('Error fetching response');
+                    }
+                })
+                .catch(error => {
+                    let full_error_message = "Error fetching response: " + String(error.message);
+                    console.error(full_error_message);
+                    alert(full_error_message);
+                });
+    
+                // Clear the input field
+                document.getElementById('user-input').value = '';
+            }
+
+
+            // Call sendMessage() if the user presses the 'Enter' key
+            const maxRows = 5; // Replace this value with the maximum allowed number of rows you want
+            const inputTextAreaElement = document.getElementById("user-input");
+            var currentRows = inputTextAreaElement.rows;
+
+            inputTextAreaElement.addEventListener("keydown", function(event) {
+                const sendButton = document.getElementById('sendButton');
+                // Check if the Enter key was pressed and the input isn't empty
+                if (!event.shiftKey && event.key == "Enter" && this.value.trim() !== "") {
+                    // Prevent the default action (i.e., adding a new line)
+                    event.preventDefault();
+                    // Call the send function
+                    //sendMessage()
+                    if(!sendButton.disabled) {  //Only trigger a send event if the button is not disabled, i.e. another stream is in progress!
+                        inputTextAreaElement.rows = 1;
+                        //sendMessageAndProcessResponseStream()
+                        requestFormattedPrompt();
+                    }
+                } else if (event.shiftKey && event.key == "Enter") {
+                    if (currentRows <= maxRows) {
+                        inputTextAreaElement.rows += 1;
+                        currentRows += 1;
+                    }
+                } else if (event.keyCode === 8 || event.keyCode === 46) { //8 is Backspace and 46 is
+                    //console.log("backspace or delete pressed")
+                    newlineCount = inputTextAreaElement.value.split("\n").length;
+                    if (newlineCount < currentRows) {
+                        //console.log("trimming rows")
+                        inputTextAreaElement.rows = newlineCount;
+                        currentRows = newlineCount;
+                    }
+                }
+            });
+
+            
+            function adjustTextareaRows() {
+                newlineCount = inputTextAreaElement.value.split("\n").length;
+                if (newlineCount < maxRows) {
+                    inputTextAreaElement.rows = newlineCount;
+                    currentRows = newlineCount;
+                } else if (newlineCount >= maxRows) {
+                    inputTextAreaElement.rows = maxRows;
+                    currentRows = newlineCount;
+                }
+            }
+            document.getElementById("user-input").addEventListener('input', adjustTextareaRows);
+            document.getElementById("user-input").addEventListener('change', adjustTextareaRows);
+
+
+            // Upload new files to VectorDB
+            document.getElementById('fileInput').addEventListener('change', function (event) {
+                if (this.value) {    // Check if a file is selected
+               
+                    document.getElementById('overlay').style.display = 'block';
+                    
+                    let newFile = document.getElementById('fileInput');
+                    let file = newFile.files[0]
+
+                    if (file) {
+                        let formData = new FormData();
+                        formData.append('file', file);
+
+                        // Make the AJAX request to the server
+                        fetch('/process_new_file', {
+                            method: 'POST',
+                            body: formData
+                        })
+                        .then(response => {
+                            if (!response.ok) {
+                                return response.json().then(err => { throw new Error(err.error)});
+                            }
+                            return response
+                        })
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.success) {
+                                populateDocsLoadedTable();
+                                document.getElementById('overlay').style.display = 'none';
+                                document.getElementById('fileInput').value = "";  // Clear the input value
+                            } else {
+                                throw new Error(`Error processing file`);
+                            }
+                        })
+                        .catch(error => {
+                            let full_error_message = "Error processing file: " + String(error.message);
+                            console.error(full_error_message);
+                            alert(full_error_message);
+                            document.getElementById('overlay').style.display = 'none';
+                            document.getElementById('fileInput').value = "";  // Clear the input value
+                        });
+                    }
+                }    
+            });
+
+
+            // Store user rating & update UI - confirm the associated route does not contain print() statements as the stdout is redirected during response generation!
+            document.getElementById('chat-area').addEventListener('click', function(e) {
+                if(e.target.classList.contains('fa-star')) {
+                    let starContainer = e.target.parentElement;
+                    if(starContainer.getAttribute('data-rated') === "False") {
+                        
+                        let rate = e.target.getAttribute('data-rate');
+                        let chat_id = starContainer.getAttribute('rating-chat-id');
+                        let sequence_id = starContainer.getAttribute('rating-sequence-id');
+
+                        for(let i = 0; i < rate; i++) {
+                            console.log("filling star")
+                            starContainer.children[i].classList.remove('far');
+                            starContainer.children[i].classList.add('fas'); // This fills the star
+                        }
+                        starContainer.setAttribute('data-rated', "True");
+                        
+                        let formData = new FormData();
+                        formData.append('rating', rate);
+                        formData.append('chat_id', chat_id);
+                        formData.append('sequence_id', sequence_id);
+                        // AJAX time:
+                        fetch('/store_user_rating', {
+                            method: 'POST',
+                            body: formData
+                        })
+                        .then(response => {
+                            if (!response.ok) {
+                                return response.json().then(err => { throw new Error(err.error)});
+                            }
+                        })
+                        .catch(error => {
+                            let full_error_message = "There was an error in storing the user's rating: " + String(error.message);
+                            console.error(full_error_message);
+                            alert(full_error_message);
+                        });
+                    }
+                }
+            });
+
+
+            function toggleInfo() {
+                var infoBox = document.getElementById('info_box');
+                if (infoBox.style.display === 'none') {
+                    infoBox.style.display = 'block';
+                } else {
+                    infoBox.style.display = 'none';
+                }
+            }
+
+
+            // TEMPLATE: Make a GET request to the server
+            //    fetch('/init_chat_history_db')
+            //         .then(response => {
+            //             if (!response.ok) {
+            //                 throw new Error(`Server-side HTTP error! Status: ${response.status}`);
+            //             }
+            //             return response
+            //         })
+            //         .then(response => response.json())
+            //         .then(data => {
+            //             if (data.success) {
+
+                            
+            //             } else {
+            //                 throw new Error('Data error when fetching history-menu list');
+            //             }
+            //         })
+            //         .catch(error => {
+            //             console.error("There was an error in fetching the history-menu list: ", error.message);
+            //         });
+
+        </script>
+
+    </body>
+
+</html>
