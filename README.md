@@ -1,7 +1,7 @@
 # LARS - The LLM & Advanced Referencing Solution
 
 <p align="center">
-<img src="https://github.com/abgulati/LocalLLM/blob/main/web_app/static/images/LARS_Logo_3.png"  align="center">
+<img src="https://github.com/abgulati/LARS/blob/main/web_app/static/images/LARS_Logo_3.png"  align="center">
 </p>
 
 LARS is an application that enables you to run LLM's (Large Language Models) locally on your device, upload your own documents and engage in conversations wherein the LLM grounds its responses with your uploaded content. This grounding helps increase accuracy and reduce the common issue of AI-generated inaccuracies or "hallucinations." This technique is commonly known as "Retrieval Augmented Generation", or RAG.
@@ -38,7 +38,7 @@ There are many desktop applications for running LLMs locally, and LARS aims to b
 
 [LARS Feature-Demonstration Video](https://www.youtube.com/watch?v=Mam1i86n8sU&t=1s&ab_channel=AbheekGulati)
 
-<a href="https://www.youtube.com/watch?v=Mam1i86n8sU&t=1s&ab_channel=AbheekGulati" target="_blank" ><img src="https://github.com/abgulati/LocalLLM/blob/main/web_app/static/images/LARS_Logo_3.png" alt="LARS Feature-Demonstration Video" style="max-width:50%;"></a>
+<a href="https://www.youtube.com/watch?v=Mam1i86n8sU&t=1s&ab_channel=AbheekGulati" target="_blank" ><img src="https://github.com/abgulati/LARS/blob/main/web_app/static/images/LARS_Logo_3.png" alt="LARS Feature-Demonstration Video" style="max-width:50%;"></a>
 
 
 ## Dependencies
@@ -253,8 +253,8 @@ There are many desktop applications for running LLMs locally, and LARS aims to b
 
 1. Clone the repository:
     ```
-    git clone https://github.com/abgulati/LocalLLM
-    cd LocalLLM
+    git clone https://github.com/abgulati/LARS
+    cd LARS
     ```
 
     - If prompted for GitHub authentication, use a [Personal Access Token](https://github.com/settings/tokens) as passwords are deprecated. Also accessible via:      
@@ -328,7 +328,7 @@ There are many desktop applications for running LLMs locally, and LARS aims to b
             deactivate
             ```
 
-3. If problems persist, consider opening an issue on the [LARS GitHub repository](https://github.com/abgulati/LocalLLM/issues) for support.
+3. If problems persist, consider opening an issue on the [LARS GitHub repository](https://github.com/abgulati/LARS/issues) for support.
 
 
 ## First Run - Important Steps for First-Time Setup
@@ -378,7 +378,7 @@ There are many desktop applications for running LLMs locally, and LARS aims to b
 
 1. Document Formats Supported:
 
-    - If LibreOffice is installed and added to PATH as detailed in Step 4 of the [Dependencies](https://github.com/abgulati/LocalLLM?tab=readme-ov-file#dependencies) section, the following formats are supported:
+    - If LibreOffice is installed and added to PATH as detailed in Step 4 of the [Dependencies](https://github.com/abgulati/LARS?tab=readme-ov-file#dependencies) section, the following formats are supported:
 
         - PDFs
         - Word files: doc, docx, odt, rtf, txt
@@ -506,14 +506,14 @@ There are many desktop applications for running LLMs locally, and LARS aims to b
 
 - Alternatively, start a new chat by simply refreshing the page
 
-- If issues are faced with citations or RAG performance, try resetting the vectorDB as described in Step 4 of the [General User Guide](https://github.com/abgulati/LocalLLM?tab=readme-ov-file#general-user-guide---post-first-run-steps) above
+- If issues are faced with citations or RAG performance, try resetting the vectorDB as described in Step 4 of the [General User Guide](https://github.com/abgulati/LARS?tab=readme-ov-file#general-user-guide---post-first-run-steps) above
 
 - If any application issues crop up and are not resolved simply by starting a new chat or restarting LARS, try deleting the config.json file by following the steps below:
 
     - Shut-down the LARS app server by terminating the Python program with ```CTRL+C```
-    - Backup and delete the ```config.json``` file located in ```LocalLLM/web_app``` (same directory as ```app.py```)
+    - Backup and delete the ```config.json``` file located in ```LARS/web_app``` (same directory as ```app.py```)
 
-- For any severe data and citation issues that are not resolved even by resetting the VectorDB as described in Step 4 of the [General User Guide](https://github.com/abgulati/LocalLLM?tab=readme-ov-file#general-user-guide---post-first-run-steps) above, perform the following steps:
+- For any severe data and citation issues that are not resolved even by resetting the VectorDB as described in Step 4 of the [General User Guide](https://github.com/abgulati/LARS?tab=readme-ov-file#general-user-guide---post-first-run-steps) above, perform the following steps:
 
     - Shut-down the LARS app server by terminating the Python program with ```CTRL+C```
     - Backup and delete the entire app directory:
@@ -521,7 +521,7 @@ There are many desktop applications for running LLMs locally, and LARS aims to b
         - Linux: ```/app/storage```
         - MacOS: ```/app```
 
-- If problems persist, consider opening an issue on the [LARS GitHub repository](https://github.com/abgulati/LocalLLM/issues) for support.
+- If problems persist, consider opening an issue on the [LARS GitHub repository](https://github.com/abgulati/LARS/issues) for support.
 
 ## Current Development Roadmap
 
