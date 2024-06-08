@@ -527,7 +527,7 @@ There are many desktop applications for running LLMs locally, and LARS aims to b
 
 | Category                                      | Tasks In-Progress                                                                                              | Status                            |
 |-----------------------------------------------|----------------------------------------------------------------------------------------------------------------|-----------------------------------|
-| Minor tasks, bug-fixes & enhancements:        | Azure CV-OCR free-tier UI toggle                                                                               | :white_check_mark:                |
+| Minor tasks, bug-fixes & enhancements:        | Azure CV-OCR free-tier UI toggle                                                                               | :white_check_mark: Done!          |
 |                                               | 0B text-file cleanup                                                                                           | :construction_worker: In-Progress |  
 | Major features / detailed research:           | Local OCR via Vision LLMs                                                                                      | :calendar: Roadmapped - Not Begun |                   
 |                                               | "Summarized" RAG via recursive summary generation: [RAPTOR](https://arxiv.org/html/2401.18059v1) investigation | :construction_worker: In-Progress |                   
