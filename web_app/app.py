@@ -275,6 +275,7 @@ def read_config(keys, default_value=None, filename='config.json'):
                 'use_local_llm':True,
                 'use_gpu':True,
                 'use_gpu_for_embeddings':False,
+                'azure_cv_free_tier':True,
                 'use_azure_open_ai':False,
                 'use_openai_embeddings':False,
                 'azure_openai_api_type':'azure',
@@ -717,10 +718,11 @@ def PDFtoAzureOCRTXT(input_filepath):
     print("\n\nProcessing Document - PDF to Azure OCR TXT\n\n")
     
     try:
-        read_return = read_config(['azure_ocr_endpoint', 'azure_ocr_subscription_key', 'ocr_pdfs'])
+        read_return = read_config(['azure_ocr_endpoint', 'azure_ocr_subscription_key', 'ocr_pdfs', 'azure_cv_free_tier'])
         azure_ocr_endpoint = read_return['azure_ocr_endpoint']
         azure_ocr_subscription_key = read_return['azure_ocr_subscription_key']
         ocr_pdfs = read_return['ocr_pdfs']
+        azure_cv_free_tier = read_return['azure_cv_free_tier']
     except Exception as e:
         handle_local_error("Missing Azure OCR Endpoint URL & Subscription Key for PDFtoAzureOCRTXT, please provide required API config. Error: ", e)
 
@@ -775,18 +777,22 @@ def PDFtoAzureOCRTXT(input_filepath):
 
         # Send to Azure OCR
         try:
-            if calls_made < 20:
-                print(f"Submitting page {page_number} to AzureComputerVision for OCR")
-                result = computervision_client.recognize_printed_text_in_stream(image=img_stream)
-                #analyze_result = computervision_client.begin_analyze_document("prebuilt-layout", img_stream).result()
-                calls_made += 1
+            if azure_cv_free_tier:
+                if calls_made < 20:
+                    print(f"Submitting page {page_number} to AzureComputerVision for OCR")
+                    result = computervision_client.recognize_printed_text_in_stream(image=img_stream)
+                    #analyze_result = computervision_client.begin_analyze_document("prebuilt-layout", img_stream).result()
+                    calls_made += 1
+                else:
+                    print("Sleeping for 60secs due to AzureOCR free-tier restrictions!")
+                    time.sleep(63)  #free tier restrictions!
+                    print(f"Submitting page {page_number} to AzureComputerVision for OCR")
+                    result = computervision_client.recognize_printed_text_in_stream(image=img_stream)
+                    #analyze_result = computervision_client.begin_analyze_document("prebuilt-layout", img_stream).result()
+                    calls_made = 1  #reset counter
             else:
-                print("Sleeping for 60secs due to AzureOCR free-tier restrictions!")
-                time.sleep(63)  #free tier restrictions!
                 print(f"Submitting page {page_number} to AzureComputerVision for OCR")
                 result = computervision_client.recognize_printed_text_in_stream(image=img_stream)
-                #analyze_result = computervision_client.begin_analyze_document("prebuilt-layout", img_stream).result()
-                calls_made = 1  #reset counter
         except Exception as e:
             handle_local_error("Could not convert image to Byte Stream for Azure OCR, encountered error: ", e)
 

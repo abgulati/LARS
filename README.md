@@ -525,13 +525,13 @@ There are many desktop applications for running LLMs locally, and LARS aims to b
 
 ## Current Development Roadmap
 
-| Category                                      | Tasks In-Progress                                                                                              |
-|-----------------------------------------------|----------------------------------------------------------------------------------------------------------------|
-| Minor tasks, bug-fixes & enhancements:        | Azure CV-OCR free-tier UI toggle                                                                               |
-|                                               | 0B text-file cleanup                                                                                           |
-| Major features / detailed research:           | Local OCR via Vision LLMs                                                                                      |
-|                                               | "Summarized" RAG via recursive summary generation: [RAPTOR](https://arxiv.org/html/2401.18059v1) investigation |
-|                                               | Nvidia TensorRT-LLM inferencing backend for compatible GPUs                                                    |
+| Category                                      | Tasks In-Progress                                                                                              | Status                            |
+|-----------------------------------------------|----------------------------------------------------------------------------------------------------------------|-----------------------------------|
+| Minor tasks, bug-fixes & enhancements:        | Azure CV-OCR free-tier UI toggle                                                                               | :white_check_mark:                |
+|                                               | 0B text-file cleanup                                                                                           | :construction_worker: In-Progress |  
+| Major features / detailed research:           | Local OCR via Vision LLMs                                                                                      | :calendar: Roadmapped - Not Begun |                   
+|                                               | "Summarized" RAG via recursive summary generation: [RAPTOR](https://arxiv.org/html/2401.18059v1) investigation | :construction_worker: In-Progress |                   
+|                                               | Nvidia TensorRT-LLM inferencing backend for compatible GPUs                                                    | :construction_worker: In-Progress |                   
 
 # Support and Donations
 I hope that LARS has been valuable in your work, and I invite you to support its ongoing development! If you appreciate the tool and would like to contribute to its future enhancements, consider making a donation. Your support helps me to continue improving LARS and adding new features.
