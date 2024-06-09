@@ -49,6 +49,19 @@ There are many desktop applications for running LLMs locally, and LARS aims to b
 
         - Download Microsoft Visual Studio Build Tools 2022 from the [Official Site - "Tools for Visual Studio"](https://visualstudio.microsoft.com/downloads/)
 
+        - NOTE: When installing the above, make sure to select the following components:
+        ```
+        Desktop development with C++
+        # Then from t build toolshe "Optional" category on the right, make sure to select the following:
+        MSVC C++ x64/x86 build tools
+        C++ CMake tools for Windows
+        ```
+
+        - Refer to the screenshot below:
+        <p align="center">
+        <img src="https://github.com/abgulati/LARS/blob/main/documents/images_and_screenshots/build_tools_ms_visual_studio_installation.png"  align="center">
+        </p>
+
     - On Linux (Ubuntu and Debian-based), install the following packages:
 
         - build-essential includes GCC, G++, and make
@@ -529,7 +542,7 @@ There are many desktop applications for running LLMs locally, and LARS aims to b
 |-----------------------------------------------|----------------------------------------------------------------------------------------------------------------|-----------------------------------------|
 | Minor tasks, bug-fixes & enhancements:        | Azure CV-OCR free-tier UI toggle                                                                               | :white_check_mark: Done on 8th June 24! |
 |                                               | 0B text-file cleanup                                                                                           | :construction_worker: In-Progress       |  
-| Major features / detailed research:           | Local OCR via Vision LLMs                                                                                      | :calendar: Roadmapped - Not Begun       |                   
+| Major features / detailed research:           | Local OCR via Vision LLMs                                                                                      | :calendar: [MsTrOCR In-depth testing carried out](https://github.com/abgulati/LARS/blob/main/documents/refinements_research/Improving%20Text%20Extraction%20-%20Feb2024.pptx), LlaVa exploration soon |                   
 |                                               | "Summarized" RAG via recursive summary generation: [RAPTOR](https://arxiv.org/html/2401.18059v1) investigation | :construction_worker: In-Progress       |                   
 |                                               | Nvidia TensorRT-LLM inferencing backend for compatible GPUs                                                    | :construction_worker: In-Progress       |                   
 
