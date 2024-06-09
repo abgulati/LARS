@@ -61,6 +61,8 @@ There are many desktop applications for running LLMs locally, and LARS aims to b
         <p align="center">
         <img src="https://github.com/abgulati/LARS/blob/main/documents/images_and_screenshots/build_tools_ms_visual_studio_installation.png"  align="center">
         </p>
+        
+        - If you face issues, check the extensive [CMake Installation Troubleshooting steps below](https://github.com/abgulati/LARS/tree/main?tab=readme-ov-file#troubleshooting-installation-issues)
 
     - On Linux (Ubuntu and Debian-based), install the following packages:
 
@@ -292,7 +294,45 @@ There are many desktop applications for running LLMs locally, and LARS aims to b
         ```
 
 
-### Troubleshooting Installation Issues
+## Troubleshooting Installation Issues
+
+- If you encounter a ```CMake nmake failed``` error when attempting to build llama.cpp such as below:
+
+<p align="center">
+<img src="https://github.com/abgulati/LARS/blob/main/documents/images_and_screenshots/cmake-nmake-error.png"  align="center">
+</p>
+
+This typically indicates an issue with your Microsoft Visual Studio build tools, as CMake is unable to find the nmake tool, which is part of the Microsoft Visual Studio build tools. Try the below steps to resolve the issue:
+
+1. Ensure Visual Studio Build Tools are Installed:
+
+    - Make sure you have the Visual Studio build tools installed, including nmake. You can install these tools through the Visual Studio Installer by selecting the ```Desktop development with C++``` workload, and the ```MSVC and C++ CMake``` Optionals  
+
+    - Check Step 0 of the [Dependencies](https://github.com/abgulati/LARS/tree/main?tab=readme-ov-file#dependencies) section, specifically the screenshot therein
+
+2. Check Environment Variables:
+    
+    - Ensure that the paths to the Visual Studio tools are included in your system's PATH environment variable. Typically, this includes paths like:
+    ```
+    C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build
+    C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\Common7\IDE
+    C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\Common7\Tools
+    ```
+
+3. Use Developer Command Prompt:
+
+    - Open a "Developer Command Prompt for Visual Studio" which sets up the necessary environment variables for you
+    
+    - You can find this prompt from the Start menu under Visual Studio
+
+4. Set CMake Generator:
+
+    - When running CMake, specify the generator explicitly to use NMake Makefiles. You can do this by adding the -G option:
+    ```
+    cmake -G "NMake Makefiles" -B build -DLLAMA_CUDA=ON
+    ```
+
+5. If problems persist, consider opening an issue on the [LARS GitHub repository](https://github.com/abgulati/LARS/issues) for support.
 
 - If you encounter errors with ```pip install```, try the following:
 
