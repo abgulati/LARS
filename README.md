@@ -62,7 +62,7 @@ There are many desktop applications for running LLMs locally, and LARS aims to b
         <img src="https://github.com/abgulati/LARS/blob/main/documents/images_and_screenshots/build_tools_ms_visual_studio_installation.png"  align="center">
         </p>
 
-        - If you skipped selecting the above workloads when first installing the Visual Studio Build Tools, simply run the vs_buildTools.exe installer again, click "Modify" and ensure the "Desktop development with C++" workload and optionals are selected as outlined above
+        - If you skipped selecting the above workloads when first installing the Visual Studio Build Tools, simply run the vs_buildTools.exe installer again, click "Modify" and ensure the ```Desktop development with C++``` workload and the ```MSVC and C++ CMake``` Optionals are selected as outlined above
         
         - If you face issues when attempting to run ```CMake -B build```, check the extensive [CMake Installation Troubleshooting steps below](https://github.com/abgulati/LARS/tree/main?tab=readme-ov-file#troubleshooting-installation-issues)
 
