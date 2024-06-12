@@ -1,0 +1,41 @@
+# Use an official Python 3.11.5 runtime as a parent image
+FROM python:3.11.5
+
+# Set the working directory in the container
+WORKDIR /app
+
+# Install build dependencies: build-essential includes GCC, G++, and make; libffi-dev for Foreign Function Interface (FFI); libssl-dev for SSL support
+RUN apt-get update && apt-get install -y \
+	build-essential \
+	libffi-dev \
+	libssl-dev \
+	poppler-utils \
+	libreoffice \
+	cmake \
+	git
+
+# Test LibreOffice installation - any errors will interrupt the docker build process
+RUN libreoffice --version
+
+# Copy the current directory contents into the container at /app
+COPY . /app
+
+# Build llama.cpp
+WORKDIR /app/llama-cpp-b3131
+RUN cmake -B build \
+	&& cmake --build build --config Release
+
+# Add the build path to the system PATH
+ENV PATH "/app/llama-cpp-b3131/build/bin:${PATH}"
+
+# Change back to the main app directory
+WORKDIR /app
+
+# Install any needed packages specified in requirements.txt
+RUN pip install -r requirements_linux.txt
+
+# make port 5000 available to the world outside this container
+EXPOSE 5000
+
+# Define the command to run your application
+CMD ["python", "web_app/app.py"]
