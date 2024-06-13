@@ -624,7 +624,7 @@ This typically indicates an issue with your Microsoft Visual Studio build tools,
 |                                               | 0B text-file cleanup                                                                                           | :construction_worker: In-Progress       |  
 | Major features / detailed research:           | Local OCR via Vision LLMs                                                                                      | :calendar: [MS TrOCR In-depth testing carried out](https://github.com/abgulati/LARS/blob/main/documents/refinements_research/Improving%20Text%20Extraction%20-%20Feb2024.pptx), LlaVa exploration soon |                   
 |                                               | "Summarized" RAG via recursive summary generation: [RAPTOR](https://arxiv.org/html/2401.18059v1) investigation | :construction_worker: In-Progress       |                   
-|                                               | Nvidia TensorRT-LLM inferencing backend for compatible GPUs                                                    | :construction_worker: In-Progress       |                   
+|                                               | Nvidia TensorRT-LLM inferencing backend for compatible GPUs                                                    | :negative_squared_cross_mark: Necessitates building AWQ-LLM TRT-engines specific to the target GPU, NvTensorRT-LLM is its own ecosystem and only works on Python v3.10. Skipping for now, will keep an eye on this and re-explore possibilities for seamless integration with LARS in the future. |                   
 
 [Back to Table of Contents](https://github.com/abgulati/LARS?tab=readme-ov-file#table-of-contents)
 
