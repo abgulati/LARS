@@ -64,7 +64,7 @@ There are many desktop applications for running LLMs locally, and LARS aims to b
 
 ## Dependencies
 
-### Build Tools:
+### 1. Build Tools:
 
 - On Windows:
 
@@ -96,7 +96,7 @@ There are many desktop applications for running LLMs locally, and LARS aims to b
     ```
 
 
-### Nvidia CUDA (if supported Nvidia GPU present):
+### 2. Nvidia CUDA (if supported Nvidia GPU present):
 
 - Install Nvidia [GPU Drivers](https://www.nvidia.com/Download/index.aspx?lang=en-us)
 
@@ -117,7 +117,7 @@ There are many desktop applications for running LLMs locally, and LARS aims to b
     ```C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\MSBuild\Microsoft\VC\v170\BuildCustomizations```
 
 
-### llama.cpp:
+### 3. llama.cpp:
 
 - Download from the [Official Repo](https://github.com/ggerganov/llama.cpp):
 
@@ -159,7 +159,7 @@ There are many desktop applications for running LLMs locally, and LARS aims to b
     ```
 
 
-### Python:
+### 4. Python:
 
 - Built and tested with Python v3.11.x
 
@@ -197,7 +197,7 @@ There are many desktop applications for running LLMs locally, and LARS aims to b
     ```
 
 
-### LibreOffice:
+### 5. LibreOffice:
 
 - This is an optional, but highly recommended dependency - Only PDFs are supported if this setup is not completed
 
@@ -243,7 +243,7 @@ There are many desktop applications for running LLMs locally, and LARS aims to b
         libreoffice
         ```
 
-### Poppler:
+### 6. Poppler:
 
 - LARS utilizes the pdf2image Python library to convert each page of a document into an image as required for OCR. This library is essentially a wrapper around the Poppler utility which handles the conversion process.
 
@@ -269,7 +269,7 @@ There are many desktop applications for running LLMs locally, and LARS aims to b
     sudo apt-get update && apt-get install -y poppler-utils wget
     ```
 
-### PyTesseract:
+### 7. PyTesseract (optional):
 
 - This is an optional dependency - Tesseract-OCR is not actively used in LARS but methods to use it are present in the source code
 
@@ -624,7 +624,7 @@ This typically indicates an issue with your Microsoft Visual Studio build tools,
 |                                               | 0B text-file cleanup                                                                                           | :construction_worker: In-Progress       |  
 | Major features / detailed research:           | Local OCR via Vision LLMs                                                                                      | :calendar: [MS TrOCR In-depth testing carried out](https://github.com/abgulati/LARS/blob/main/documents/refinements_research/Improving%20Text%20Extraction%20-%20Feb2024.pptx), LlaVa exploration soon |                   
 |                                               | "Summarized" RAG via recursive summary generation: [RAPTOR](https://arxiv.org/html/2401.18059v1) investigation | :construction_worker: In-Progress       |                   
-|                                               | Nvidia TensorRT-LLM inferencing backend for compatible GPUs                                                    | :negative_squared_cross_mark: Necessitates building AWQ-LLM TRT-engines specific to the target GPU, NvTensorRT-LLM is its own ecosystem and only works on Python v3.10. Skipping for now, will keep an eye on this and re-explore possibilities for seamless integration with LARS in the future. |                   
+|                                               | Nvidia TensorRT-LLM inferencing backend for compatible GPUs                                                    | :negative_squared_cross_mark: Necessitates building AWQ-LLM TRT-engines specific to the target GPU, NvTensorRT-LLM is its own ecosystem and only works on Python v3.10. Skipping for now, will keep an eye on this and re-explore possibilities for seamless integration with LARS in the future. |         
 
 [Back to Table of Contents](https://github.com/abgulati/LARS?tab=readme-ov-file#table-of-contents)
 
