@@ -178,10 +178,17 @@ def handle_error_no_return(message, exception=None):
 #########################-------------------------------------###############################
 
 
+docker_only_config_path = '/app/storage/config.json'    # we already know that a docker env is linux-debian, no need to wait for platform detection logic further below!
+docker_directory = os.path.dirname(docker_only_config_path)
 
-if not os.path.exists('config.json'):
+try:
+    os.makedirs(docker_directory, exist_ok=True)    # Creates the directory, and all directories in the specified path if they don't exist, no errors otherwise
+except Exception as e:
+    handle_local_error("Failed to create base app dir in the docker storage volume, encountered error: ", e)
+
+if not os.path.exists(docker_only_config_path):
     try:
-        with open('config.json', 'w') as file:
+        with open(docker_only_config_path, 'w') as file:
             json.dump({}, file)
     except Exception as e:
         handle_error_no_return("Could not init config.json. Multiple app restarts may be required to get the app to init correctly. Printing error and proceeding: ", e)
@@ -189,7 +196,7 @@ if not os.path.exists('config.json'):
 
 
 # Method to write to config.json | input- dict of key:values to be written to config.json
-def write_config(config_updates, filename='config.json'):
+def write_config(config_updates, filename=docker_only_config_path):
 
     # Open config file to read-in all current params:
     try:
@@ -233,7 +240,7 @@ def write_config(config_updates, filename='config.json'):
             
 
 # Method to read from config.json | input- list of keys to be read from config.json; output- dict of key:value pairs; MANAGE DEFAULTS HERE!
-def read_config(keys, default_value=None, filename='config.json'):
+def read_config(keys, default_value=None, filename=docker_only_config_path):
     
     # Open config file to read-in all current params:
     try:
@@ -1930,7 +1937,7 @@ def llama_cpp_server_starter():
 
 
     try:
-        read_return = read_config(['model_dir', 'model_choice', 'local_llm_context_length', 'local_llm_max_new_tokens', 'local_llm_gpu_layers', 'server_timeout_seconds', 'server_retry_attempts'])
+        read_return = read_config(['model_dir', 'model_choice', 'local_llm_context_length', 'local_llm_max_new_tokens', 'local_llm_gpu_layers', 'server_timeout_seconds', 'server_retry_attempts', 'use_gpu'])
         model_dir = read_return['model_dir']
         model_choice = read_return['model_choice']
         local_llm_context_length = read_return['local_llm_context_length']
@@ -1938,15 +1945,18 @@ def llama_cpp_server_starter():
         local_llm_gpu_layers = read_return['local_llm_gpu_layers']
         server_timeout_seconds = read_return['server_timeout_seconds']
         server_retry_attempts = read_return['server_retry_attempts']
+        use_gpu = read_return['use_gpu']
     except Exception as e:
         handle_api_error("Missing values in config.json when preparing to launch llama.cpp server, encountered error: ", e)
 
-
+    
     try:
         cpp_model = os.path.join(model_dir, model_choice)
     except Exception as e:
         handle_api_error("Could not os.join path to model file to launch llama.cpp server, encountered error: ", e)
 
+    if not use_gpu:
+        local_llm_gpu_layers = 0
 
     try:
         cpp_app = ['server', '-m', cpp_model, '-ngl', str(local_llm_gpu_layers), '-c', str(local_llm_context_length), '-n', str(local_llm_max_new_tokens), '--host', '0.0.0.0']
@@ -2684,8 +2694,12 @@ def setup_for_llama_cpp_response():
     # We do not modify the force_enable_rag or force_disable_rag flags in this method, we simply respond to them here. UI updates should handle those flags.
     if force_enable_rag:
         print("\n\nFORCE_ENABLE_RAG True, force enabling RAG and returning\n\n")
-        page_contents, do_rag = filter_relevant_documents(user_query, docs)
-        do_rag = True
+        try:
+            page_contents, do_rag = filter_relevant_documents(user_query, docs)
+            do_rag = True
+        except Exception as e:
+            do_rag = False
+            handle_error_no_return("Error force-enabling RAG, disabling RAG and continuing: could not filter_relevant_documents during setup_for_streaming_response, encountered error: ", e)
     elif force_disable_rag:
         print("\n\nFORCE_DISABLE_RAG True, force disabling RAG and returning\n\n")
         do_rag = False
@@ -2693,22 +2707,30 @@ def setup_for_llama_cpp_response():
         try:
             page_contents, do_rag = filter_relevant_documents(user_query, docs)
         except Exception as e:
-            handle_error_no_return("Force enabling RAG and returning: could not determine do_rag during setup_for_streaming_response, encountered error: ", e)
+            do_rag = False
+            handle_error_no_return("RAG Error, disabling RAG and continuing: could not filter_relevant_documents during setup_for_streaming_response, encountered error: ", e)
     
     print(f'Do RAG? {do_rag}')
 
     try:
         write_config({'do_rag':do_rag})
     except Exception as e:
-        handle_api_error("Could not write do_rag during setup_for_streaming_response, encountered error: ", e)
+        handle_error_no_return("Could not write do_rag to config during setup_for_streaming_response, encountered error: ", e)
 
     
     # Having determined do_rag, time to build the prompt template!
     
     if do_rag:  # add similarity search results for RAG!
-        QUERIES[key_for_vector_results] = docs
-        user_query += f"\n\nThe following context might be helpful in answering the user query above:\n{page_contents}"
-        print(f"RAG formatted user_query: {user_query}")
+        try:
+            QUERIES[key_for_vector_results] = docs
+            user_query += f"\n\nThe following context might be helpful in answering the user query above:\n{page_contents}"
+            print(f"RAG formatted user_query: {user_query}")
+        except Exception as e:
+            try:
+                write_config({'do_rag':False})
+            except Exception as e:
+                handle_error_no_return("Could not write do_rag to config during setup_for_streaming_response, encountered error: ", e)
+            handle_error_no_return("RAG Error: Could not update QUERIES dict and user_query during setup_for_streaming_response, proceeding without RAG. Encountered error: ", e)
 
     current_sequence_id = determine_sequence_id_for_chat(chat_id)
     formatted_prompt = ""
