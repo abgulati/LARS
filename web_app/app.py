@@ -1930,7 +1930,7 @@ def llama_cpp_server_starter():
 
 
     try:
-        read_return = read_config(['model_dir', 'model_choice', 'local_llm_context_length', 'local_llm_max_new_tokens', 'local_llm_gpu_layers', 'server_timeout_seconds', 'server_retry_attempts'])
+        read_return = read_config(['model_dir', 'model_choice', 'local_llm_context_length', 'local_llm_max_new_tokens', 'local_llm_gpu_layers', 'server_timeout_seconds', 'server_retry_attempts', 'use_gpu'])
         model_dir = read_return['model_dir']
         model_choice = read_return['model_choice']
         local_llm_context_length = read_return['local_llm_context_length']
@@ -1938,6 +1938,7 @@ def llama_cpp_server_starter():
         local_llm_gpu_layers = read_return['local_llm_gpu_layers']
         server_timeout_seconds = read_return['server_timeout_seconds']
         server_retry_attempts = read_return['server_retry_attempts']
+        use_gpu = read_return['use_gpu']
     except Exception as e:
         handle_api_error("Missing values in config.json when preparing to launch llama.cpp server, encountered error: ", e)
 
@@ -1947,9 +1948,11 @@ def llama_cpp_server_starter():
     except Exception as e:
         handle_api_error("Could not os.join path to model file to launch llama.cpp server, encountered error: ", e)
 
+    if not use_gpu:
+        local_llm_gpu_layers = 0
 
     try:
-        cpp_app = ['server', '-m', cpp_model, '-ngl', str(local_llm_gpu_layers), '-c', str(local_llm_context_length), '-n', str(local_llm_max_new_tokens)]
+        cpp_app = ['server', '-m', cpp_model, '-ngl', str(local_llm_gpu_layers), '-c', str(local_llm_context_length), '-n', str(local_llm_max_new_tokens), '--host', '0.0.0.0']
 
         if platform.system() == 'Windows':
             LLAMA_CPP_PROCESS = subprocess.Popen(cpp_app, creationflags=subprocess.CREATE_NEW_CONSOLE)  # Windows only! Comment when containerizing or deploying to Linux/MacOS!
@@ -2684,8 +2687,12 @@ def setup_for_llama_cpp_response():
     # We do not modify the force_enable_rag or force_disable_rag flags in this method, we simply respond to them here. UI updates should handle those flags.
     if force_enable_rag:
         print("\n\nFORCE_ENABLE_RAG True, force enabling RAG and returning\n\n")
-        page_contents, do_rag = filter_relevant_documents(user_query, docs)
-        do_rag = True
+        try:
+            page_contents, do_rag = filter_relevant_documents(user_query, docs)
+            do_rag = True
+        except Exception as e:
+            do_rag = False
+            handle_error_no_return("Error force-enabling RAG, disabling RAG and continuing: could not filter_relevant_documents during setup_for_streaming_response, encountered error: ", e)
     elif force_disable_rag:
         print("\n\nFORCE_DISABLE_RAG True, force disabling RAG and returning\n\n")
         do_rag = False
@@ -2693,22 +2700,30 @@ def setup_for_llama_cpp_response():
         try:
             page_contents, do_rag = filter_relevant_documents(user_query, docs)
         except Exception as e:
-            handle_error_no_return("Force enabling RAG and returning: could not determine do_rag during setup_for_streaming_response, encountered error: ", e)
+            do_rag = False
+            handle_error_no_return("RAG Error, disabling RAG and continuing: could not filter_relevant_documents during setup_for_streaming_response, encountered error: ", e)
     
     print(f'Do RAG? {do_rag}')
 
     try:
         write_config({'do_rag':do_rag})
     except Exception as e:
-        handle_api_error("Could not write do_rag during setup_for_streaming_response, encountered error: ", e)
+        handle_error_no_return("Could not write do_rag to config during setup_for_streaming_response, encountered error: ", e)
 
     
     # Having determined do_rag, time to build the prompt template!
     
     if do_rag:  # add similarity search results for RAG!
-        QUERIES[key_for_vector_results] = docs
-        user_query += f"\n\nThe following context might be helpful in answering the user query above:\n{page_contents}"
-        print(f"RAG formatted user_query: {user_query}")
+        try:
+            QUERIES[key_for_vector_results] = docs
+            user_query += f"\n\nThe following context might be helpful in answering the user query above:\n{page_contents}"
+            print(f"RAG formatted user_query: {user_query}")
+        except Exception as e:
+            try:
+                write_config({'do_rag':False})
+            except Exception as e:
+                handle_error_no_return("Could not write do_rag to config during setup_for_streaming_response, encountered error: ", e)
+            handle_error_no_return("RAG Error: Could not update QUERIES dict and user_query during setup_for_streaming_response, proceeding without RAG. Encountered error: ", e)
 
     current_sequence_id = determine_sequence_id_for_chat(chat_id)
     formatted_prompt = ""
