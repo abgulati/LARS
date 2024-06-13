@@ -1,0 +1,67 @@
+# Use an official Python 3.11.5 runtime as a parent image
+FROM nvidia/cuda:12.2.2-devel-ubuntu22.04
+
+# Avoid interactive prompts - auto-select defaults for any prompts 
+ARG DEBIAN_FRONTEND=noninteractive
+
+# Set timezone for tzdata package as it's a dependency for some packages
+ENV TZ=America/Los_Angeles
+
+# Set the working directory in the container
+WORKDIR /app
+
+# Install build dependencies: build-essential includes GCC, G++, and make; libffi-dev for Foreign Function Interface (FFI); libssl-dev for SSL support
+RUN apt-get update && apt-get install -y \
+	software-properties-common \
+	build-essential \
+	libffi-dev \
+	libssl-dev \
+	poppler-utils \
+	wget \
+	libreoffice \
+	cmake \
+	git \
+	net-tools \
+	iproute2
+
+# Test LibreOffice installation - any errors will interrupt the docker build process
+RUN libreoffice --version
+
+# Copy the current directory contents into the container at /app
+COPY . /app
+
+# Build llama.cpp
+WORKDIR /app/llama-cpp-b3131
+RUN cmake -B build -DLLAMA_CUDA=ON \
+	&& cmake --build build --config Release
+
+# Add the build path to the system PATH
+ENV PATH "/app/llama-cpp-b3131/build/bin:${PATH}"
+
+# Change back to the main app directory
+WORKDIR /app
+
+# Add deadsnakes PPA for Python 3.11 - since the Ubuntu rep may not contain our desired version of Python, we install a popular Personal Package Archive (PPA), deadsnakes, to get the desired version which will pull the latest 3.11.X (other specific subversions are not hosted)
+RUN add-apt-repository ppa:deadsnakes/ppa -y
+
+# Install Python 3.11 and upgrade pip, while ensuring pip is installed
+RUN apt-get update && apt-get install -y python3.11 python3.11-venv python3.11-dev && python3.11 -m ensurepip
+
+# Create a virtual environment to ensure Python Packages are isolated from the system
+RUN python3.11 -m venv /venv
+
+# Activate the venv (modifying PATH is typical for a container env rather than 'activate')
+ENV PATH="/venv/bin:$PATH"
+
+# Now upgrade pip from within the venv
+RUN pip install --upgrade pip
+
+# Install any needed packages specified in requirements.txt
+RUN pip install -r requirements_linux.txt
+
+# make port 5000 available to the world outside this container
+EXPOSE 5000
+EXPOSE 8080
+
+# Define the command to run your application
+CMD ["python3", "web_app/app.py"]
