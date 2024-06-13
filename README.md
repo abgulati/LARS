@@ -36,234 +36,258 @@ There are many desktop applications for running LLMs locally, and LARS aims to b
 
 ### A demonstration video showcasing these features can be viewed at the link below:
 
-[LARS Feature-Demonstration Video](https://www.youtube.com/watch?v=Mam1i86n8sU&t=1s&ab_channel=AbheekGulati)
+[LARS Feature-Demonstration Video](https://www.youtube.com/watch?v=Mam1i86n8sU&ab_channel=AbheekGulati)
 
-<a href="https://www.youtube.com/watch?v=Mam1i86n8sU&t=1s&ab_channel=AbheekGulati" target="_blank" ><img src="https://github.com/abgulati/LARS/blob/main/web_app/static/images/LARS_Logo_3.png" alt="LARS Feature-Demonstration Video" style="max-width:50%;"></a>
+<a href="https://www.youtube.com/watch?v=Mam1i86n8sU&ab_channel=AbheekGulati" target="_blank" ><img src="https://github.com/abgulati/LARS/blob/main/web_app/static/images/LARS_Logo_3.png" alt="LARS Feature-Demonstration Video" style="max-width:50%;"></a>
 
+
+## Table of Contents
+
+1. [LARS - The LLM & Advanced Referencing Solution](https://github.com/abgulati/LARS?tab=readme-ov-file#lars---the-llm--advanced-referencing-solution)
+    - [Detailed list of LARS's feature-set](https://github.com/abgulati/LARS?tab=readme-ov-file#heres-a-list-detailing-larss-feature-set-as-it-stands-today)
+    - [A demonstration video showcasing these features](https://github.com/abgulati/LARS?tab=readme-ov-file#a-demonstration-video-showcasing-these-features-can-be-viewed-at-the-link-below)
+2. [Dependencies](https://github.com/abgulati/LARS?tab=readme-ov-file#dependencies)
+    - [Build Tools](https://github.com/abgulati/LARS?tab=readme-ov-file#)
+    - [Nvidia CUDA (if supported Nvidia GPU present)](https://github.com/abgulati/LARS?tab=readme-ov-file#)
+    - [llama.cpp](https://github.com/abgulati/LARS?tab=readme-ov-file#)
+    - [Python](https://github.com/abgulati/LARS?tab=readme-ov-file#)
+    - [LibreOffice](https://github.com/abgulati/LARS?tab=readme-ov-file#)
+    - [Poppler](https://github.com/abgulati/LARS?tab=readme-ov-file#)
+    - [PyTesseract (optional)](https://github.com/abgulati/LARS?tab=readme-ov-file#)
+3. [Installing LARS](https://github.com/abgulati/LARS?tab=readme-ov-file#installing-lars)
+4. [Troubleshooting Installation Issues](https://github.com/abgulati/LARS?tab=readme-ov-file#troubleshooting-installation-issues)
+5. [First Run - Important Steps for First-Time Setup](https://github.com/abgulati/LARS?tab=readme-ov-file#first-run---important-steps-for-first-time-setup)
+6. [General User Guide - Post First-Run Steps](https://github.com/abgulati/LARS?tab=readme-ov-file#general-user-guide---post-first-run-steps)
+7. [Troubleshooting](https://github.com/abgulati/LARS?tab=readme-ov-file#troubleshooting)
+8. [Current Development Roadmap](https://github.com/abgulati/LARS?tab=readme-ov-file#current-development-roadmap)
+9. [Support and Donations](https://github.com/abgulati/LARS?tab=readme-ov-file#support-and-donations)
 
 ## Dependencies
 
-0. Build Tools:
+### Build Tools:
 
-    - On Windows:
+- On Windows:
 
-        - Download Microsoft Visual Studio Build Tools 2022 from the [Official Site - "Tools for Visual Studio"](https://visualstudio.microsoft.com/downloads/)
+    - Download Microsoft Visual Studio Build Tools 2022 from the [Official Site - "Tools for Visual Studio"](https://visualstudio.microsoft.com/downloads/)
 
-        - NOTE: When installing the above, make sure to select the following components:
-        ```
-        Desktop development with C++
-        # Then from t build toolshe "Optional" category on the right, make sure to select the following:
-        MSVC C++ x64/x86 build tools
-        C++ CMake tools for Windows
-        ```
+    - NOTE: When installing the above, make sure to select the following components:
+    ```
+    Desktop development with C++
+    # Then from t build toolshe "Optional" category on the right, make sure to select the following:
+    MSVC C++ x64/x86 build tools
+    C++ CMake tools for Windows
+    ```
 
-        - Refer to the screenshot below:
-        <p align="center">
-        <img src="https://github.com/abgulati/LARS/blob/main/documents/images_and_screenshots/build_tools_ms_visual_studio_installation.png"  align="center">
-        </p>
+    - Refer to the screenshot below:
+    <p align="center">
+    <img src="https://github.com/abgulati/LARS/blob/main/documents/images_and_screenshots/build_tools_ms_visual_studio_installation.png"  align="center">
+    </p>
 
-        - If you skipped selecting the above workloads when first installing the Visual Studio Build Tools, simply run the vs_buildTools.exe installer again, click "Modify" and ensure the ```Desktop development with C++``` workload and the ```MSVC and C++ CMake``` Optionals are selected as outlined above
+    - If you skipped selecting the above workloads when first installing the Visual Studio Build Tools, simply run the vs_buildTools.exe installer again, click "Modify" and ensure the ```Desktop development with C++``` workload and the ```MSVC and C++ CMake``` Optionals are selected as outlined above
 
-    - On Linux (Ubuntu and Debian-based), install the following packages:
+- On Linux (Ubuntu and Debian-based), install the following packages:
 
-        - build-essential includes GCC, G++, and make
-        - libffi-dev for Foreign Function Interface (FFI)
-        - libssl-dev for SSL support   
+    - build-essential includes GCC, G++, and make
+    - libffi-dev for Foreign Function Interface (FFI)
+    - libssl-dev for SSL support   
 
-        ```
-        apt-get update
-        apt-get install -y software-properties-common build-essential libffi-dev libssl-dev
-        ```
-
-
-1. Nvidia CUDA (if supported Nvidia GPU present):
-    - Install Nvidia [GPU Drivers](https://www.nvidia.com/Download/index.aspx?lang=en-us)
-
-    - Install Nvidia [CUDA Toolkit](https://developer.nvidia.com/cuda-toolkit-archive) - LARS built and tested with v12.2.2
-
-    - Verify Installation via the terminal:
-        ```
-        nvcc -V
-        nvidia-smi
-        ```
-
-    - CMAKE-CUDA Fix (Very Important!):
-
-        Copy all the four files from the following directory:   
-        ```C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.2\extras\visual_studio_integration\MSBuildExtensions```
-        
-        and Paste them to the following directory:   
-        ```C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\MSBuild\Microsoft\VC\v170\BuildCustomizations```
+    ```
+    sudo apt-get update && apt-get install -y software-properties-common build-essential libffi-dev libssl-dev cmake
+    ```
 
 
-2. llama.cpp:
-    - Download from the [Official Repo](https://github.com/ggerganov/llama.cpp):
+### Nvidia CUDA (if supported Nvidia GPU present):
+
+- Install Nvidia [GPU Drivers](https://www.nvidia.com/Download/index.aspx?lang=en-us)
+
+- Install Nvidia [CUDA Toolkit](https://developer.nvidia.com/cuda-toolkit-archive) - LARS built and tested with v12.2.2
+
+- Verify Installation via the terminal:
+    ```
+    nvcc -V
+    nvidia-smi
+    ```
+
+- CMAKE-CUDA Fix (Very Important!):
+
+    Copy all the four files from the following directory:   
+    ```C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.2\extras\visual_studio_integration\MSBuildExtensions```
     
-        ```
-        git clone https://github.com/ggerganov/llama.cpp
-        cd llama.cpp
-        ```
+    and Paste them to the following directory:   
+    ```C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\MSBuild\Microsoft\VC\v170\BuildCustomizations```
+
+
+### llama.cpp:
+
+- Download from the [Official Repo](https://github.com/ggerganov/llama.cpp):
+
+    ```
+    git clone https://github.com/ggerganov/llama.cpp
+    cd llama.cpp
+    ```
+
+- Install CMAKE on Windows from the [Official Site](https://cmake.org/download/)
+
+    - add to PATH:   
+    ```C:\Program Files\CMake\bin```
+
+- Build llama.cpp with CMAKE:
+
+    - Build with CUDA:   
     
-    - Install CMAKE on Windows from the [Official Site](https://cmake.org/download/)
+    ```
+    cmake -B build -DLLAMA_CUDA=ON
+    cmake --build build  --config Release
+    ```
 
-        - add to PATH:   
-        ```C:\Program Files\CMake\bin```
+    - Build without CUDA:   
     
-    - Build llama.cpp with CMAKE:
-    
-        - Build with CUDA:   
-        
-        ```
-        cmake -B build -DLLAMA_CUDA=ON
-        cmake --build build  --config Release
-        ```
-    
-        - Build without CUDA:   
-        
-        ```
-        cmake -B build
-        cmake --build build  --config Release
-        ```
+    ```
+    cmake -B build
+    cmake --build build  --config Release
+    ```
 
-    - If you face issues when attempting to run ```CMake -B build```, check the extensive [CMake Installation Troubleshooting steps below](https://github.com/abgulati/LARS/tree/main?tab=readme-ov-file#troubleshooting-installation-issues)
-    
-    - Add to PATH:   
-        ```path_to_cloned_repo\llama.cpp\build\bin\Release```
-    
-    - Verify Installation via the terminal:
-    
-        ```
-        server
-        ```
+- If you face issues when attempting to run ```CMake -B build```, check the extensive [CMake Installation Troubleshooting steps below](https://github.com/abgulati/LARS/tree/main?tab=readme-ov-file#troubleshooting-installation-issues)
+
+- Add to PATH:   
+    ```path_to_cloned_repo\llama.cpp\build\bin\Release```
+
+- Verify Installation via the terminal:
+
+    ```
+    server
+    ```
 
 
-3. Python:
-    - Built and tested with Python v3.11.x
+### Python:
 
-    - Windows:
+- Built and tested with Python v3.11.x
 
-        - Download v3.11.9 from the [Official Site](https://www.python.org/downloads/windows/)
+- Windows:
 
-        - During installation, ensure you check "Add Python 3.11 to PATH" or manually add it later, either via:
+    - Download v3.11.9 from the [Official Site](https://www.python.org/downloads/windows/)
 
-            - Advanced System Settings -> Environment Variables -> System Variables -> EDIT PATH Variable -> Add the below (change as per your installation location):    
-                ```
-                C:\Users\user_name\AppData\Local\Programs\Python\Python311\
-                ```
-            
-            - Or via PowerShell:   
-                ```
-                Set PATH=%PATH%;C:\Users\user_name\AppData\Local\Programs\Python\Python311
-                ```
+    - During installation, ensure you check "Add Python 3.11 to PATH" or manually add it later, either via:
 
-    - Linux (Ubuntu and Debian-based):
-    
-        - via deadsnakes PPA:   
-
-        ```
-        add-apt-repository ppa:deadsnakes/ppa -y
-        apt-get update
-        apt-get install -y python3.11 python3.11-venv python3.11-dev
-        python3.11 -m ensurepip
-        ```
-
-    - Verify Installation via the terminal:
-
-        ```
-        python --version
-        ```
-
-
-4. LibreOffice:
-    - This is an optional, but highly recommended dependency - Only PDFs are supported if this setup is not completed
-
-    - Windows:
-        - Download from the [Official Site](https://www.libreoffice.org/download/download-libreoffice/)
-
-        - Add to PATH, either via:
-
-            - Advanced System Settings -> Environment Variables -> System Variables -> EDIT PATH Variable -> Add the below (change as per your installation location):    
-                ```
-                C:\Program Files\LibreOffice\program
-                ```
-            
-            - Or via PowerShell:   
-                ```
-                Set PATH=%PATH%;C:\Program Files\LibreOffice\program
-                ```
-
-    - Ubuntu & Debian-based Linux - Download from the [Official Site](https://www.libreoffice.org/download/download-libreoffice/) or install via terminal:
-
-        ```
-        sudo apt update
-        sudo apt install libreoffice
-        ```
-
-    - Fedora and other RPM-based distros - Download from the [Official Site](https://www.libreoffice.org/download/download-libreoffice/) or install via terminal:
-
-        ```
-        sudo dnf update
-        sudo dnf install libreoffice
-        ```
-
-    - MacOS - Download from the [Official Site](https://www.libreoffice.org/download/download-libreoffice/) or install via Homebrew:
-
-        ```
-        brew install --cask libreoffice
-        ```
-
-    - Verify Installation:
-        - On Windows and MacOS: Run the LibreOffice application
-        
-        - On Linux via the terminal: 
+        - Advanced System Settings -> Environment Variables -> System Variables -> EDIT PATH Variable -> Add the below (change as per your installation location):    
             ```
-            libreoffice
+            C:\Users\user_name\AppData\Local\Programs\Python\Python311\
+            ```
+        
+        - Or via PowerShell:   
+            ```
+            Set PATH=%PATH%;C:\Users\user_name\AppData\Local\Programs\Python\Python311
             ```
 
-5. Poppler:
-    - LARS utilizes the pdf2image Python library to convert each page of a document into an image as required for OCR. This library is essentially a wrapper around the Poppler utility which handles the conversion process.
+- Linux (Ubuntu and Debian-based):
 
-    - Windows:
+    - via deadsnakes PPA:   
+
+    ```
+    add-apt-repository ppa:deadsnakes/ppa -y
+    apt-get update
+    apt-get install -y python3.11 python3.11-venv python3.11-dev
+    python3.11 -m ensurepip
+    ```
+
+- Verify Installation via the terminal:
+
+    ```
+    python --version
+    ```
+
+
+### LibreOffice:
+
+- This is an optional, but highly recommended dependency - Only PDFs are supported if this setup is not completed
+
+- Windows:
+    - Download from the [Official Site](https://www.libreoffice.org/download/download-libreoffice/)
+
+    - Add to PATH, either via:
+
+        - Advanced System Settings -> Environment Variables -> System Variables -> EDIT PATH Variable -> Add the below (change as per your installation location):    
+            ```
+            C:\Program Files\LibreOffice\program
+            ```
+        
+        - Or via PowerShell:   
+            ```
+            Set PATH=%PATH%;C:\Program Files\LibreOffice\program
+            ```
+
+- Ubuntu & Debian-based Linux - Download from the [Official Site](https://www.libreoffice.org/download/download-libreoffice/) or install via terminal:
+
+    ```
+    sudo apt-get update && apt-get install -y libreoffice
+    ```
+
+- Fedora and other RPM-based distros - Download from the [Official Site](https://www.libreoffice.org/download/download-libreoffice/) or install via terminal:
+
+    ```
+    sudo dnf update
+    sudo dnf install libreoffice
+    ```
+
+- MacOS - Download from the [Official Site](https://www.libreoffice.org/download/download-libreoffice/) or install via Homebrew:
+
+    ```
+    brew install --cask libreoffice
+    ```
+
+- Verify Installation:
+    - On Windows and MacOS: Run the LibreOffice application
     
-        - Download from the [Official Repo](https://github.com/oschwartz10612/poppler-windows/releases/tag/v24.02.0-0)
-
-        - Add to PATH, either via:
-
-            - Advanced System Settings -> Environment Variables -> System Variables -> EDIT PATH Variable -> Add the below (change as per your installation location):    
-                ```
-                path_to_installation\poppler_version\Library\bin
-                ```
-            
-            - Or via PowerShell:   
-                ```
-                Set PATH=%PATH%;path_to_installation\poppler_version\Library\bin
-                ```   
-
-    - Linux:
-
+    - On Linux via the terminal: 
         ```
-        apt-get update
-        apt-get install -y poppler-utils wget
+        libreoffice
         ```
 
-6. PyTesseract:
-    - This is an optional dependency - Tesseract-OCR is not actively used in LARS but methods to use it are present in the source code
+### Poppler:
 
-    - Windows:
+- LARS utilizes the pdf2image Python library to convert each page of a document into an image as required for OCR. This library is essentially a wrapper around the Poppler utility which handles the conversion process.
 
-        - Download Tesseract-OCR for Windows via [UB-Mannheim](https://github.com/UB-Mannheim/tesseract/wiki)
+- Windows:
 
-        - Add to PATH, either via:
+    - Download from the [Official Repo](https://github.com/oschwartz10612/poppler-windows/releases/tag/v24.02.0-0)
 
-            - Advanced System Settings -> Environment Variables -> System Variables -> EDIT PATH Variable -> Add the below (change as per your installation location):    
-                ```
-                C:\Program Files\Tesseract-OCR
-                ```
-            
-            - Or via PowerShell:   
-                ```
-                Set PATH=%PATH%;C:\Program Files\Tesseract-OCR
-                ```
+    - Add to PATH, either via:
+
+        - Advanced System Settings -> Environment Variables -> System Variables -> EDIT PATH Variable -> Add the below (change as per your installation location):    
+            ```
+            path_to_installation\poppler_version\Library\bin
+            ```
+        
+        - Or via PowerShell:   
+            ```
+            Set PATH=%PATH%;path_to_installation\poppler_version\Library\bin
+            ```   
+
+- Linux:
+
+    ```
+    sudo apt-get update && apt-get install -y poppler-utils wget
+    ```
+
+### PyTesseract:
+
+- This is an optional dependency - Tesseract-OCR is not actively used in LARS but methods to use it are present in the source code
+
+- Windows:
+
+    - Download Tesseract-OCR for Windows via [UB-Mannheim](https://github.com/UB-Mannheim/tesseract/wiki)
+
+    - Add to PATH, either via:
+
+        - Advanced System Settings -> Environment Variables -> System Variables -> EDIT PATH Variable -> Add the below (change as per your installation location):    
+            ```
+            C:\Program Files\Tesseract-OCR
+            ```
+        
+        - Or via PowerShell:   
+            ```
+            Set PATH=%PATH%;C:\Program Files\Tesseract-OCR
+            ```
 
 
 ## Installing LARS
@@ -584,7 +608,7 @@ This typically indicates an issue with your Microsoft Visual Studio build tools,
 |-----------------------------------------------|----------------------------------------------------------------------------------------------------------------|-----------------------------------------|
 | Minor tasks, bug-fixes & enhancements:        | Azure CV-OCR free-tier UI toggle                                                                               | :white_check_mark: Done on 8th June 24! |
 |                                               | 0B text-file cleanup                                                                                           | :construction_worker: In-Progress       |  
-| Major features / detailed research:           | Local OCR via Vision LLMs                                                                                      | :calendar: [MsTrOCR In-depth testing carried out](https://github.com/abgulati/LARS/blob/main/documents/refinements_research/Improving%20Text%20Extraction%20-%20Feb2024.pptx), LlaVa exploration soon |                   
+| Major features / detailed research:           | Local OCR via Vision LLMs                                                                                      | :calendar: [MS TrOCR In-depth testing carried out](https://github.com/abgulati/LARS/blob/main/documents/refinements_research/Improving%20Text%20Extraction%20-%20Feb2024.pptx), LlaVa exploration soon |                   
 |                                               | "Summarized" RAG via recursive summary generation: [RAPTOR](https://arxiv.org/html/2401.18059v1) investigation | :construction_worker: In-Progress       |                   
 |                                               | Nvidia TensorRT-LLM inferencing backend for compatible GPUs                                                    | :construction_worker: In-Progress       |                   
 
