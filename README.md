@@ -47,13 +47,13 @@ There are many desktop applications for running LLMs locally, and LARS aims to b
     - [Detailed list of LARS's feature-set](https://github.com/abgulati/LARS?tab=readme-ov-file#heres-a-list-detailing-larss-feature-set-as-it-stands-today)
     - [A demonstration video showcasing these features](https://github.com/abgulati/LARS?tab=readme-ov-file#a-demonstration-video-showcasing-these-features-can-be-viewed-at-the-link-below)
 2. [Dependencies](https://github.com/abgulati/LARS?tab=readme-ov-file#dependencies)
-    - [Build Tools](https://github.com/abgulati/LARS?tab=readme-ov-file#)
-    - [Nvidia CUDA (if supported Nvidia GPU present)](https://github.com/abgulati/LARS?tab=readme-ov-file#)
-    - [llama.cpp](https://github.com/abgulati/LARS?tab=readme-ov-file#)
-    - [Python](https://github.com/abgulati/LARS?tab=readme-ov-file#)
-    - [LibreOffice](https://github.com/abgulati/LARS?tab=readme-ov-file#)
-    - [Poppler](https://github.com/abgulati/LARS?tab=readme-ov-file#)
-    - [PyTesseract (optional)](https://github.com/abgulati/LARS?tab=readme-ov-file#)
+    - [1. Build Tools](https://github.com/abgulati/LARS?tab=readme-ov-file#build-tools)
+    - [2. Nvidia CUDA (if supported Nvidia GPU present)](https://github.com/abgulati/LARS?tab=readme-ov-file#nvidia-cuda-if-supported-nvidia-gpu-present)
+    - [3. llama.cpp](https://github.com/abgulati/LARS?tab=readme-ov-file#llamacpp)
+    - [4. Python](https://github.com/abgulati/LARS?tab=readme-ov-file#python)
+    - [5. LibreOffice](https://github.com/abgulati/LARS?tab=readme-ov-file#libreoffice)
+    - [6. Poppler](https://github.com/abgulati/LARS?tab=readme-ov-file#poppler)
+    - [7. PyTesseract (optional)](https://github.com/abgulati/LARS?tab=readme-ov-file#pytesseract)
 3. [Installing LARS](https://github.com/abgulati/LARS?tab=readme-ov-file#installing-lars)
 4. [Troubleshooting Installation Issues](https://github.com/abgulati/LARS?tab=readme-ov-file#troubleshooting-installation-issues)
 5. [First Run - Important Steps for First-Time Setup](https://github.com/abgulati/LARS?tab=readme-ov-file#first-run---important-steps-for-first-time-setup)
@@ -289,6 +289,8 @@ There are many desktop applications for running LLMs locally, and LARS aims to b
             Set PATH=%PATH%;C:\Program Files\Tesseract-OCR
             ```
 
+[Back to Table of Contents](https://github.com/abgulati/LARS?tab=readme-ov-file#table-of-contents)
+
 
 ## Installing LARS
 
@@ -318,6 +320,8 @@ There are many desktop applications for running LLMs locally, and LARS aims to b
         ```
         pip3 install -r ./requirements_mac.txt
         ```
+
+[Back to Table of Contents](https://github.com/abgulati/LARS?tab=readme-ov-file#table-of-contents)
 
 
 ## Troubleshooting Installation Issues
@@ -409,6 +413,8 @@ This typically indicates an issue with your Microsoft Visual Studio build tools,
 
 3. If problems persist, consider opening an issue on the [LARS GitHub repository](https://github.com/abgulati/LARS/issues) for support.
 
+[Back to Table of Contents](https://github.com/abgulati/LARS?tab=readme-ov-file#table-of-contents)
+
 
 ## First Run - Important Steps for First-Time Setup
 
@@ -451,6 +457,8 @@ This typically indicates an issue with your Microsoft Visual Studio build tools,
 - If all steps have been executed correctly, first-time setup is now complete, and LARS is ready for use
 
 - LARS will also remember your LLM settings for subsequent use
+
+[Back to Table of Contents](https://github.com/abgulati/LARS?tab=readme-ov-file#table-of-contents)
 
 
 ## General User Guide - Post First-Run Steps
@@ -579,6 +587,9 @@ This typically indicates an issue with your Microsoft Visual Studio build tools,
 
     - Do NOT tweak any settings or submit additional queries while a response to a query is already being generated! Wait for any ongoing response generation to complete.
 
+[Back to Table of Contents](https://github.com/abgulati/LARS?tab=readme-ov-file#table-of-contents)
+
+
 ## Troubleshooting
 
 - If a chat goes awry, or any odd responses are generated, simply try starting a ```New Chat``` via the menu on the top-left
@@ -602,6 +613,9 @@ This typically indicates an issue with your Microsoft Visual Studio build tools,
 
 - If problems persist, consider opening an issue on the [LARS GitHub repository](https://github.com/abgulati/LARS/issues) for support.
 
+[Back to Table of Contents](https://github.com/abgulati/LARS?tab=readme-ov-file#table-of-contents)
+
+
 ## Current Development Roadmap
 
 | Category                                      | Tasks In-Progress                                                                                              | Status                                  |
@@ -612,6 +626,9 @@ This typically indicates an issue with your Microsoft Visual Studio build tools,
 |                                               | "Summarized" RAG via recursive summary generation: [RAPTOR](https://arxiv.org/html/2401.18059v1) investigation | :construction_worker: In-Progress       |                   
 |                                               | Nvidia TensorRT-LLM inferencing backend for compatible GPUs                                                    | :construction_worker: In-Progress       |                   
 
+[Back to Table of Contents](https://github.com/abgulati/LARS?tab=readme-ov-file#table-of-contents)
+
+
 # Support and Donations
 I hope that LARS has been valuable in your work, and I invite you to support its ongoing development! If you appreciate the tool and would like to contribute to its future enhancements, consider making a donation. Your support helps me to continue improving LARS and adding new features.
 
@@ -621,3 +638,5 @@ To make a donation, please use the following link to my PayPal:
 [Donate via PayPal](https://www.paypal.com/donate/?business=35EP992TTK5J6&no_recurring=0&item_name=If+you+appreciate+my+work+and+would+like+to+contribute+to+its+ongoing+development+%26+enhancements%2C+consider+making+a+donation%21&currency_code=CAD)
 
 Your contributions are greatly appreciated and will be used to fund further development efforts.
+
+[Back to Table of Contents](https://github.com/abgulati/LARS?tab=readme-ov-file#table-of-contents)
