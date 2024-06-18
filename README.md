@@ -696,7 +696,7 @@ This typically indicates an issue with your Microsoft Visual Studio build tools,
     ```
     Compatible Nvidia GPU(s)
     Nvidia GPU drivers
-    Nvidia CUDA Toolkit v12.2 (v12.4 also tested as working)
+    Nvidia CUDA Toolkit v12.2
     ```
 
 - For Linux, you're all set up with the above so skip the next step and head directly to the build and run steps further below
@@ -708,7 +708,7 @@ This typically indicates an issue with your Microsoft Visual Studio build tools,
         ```
         Compatible Nvidia GPU(s)
         Nvidia GPU drivers
-        Nvidia CUDA Toolkit v12.2 (v12.4 also tested as working)
+        Nvidia CUDA Toolkit v12.2
         Docker Desktop
         Windows Subsystem for Linux (WSL)
         ```
