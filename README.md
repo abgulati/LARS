@@ -59,8 +59,12 @@ There are many desktop applications for running LLMs locally, and LARS aims to b
 5. [First Run - Important Steps for First-Time Setup](https://github.com/abgulati/LARS?tab=readme-ov-file#first-run---important-steps-for-first-time-setup)
 6. [General User Guide - Post First-Run Steps](https://github.com/abgulati/LARS?tab=readme-ov-file#general-user-guide---post-first-run-steps)
 7. [Troubleshooting](https://github.com/abgulati/LARS?tab=readme-ov-file#troubleshooting)
-8. [Current Development Roadmap](https://github.com/abgulati/LARS?tab=readme-ov-file#current-development-roadmap)
-9. [Support and Donations](https://github.com/abgulati/LARS?tab=readme-ov-file#support-and-donations)
+8. [Docker - Deploying Containerized LARS](https://github.com/abgulati/LARS?tab=readme-ov-file#docker---deploying-containerized-lars)
+    - [Background and Setup](https://github.com/abgulati/LARS?tab=readme-ov-file#background-and-setup)
+    - [Building & Running the CPU-Inferencing Container](https://github.com/abgulati/LARS?tab=readme-ov-file#building--running-the-cpu-inferencing-container)
+    - [Building & Running the Nvidia-CUDA GPU-Enabled Container](https://github.com/abgulati/LARS?tab=readme-ov-file#building--running-the-nvidia-cuda-gpu-enabled-container)
+9. [Current Development Roadmap](https://github.com/abgulati/LARS?tab=readme-ov-file#current-development-roadmap)
+10. [Support and Donations](https://github.com/abgulati/LARS?tab=readme-ov-file#support-and-donations)
 
 ## Dependencies
 
@@ -830,6 +834,8 @@ This typically indicates an issue with your Microsoft Visual Studio build tools,
     ```
     docker system df
     ```
+
+[Back to Table of Contents](https://github.com/abgulati/LARS?tab=readme-ov-file#table-of-contents)
     
 
 ## Current Development Roadmap
