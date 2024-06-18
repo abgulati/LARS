@@ -63,6 +63,8 @@ There are many desktop applications for running LLMs locally, and LARS aims to b
     - [Background and Setup](https://github.com/abgulati/LARS?tab=readme-ov-file#background-and-setup)
     - [Building & Running the CPU-Inferencing Container](https://github.com/abgulati/LARS?tab=readme-ov-file#building--running-the-cpu-inferencing-container)
     - [Building & Running the Nvidia-CUDA GPU-Enabled Container](https://github.com/abgulati/LARS?tab=readme-ov-file#building--running-the-nvidia-cuda-gpu-enabled-container)
+    - [Special Note for Containers - Troubleshooting Networking Issues and Errors on First Run](https://github.com/abgulati/LARS?tab=readme-ov-file#special-note-for-containers---troubleshooting-networking-issues-and-errors-on-first-run)
+    - [Special Note for Containers - Updating the Container Image Post-First-Run](https://github.com/abgulati/LARS?tab=readme-ov-file#special-note-for-containers---updating-the-container-image-post-first-run)
 9. [Current Development Roadmap](https://github.com/abgulati/LARS?tab=readme-ov-file#current-development-roadmap)
 10. [Support and Donations](https://github.com/abgulati/LARS?tab=readme-ov-file#support-and-donations)
 
@@ -793,7 +795,7 @@ This typically indicates an issue with your Microsoft Visual Studio build tools,
 
 - The [Troubleshooting](https://github.com/abgulati/LARS?tab=readme-ov-file#troubleshooting) sections applies to Container-LARS as well
 
-### Special Note for Containers - Troubleshooting Networking Issues and Errors on First Run:
+### Special Note for Containers - Troubleshooting Networking Issues and Errors on First Run
 
 - In case you encounter Network-related errors, especially pertaining to unavailable package repositories when building the container, this is a networking issue at your end often pertaining to Firewall issues
 
@@ -809,7 +811,7 @@ This typically indicates an issue with your Microsoft Visual Studio build tools,
 
 - You can switch back to the sentence-transformers embedding model and the issue should be resolved
 
-### Special Note for Containers - Updating the Container Image Post-First-Run:
+### Special Note for Containers - Updating the Container Image Post-First-Run
 
 - As stated in the Troubleshooting section above, embedding models are downloaded the first time LARS runs
 
