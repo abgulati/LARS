@@ -73,7 +73,7 @@ There are many desktop applications for running LLMs locally, and LARS aims to b
     - NOTE: When installing the above, make sure to select the following components:
     ```
     Desktop development with C++
-    # Then from t build toolshe "Optional" category on the right, make sure to select the following:
+    # Then from the "Optional" category on the right, make sure to select the following:
     MSVC C++ x64/x86 build tools
     C++ CMake tools for Windows
     ```
@@ -615,6 +615,222 @@ This typically indicates an issue with your Microsoft Visual Studio build tools,
 
 [Back to Table of Contents](https://github.com/abgulati/LARS?tab=readme-ov-file#table-of-contents)
 
+
+## Docker - Deploying Containerized LARS
+
+### Background and Setup
+
+- LARS has been adapted to a Docker container-deployment environment via two separate images as below:
+
+    - [CPU-inferencing only Docker container](https://github.com/abgulati/LARS/tree/main/dockerized)
+    - [Nvidia-CUDA GPU-enabled Docker container](https://github.com/abgulati/LARS/tree/main/dockerized_nvidia_cuda_gpu)
+
+- Both have different requirements with the former being a simpler deployment, but suffering far slower inferencing performance due to the CPU and DDR memory acting as bottlenecks
+
+- While not explicitly required, some experience with Docker containers and familiarity with the concepts of containerization and virtualization will be very helpful in this section!
+
+- Beginning with common setup steps for both:
+
+    1. Installing Docker
+
+        - Your CPU should support virtualization and it should be enabled in your system's BIOS/UEFI
+
+        - Download and install [Docker Desktop](https://www.docker.com/products/docker-desktop/)
+
+        - If on Windows, you may need to install the Windows Subsystem for Linux if it's not already present. To do so, open PowerShell as an Administrator and run the following:
+
+            ```
+            wsl --install
+            ```
+
+        - Ensure Docker Desktop is up and running, then open a Command Prompt / Terminal and execute the following command to ensure Docker is correctly installed and up and running:
+
+            ```
+            docker ps
+            ```
+
+    2. Create a Docker storage volume, which will be attached to the LARS containers at runtime:
+
+        - Creating a storage volume for use with the LARS container is highly advantageous as it'll allow you to upgrade the LARS container to a newer version, or switch between the CPU & GPU container variants while persisting all your settings, chat history and vector databases seamlessly.
+
+        - Execute the following command in a Command Prompt / Terminal:
+
+            ```
+            docker volume create lars_storage_volue
+            ```
+
+        - This volume will be attached to the LARS container later at runtime, for now proceed to building the LARS image in the steps below.
+
+### Building & Running the CPU-Inferencing Container
+
+- In a Command Prompt / Terminal, execute the following commands:
+
+    ```
+    git clone https://github.com/abgulati/LARS  # skip if already done
+
+    cd LARS # skip if already done
+
+    cd dockerized
+
+    docker build -t lars-no-gpu .
+
+    # Once the build is complete, run the container:
+
+    docker run -p 5000:5000 -p 8080:8080 -v lars_storage:/app/storage lars-no-gpu
+    ```
+
+- Once done, Navigate to ```http://localhost:5000/``` in your browser and follow the remainder of the [First Run Steps](https://github.com/abgulati/LARS?tab=readme-ov-file#first-run---important-steps-for-first-time-setup) and [User Guide](https://github.com/abgulati/LARS?tab=readme-ov-file#general-user-guide---post-first-run-steps)
+
+- The [Troubleshooting](https://github.com/abgulati/LARS?tab=readme-ov-file#troubleshooting) sections applies to Container-LARS as well
+
+### Building & Running the Nvidia-CUDA GPU-Enabled Container
+
+- Requirements (in addition to [Docker](https://github.com/abgulati/LARS?tab=readme-ov-file#background-and-setup)):
+
+    ```
+    Compatible Nvidia GPU(s)
+    Nvidia GPU drivers
+    Nvidia CUDA Toolkit v12.2 (v12.4 also tested as working)
+    ```
+
+- For Linux, you're all set up with the above so skip the next step and head directly to the build and run steps further below
+
+- If on Windows, and if this is your first time running an Nvidia GPU container on Docker, strap in as this is going to be quite the ride (favorite beverage or three highly recommended!)
+
+    - Risking extreme redundancy, before proceeding ensure the following dependencies are present:
+
+        ```
+        Compatible Nvidia GPU(s)
+        Nvidia GPU drivers
+        Nvidia CUDA Toolkit v12.2 (v12.4 also tested as working)
+        Docker Desktop
+        Windows Subsystem for Linux (WSL)
+        ```
+
+    - Refer to the [Nvidia CUDA Dependencies section](https://github.com/abgulati/LARS?tab=readme-ov-file#2-nvidia-cuda-if-supported-nvidia-gpu-present) and the [Docker Setup section](https://github.com/abgulati/LARS?tab=readme-ov-file#background-and-setup) above if unsure
+
+    - If the above are present and setup, you're clear to proceed
+
+    - Open the Microsoft Store app on your PC, and download & install Ubuntu 22.04.3 LTS (must match the version on [line 2 in the dockerfile](https://github.com/abgulati/LARS/blob/main/dockerized_nvidia_cuda_gpu/dockerfile))
+
+    - Yes you read the above right: download and install Ubuntu from the Microsoft store app, refer screenshot below:
+    
+    <p align="center">
+    <img src="https://github.com/abgulati/LARS/blob/main/documents/images_and_screenshots/ubuntu_for_docker_wsl.png"  align="center">
+    </p>
+
+    - It's now time to install the [Nvidia Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) within Ubuntu, follow the steps below to do so:
+
+        - Launch an Ubuntu shell in Windows by searching for ```Ubuntu``` in the Start-menu after the installation above is completed
+
+        - In this Ubuntu command-line that opens, perform the following steps:
+
+        - Configure the production repository:
+
+            ```
+            curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg \
+            && curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | \
+                sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \
+                sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
+            ```
+
+        - Update the packages list from the repository & Install the Nvidia Container Toolkit Packages: 
+
+            ```
+            sudo apt-get update && apt-get install -y nvidia-container-toolkit
+            ```
+
+        - Configure the container runtime by using the nvidia-ctk command, which modifies the /etc/docker/daemon.json file so that Docker can use the Nvidia Container Runtime:
+
+            ```
+            sudo nvidia-ctk runtime configure --runtime=docker
+            ```
+
+        - Restart the Docker daemon: 
+
+            ```
+            sudo systemctl restart docker
+            ```
+
+    - Now your Ubuntu setup is complete, time to complete the WSL and Docker Integrations:
+
+        - Open a new PowerShell window and set this Ubuntu installation as the WSL default:
+
+            ```
+            wsl --list
+            wsl --set-default Ubuntu-22.04 # if not already marked as Default
+            ```
+
+        -  Navigate to ```Docker Desktop -> Settings -> Resources -> WSL Integration``` -> Check Default & Ubuntu 22.04 integrations. Refer to the screenshot below:
+        
+        <p align="center">
+        <img src="https://github.com/abgulati/LARS/blob/main/documents/images_and_screenshots/docker_wsl_integration.png"  align="center">
+        </p>
+
+    - Now if everything has been done correctly, you're ready to build and run the container!
+
+- In a Command Prompt / Terminal, execute the following commands:
+
+    ```
+    git clone https://github.com/abgulati/LARS  # skip if already done
+
+    cd LARS # skip if already done
+
+    cd dockerized_nvidia_cuda_gpu
+
+    docker build -t lars-nvcuda .
+
+    # Once the build is complete, run the container:
+
+    docker run --gpus all -p 5000:5000 -p 8080:8080 -v lars_storage:/app/storage lars-nvcuda
+    ```
+
+- Once done, Navigate to ```http://localhost:5000/``` in your browser and follow the remainder of the [First Run Steps](https://github.com/abgulati/LARS?tab=readme-ov-file#first-run---important-steps-for-first-time-setup) and [User Guide](https://github.com/abgulati/LARS?tab=readme-ov-file#general-user-guide---post-first-run-steps)
+
+- The [Troubleshooting](https://github.com/abgulati/LARS?tab=readme-ov-file#troubleshooting) sections applies to Container-LARS as well
+
+### Special Note for Containers - Troubleshooting Networking Issues and Errors on First Run:
+
+- In case you encounter Network-related errors, especially pertaining to unavailable package repositories when building the container, this is a networking issue at your end often pertaining to Firewall issues
+
+- On Windows, navigate to ```Control Panel\System and Security\Windows Defender Firewall\Allowed apps```, or search ```Firewall``` in the Start-Menu and head to ```Allow an app through the firewall``` and ensure ```Docker Desktop Backend`` is allowed through
+
+- The first time you run LARS, the sentence-transformers embedding model will be downloaded
+
+- In the containerized environment, this download can sometimes be problematic and result in errors when you ask a query
+
+- If this occurs, simply head to the LARS Settings menu: ```Settings->VectorDB & Embedding Models``` and change the Embedding Model to either BGE-Base or BGE-Large, this will force a reload and redownload
+
+- Once done, proceed to ask questions again and the response should generate as normal
+
+- You can switch back to the sentence-transformers embedding model and the issue should be resolved
+
+### Special Note for Containers - Updating the Container Image Post-First-Run:
+
+- As stated in the Troubleshooting section above, embedding models are downloaded the first time LARS runs
+
+- It's best to save the state of the container before shutting it down so this download step need-not be repeated every subsequent time the container is launched
+
+- To do so, open another Command Prompt / Terminal and commit changes BEFORE shutting the running LARS container:
+
+    ```
+    docker ps # note the container_id here
+
+    docker commit <container_ID> <new_image_name>   # for new_image_name, I simply add 'pfr', for 'post-first-run' to the current image name, example: lars-nvcuda-pfr
+    ```
+
+- This will create an updated image that you can use on subsequent runs:
+
+    ```
+    docker run --gpus all -p 5000:5000 -p 8080:8080 -v lars_storage:/app/storage lars-nvcuda-pfr
+    ```
+
+- NOTE: Having done the above, if you check the space used by images with ```docker images```, you'll notice a lot of space used. BUT, don’t take the sizes here literally! The size shown for each image includes the total size of all its layers, but many of those layers are shared between images, especially if those images are based on the same base image or if one image is a committed version of another. To see how much disk space your Docker images are actually using, use:
+
+    ```
+    docker system df
+    ```
+    
 
 ## Current Development Roadmap
 
