@@ -841,6 +841,7 @@
                                             <option value="phi3">Microsoft Phi-3 Prompt Template Format</option>
                                             <option value="command-r">Cohere Command-R & Command-R+ Prompt Template Format</option>
                                             <option value="deepseek">Deepseek-Coder Prompt Template Format</option>
+                                            <option value="deepseek-coder-v2">Deepseek-Coder-V2 Prompt Template Format</option>
                                             <option value="vicuna">Nous-Capybara Vicuna Prompt Template Format</option>
                                             <option value="openchat">OpenChat-3.5-0106 Prompt Template Format</option>
                                         </select>
@@ -2475,11 +2476,11 @@
                             const requestData = {
                                 prompt: formatted_user_prompt,
                                 stream: true,
-                                temperature: document.getElementById('tempSlider').value,
-                                top_k: document.getElementById('topkSlider').value,
-                                top_p: document.getElementById('toppSlider').value,
-                                min_p: document.getElementById('minpSlider').value,
-                                n_keep: document.getElementById('nkeepSlider').value
+                                temperature: parseInt(document.getElementById('tempSlider').value),
+                                top_k: parseInt(document.getElementById('topkSlider').value),
+                                top_p: parseInt(document.getElementById('toppSlider').value),
+                                min_p: parseInt(document.getElementById('minpSlider').value),
+                                n_keep: parseInt(document.getElementById('nkeepSlider').value)
                             };
 
                             try {

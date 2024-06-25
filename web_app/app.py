@@ -1952,7 +1952,7 @@ def llama_cpp_server_starter():
         local_llm_gpu_layers = 0
 
     try:
-        cpp_app = ['server', '-m', cpp_model, '-ngl', str(local_llm_gpu_layers), '-c', str(local_llm_context_length), '-n', str(local_llm_max_new_tokens), '--host', '0.0.0.0']
+        cpp_app = ['llama-server', '-m', cpp_model, '-ngl', str(local_llm_gpu_layers), '-c', str(local_llm_context_length), '-n', str(local_llm_max_new_tokens), '--host', '0.0.0.0']
 
         if platform.system() == 'Windows':
             LLAMA_CPP_PROCESS = subprocess.Popen(cpp_app, creationflags=subprocess.CREATE_NEW_CONSOLE)  # Windows only! Comment when containerizing or deploying to Linux/MacOS!
@@ -2802,6 +2802,13 @@ def setup_for_llama_cpp_response():
         else:
             formatted_prompt += f"{base_template}### Instruction:\n{user_query}\n### Response:\n"
 
+    elif local_llm_chat_template_format == 'deepseek-coder-v2':
+        
+        if current_sequence_id > 0:
+            formatted_prompt += f"User: {user_query}\nAssistant: "
+        else:
+            formatted_prompt += f"<|begin_of_sentence|>{base_template}\nUser: {user_query}\nAssistant: "
+
     if local_llm_chat_template_format == 'vicuna':
 
         if current_sequence_id > 0:
@@ -2857,6 +2864,8 @@ def get_references():
         formatted_user_prompt += f"{llm_response}<|END_OF_TURN_TOKEN|>"
     elif local_llm_chat_template_format == 'deepseek':
         formatted_user_prompt += f"{llm_response}\n<|EOT|>\n"
+    elif local_llm_chat_template_format == 'deepseek-coder-v2':
+        formatted_user_prompt += f"{llm_response}<|end_of_sentence|>"
     elif local_llm_chat_template_format == 'vicuna':
         formatted_user_prompt += f"{llm_response} </s>\n"
     elif local_llm_chat_template_format == 'openchat':
