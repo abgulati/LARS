@@ -142,7 +142,7 @@ There are many desktop applications for running LLMs locally, and LARS aims to b
     - Build with CUDA:   
     
     ```
-    cmake -B build -DLLAMA_CUDA=ON
+    cmake -B build -DGGML_CUDA=ON
     cmake --build build  --config Release
     ```
 
@@ -161,7 +161,7 @@ There are many desktop applications for running LLMs locally, and LARS aims to b
 - Verify Installation via the terminal:
 
     ```
-    server
+    llama-server
     ```
 
 
