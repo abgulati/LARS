@@ -98,7 +98,8 @@ There are many desktop applications for running LLMs locally, and LARS aims to b
     - libssl-dev for SSL support   
 
     ```
-    sudo apt-get update && apt-get install -y software-properties-common build-essential libffi-dev libssl-dev cmake
+    sudo apt-get update
+    sudo apt-get install -y software-properties-common build-essential libffi-dev libssl-dev cmake
     ```
 
 
@@ -190,16 +191,16 @@ There are many desktop applications for running LLMs locally, and LARS aims to b
     - via deadsnakes PPA:   
 
     ```
-    add-apt-repository ppa:deadsnakes/ppa -y
-    apt-get update
-    apt-get install -y python3.11 python3.11-venv python3.11-dev
-    python3.11 -m ensurepip
+    sudo add-apt-repository ppa:deadsnakes/ppa -y
+    sudo apt-get update
+    sudo apt-get install -y python3.11 python3.11-venv python3.11-dev
+    sudo python3.11 -m ensurepip
     ```
 
 - Verify Installation via the terminal:
 
     ```
-    python --version
+    python3 --version
     ```
 
 
@@ -225,7 +226,8 @@ There are many desktop applications for running LLMs locally, and LARS aims to b
 - Ubuntu & Debian-based Linux - Download from the [Official Site](https://www.libreoffice.org/download/download-libreoffice/) or install via terminal:
 
     ```
-    sudo apt-get update && apt-get install -y libreoffice
+    sudo apt-get update
+    sudo apt-get install -y libreoffice
     ```
 
 - Fedora and other RPM-based distros - Download from the [Official Site](https://www.libreoffice.org/download/download-libreoffice/) or install via terminal:
@@ -246,7 +248,7 @@ There are many desktop applications for running LLMs locally, and LARS aims to b
     
     - On Linux via the terminal: 
         ```
-        libreoffice
+        libreoffice --version
         ```
 
 ### 6. Poppler:
@@ -272,7 +274,8 @@ There are many desktop applications for running LLMs locally, and LARS aims to b
 - Linux:
 
     ```
-    sudo apt-get update && apt-get install -y poppler-utils wget
+    sudo apt-get update
+    sudo apt-get install -y poppler-utils wget
     ```
 
 ### 7. PyTesseract (optional):
