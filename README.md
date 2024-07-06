@@ -107,7 +107,7 @@ There are many desktop applications for running LLMs locally, and LARS aims to b
 
 - Install Nvidia [GPU Drivers](https://www.nvidia.com/Download/index.aspx?lang=en-us)
 
-- Install Nvidia [CUDA Toolkit](https://developer.nvidia.com/cuda-toolkit-archive) - LARS built and tested with v12.2.2
+- Install Nvidia [CUDA Toolkit](https://developer.nvidia.com/cuda-toolkit-archive) - LARS built and tested with v12.2 and v12.4
 
 - Verify Installation via the terminal:
     ```
@@ -139,6 +139,8 @@ There are many desktop applications for running LLMs locally, and LARS aims to b
     ```C:\Program Files\CMake\bin```
 
 - Build llama.cpp with CMAKE:
+
+    - Note: For faster compilation, add the -j argument to run multiple jobs in parallel. For example, `cmake --build build --config Release -j 8` will run 8 jobs in parallel.
 
     - Build with CUDA:   
     
@@ -861,7 +863,7 @@ This typically indicates an issue with your Microsoft Visual Studio build tools,
 |                                               | **Performance-centric:**                                                                                                                                                                                                    |                                           |
 |                                               | Nvidia TensorRT-LLM AWQ Support                                                                                                                                                                                             | :calendar: Future Task                    |
 | **Research Tasks:**                           | Investigate Nvidia TensorRT-LLM: Necessitates building AWQ-LLM TRT-engines specific to the target GPU, NvTensorRT-LLM is its own ecosystem and only works on Python v3.10.                                                  | :white_check_mark: Done on 13th June 2024 |
-|                                               | Local OCR with Vision LLMs: MS-TrOCR ([done](https://github.com/abgulati/LARS/blob/main/documents/refinements_research/Improving%20Text%20Extraction%20-%20Feb2024.pptx)), Kosmos-2.5 (high Priority), Llava, Florence-2    | :construction_worker: In-Progress         |
+|                                               | Local OCR with Vision LLMs: MS-TrOCR ([done](https://github.com/abgulati/LARS/blob/main/documents/refinements_research/Improving%20Text%20Extraction%20-%20Feb2024.pptx)), Kosmos-2.5 (high Priority), Llava, Florence-2    | :construction_worker: In-Progress [5th July 2024 Update](https://github.com/microsoft/unilm/issues/1596) |
 |                                               | RAG Improvements: Re-ranker, [RAPTOR](https://arxiv.org/html/2401.18059v1), [T-RAG](https://arxiv.org/abs/2402.07483)                                                                                                       | :calendar: Future Task                    |
 |                                               | Investigate GraphDB integration: using LLMs to extract entity-relationship data from documents and populate, update & maintain a GraphDB                                                                                    | :calendar: Future Task                    |
 
