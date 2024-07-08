@@ -23,12 +23,12 @@ RUN libreoffice --version
 COPY . /app
 
 # Build llama.cpp
-WORKDIR /app/llama-cpp-b3131
+WORKDIR /app/llama-cpp-b3334
 RUN cmake -B build \
-	&& cmake --build build --config Release
+	&& cmake --build build --config Release -j 16
 
 # Add the build path to the system PATH
-ENV PATH "/app/llama-cpp-b3131/build/bin:${PATH}"
+ENV PATH "/app/llama-cpp-b3334/build/bin:${PATH}"
 
 # Change back to the main app directory
 WORKDIR /app
