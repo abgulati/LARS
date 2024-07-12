@@ -2809,7 +2809,7 @@ def setup_for_llama_cpp_response():
         else:
             formatted_prompt += f"<|begin_of_sentence|>{base_template}\nUser: {user_query}\nAssistant: "
 
-    if local_llm_chat_template_format == 'vicuna':
+    elif local_llm_chat_template_format == 'vicuna':
 
         if current_sequence_id > 0:
             formatted_prompt += f"USER: {user_query}\nASSISTANT: "
@@ -2822,6 +2822,13 @@ def setup_for_llama_cpp_response():
             formatted_prompt += f"GPT4 Correct User: {user_query}<|end_of_turn|>GPT4 Correct Assistant: "
         else:
             formatted_prompt += f"<s>GPT4 Correct System: {base_template}<|end_of_turn|>GPT4 Correct User: {user_query}<|end_of_turn|>GPT4 Correct Assistant: "
+
+    elif local_llm_chat_template_format == 'gemma2':
+
+        if current_sequence_id > 0:
+            formatted_prompt += f"<start_of_turn>user\n{user_query}<end_of_turn>\n<start_of_turn>model\n"
+        else:
+            formatted_prompt += f"<start_of_turn>user\n{base_template}\n{user_query}<end_of_turn>\n<start_of_turn>model\n"
 
     # Return a bunch of stuff
     new_sequence_id = int(current_sequence_id) + 1
@@ -2870,6 +2877,8 @@ def get_references():
         formatted_user_prompt += f"{llm_response} </s>\n"
     elif local_llm_chat_template_format == 'openchat':
         formatted_user_prompt += f"{llm_response}<|end_of_turn|>"
+    elif local_llm_chat_template_format == 'gemma2':
+        formatted_user_prompt += f"{llm_response}<end_of_turn>\n"
 
     if not do_rag:
         print("\n\nSkipping RAG, storing chat history and returning\n\n")
