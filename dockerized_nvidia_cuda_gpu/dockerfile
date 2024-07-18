@@ -1,5 +1,5 @@
-# Use an official Python 3.11.5 runtime as a parent image
-FROM nvidia/cuda:12.2.2-devel-ubuntu22.04
+# Use an official Nvidia CUDA runtime as a parent image
+FROM nvidia/cuda:12.4.1-devel-ubuntu22.04
 
 # Avoid interactive prompts - auto-select defaults for any prompts 
 ARG DEBIAN_FRONTEND=noninteractive
@@ -19,10 +19,10 @@ RUN apt-get update && apt-get install -y \
 	poppler-utils \
 	wget \
 	libreoffice \
-	cmake \
 	git \
 	net-tools \
-	iproute2
+	iproute2 \
+	cuda-toolkit-12-4
 
 # Test LibreOffice installation - any errors will interrupt the docker build process
 RUN libreoffice --version
@@ -31,12 +31,11 @@ RUN libreoffice --version
 COPY . /app
 
 # Build llama.cpp
-WORKDIR /app/llama-cpp-b3131
-RUN cmake -B build -DLLAMA_CUDA=ON \
-	&& cmake --build build --config Release
+WORKDIR /app/llama.cpp
+RUN make GGML_CUDA=1 -j $(nproc)
 
 # Add the build path to the system PATH
-ENV PATH "/app/llama-cpp-b3131/build/bin:${PATH}"
+ENV PATH "/app/llama.cpp:${PATH}"
 
 # Change back to the main app directory
 WORKDIR /app
@@ -63,5 +62,5 @@ RUN pip install -r requirements_linux.txt
 EXPOSE 5000
 EXPOSE 8080
 
-# Define the command to run your application
+# Run application
 CMD ["python3", "web_app/app.py"]

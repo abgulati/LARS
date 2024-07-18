@@ -11,7 +11,6 @@ RUN apt-get update && apt-get install -y \
 	libssl-dev \
 	poppler-utils \
 	libreoffice \
-	cmake \
 	git \
 	net-tools \
 	iproute2
@@ -23,12 +22,11 @@ RUN libreoffice --version
 COPY . /app
 
 # Build llama.cpp
-WORKDIR /app/llama-cpp-b3334
-RUN cmake -B build \
-	&& cmake --build build --config Release -j 16
+WORKDIR /app/llama.cpp
+RUN make -j $(nproc)
 
 # Add the build path to the system PATH
-ENV PATH "/app/llama-cpp-b3334/build/bin:${PATH}"
+ENV PATH "/app/llama.cpp:${PATH}"
 
 # Change back to the main app directory
 WORKDIR /app
@@ -40,5 +38,5 @@ RUN pip install -r requirements_linux.txt
 EXPOSE 5000
 EXPOSE 8080
 
-# Define the command to run your application
+# Run application
 CMD ["python", "web_app/app.py"]

@@ -1949,7 +1949,7 @@ def llama_cpp_server_starter():
     except Exception as e:
         handle_api_error("Missing values in config.json when preparing to launch llama.cpp server, encountered error: ", e)
 
-    
+
     try:
         cpp_model = os.path.join(model_dir, model_choice)
     except Exception as e:
@@ -1959,7 +1959,7 @@ def llama_cpp_server_starter():
         local_llm_gpu_layers = 0
 
     try:
-        cpp_app = ['server', '-m', cpp_model, '-ngl', str(local_llm_gpu_layers), '-c', str(local_llm_context_length), '-n', str(local_llm_max_new_tokens), '--host', '0.0.0.0']
+        cpp_app = ['llama-server', '-m', cpp_model, '-ngl', str(local_llm_gpu_layers), '-c', str(local_llm_context_length), '-n', str(local_llm_max_new_tokens), '--host', '0.0.0.0']
 
         if platform.system() == 'Windows':
             LLAMA_CPP_PROCESS = subprocess.Popen(cpp_app, creationflags=subprocess.CREATE_NEW_CONSOLE)  # Windows only! Comment when containerizing or deploying to Linux/MacOS!
@@ -2809,7 +2809,14 @@ def setup_for_llama_cpp_response():
         else:
             formatted_prompt += f"{base_template}### Instruction:\n{user_query}\n### Response:\n"
 
-    if local_llm_chat_template_format == 'vicuna':
+    elif local_llm_chat_template_format == 'deepseek-coder-v2':
+        
+        if current_sequence_id > 0:
+            formatted_prompt += f"User: {user_query}\nAssistant: "
+        else:
+            formatted_prompt += f"<|begin_of_sentence|>{base_template}\nUser: {user_query}\nAssistant: "
+
+    elif local_llm_chat_template_format == 'vicuna':
 
         if current_sequence_id > 0:
             formatted_prompt += f"USER: {user_query}\nASSISTANT: "
@@ -2822,6 +2829,13 @@ def setup_for_llama_cpp_response():
             formatted_prompt += f"GPT4 Correct User: {user_query}<|end_of_turn|>GPT4 Correct Assistant: "
         else:
             formatted_prompt += f"<s>GPT4 Correct System: {base_template}<|end_of_turn|>GPT4 Correct User: {user_query}<|end_of_turn|>GPT4 Correct Assistant: "
+
+    elif local_llm_chat_template_format == 'gemma2':
+
+        if current_sequence_id > 0:
+            formatted_prompt += f"<start_of_turn>user\n{user_query}<end_of_turn>\n<start_of_turn>model\n"
+        else:
+            formatted_prompt += f"<start_of_turn>user\n{base_template}\n{user_query}<end_of_turn>\n<start_of_turn>model\n"
 
     # Return a bunch of stuff
     new_sequence_id = int(current_sequence_id) + 1
@@ -2864,10 +2878,14 @@ def get_references():
         formatted_user_prompt += f"{llm_response}<|END_OF_TURN_TOKEN|>"
     elif local_llm_chat_template_format == 'deepseek':
         formatted_user_prompt += f"{llm_response}\n<|EOT|>\n"
+    elif local_llm_chat_template_format == 'deepseek-coder-v2':
+        formatted_user_prompt += f"{llm_response}<|end_of_sentence|>"
     elif local_llm_chat_template_format == 'vicuna':
         formatted_user_prompt += f"{llm_response} </s>\n"
     elif local_llm_chat_template_format == 'openchat':
         formatted_user_prompt += f"{llm_response}<|end_of_turn|>"
+    elif local_llm_chat_template_format == 'gemma2':
+        formatted_user_prompt += f"{llm_response}<end_of_turn>\n"
 
     if not do_rag:
         print("\n\nSkipping RAG, storing chat history and returning\n\n")
