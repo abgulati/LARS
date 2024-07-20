@@ -1557,7 +1557,6 @@ def store_chat_history_to_db(user_query_for_history_db, model_response_for_histo
     conn.close()
 
 
-
 # Route for loading all models from model dir
 @app.route('/load_local_models')
 def load_local_models():
@@ -1576,6 +1575,36 @@ def load_local_models():
     #print(f"locally available models: {models}")
     return jsonify({'success': True, 'models': models})
 
+
+@app.route('/upload_new_llm', methods=['POST'])
+def upload_new_llm():
+
+    try:
+        read_return = read_config(['model_dir'])
+        model_dir = read_return['model_dir']
+    except Exception as e:
+        handle_api_error("Could not determine model_dir in upload_new_llm. Error: ", e)
+
+    try:
+        input_file = request.files['file']
+    except Exception as e:
+        handle_api_error("Server-side error recieving LLM file: ", e)
+
+    # Ensure the filename is secure
+    filename = secure_filename(input_file.filename)
+
+    try:
+        filepath = os.path.join(model_dir, filename)
+
+        print("Loading new LLM - filename: ", filename)
+        print("Loading new LLM - filepath: ", filepath)
+
+        # Save the uploaded file to the specified path
+        input_file.save(filepath)
+    except Exception as e:
+        handle_api_error("Failed to save LLM to model_dir, encountered error: ", e)
+
+    return jsonify(success=True)
 
 
 # Route to handle the submission of the first form (LLM & embeddings model and GPU selection)

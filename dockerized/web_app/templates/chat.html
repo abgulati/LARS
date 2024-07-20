@@ -761,6 +761,15 @@
             </div>
         </div>
 
+        <div id="UploadingLlmOverlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgb(250,250,250,0.5); z-index: 1000;">
+            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: black; font-size: 24px; font-family: 'Roboto', sans-serif; font-weight: 500;">
+                Uploading LLM to 'models' directory...
+                <div id="uploadProgress" style="display: none;">
+                    <p>Upload Progress: <span id="progressPercentage">0%</span></p>
+                </div>
+            </div>
+        </div>
+
         <div id="ModelAndDBLoading" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgb(250,250,250,0.5); z-index: 1000;">
             <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: black; font-size: 24px; font-family: 'Roboto', sans-serif; font-weight: 500;">
                 Loading Model and Vector Database...
@@ -818,6 +827,11 @@
                                         </label>
                                     </div>
 
+                                    <br>
+
+                                    <input type="file" name="llmFile" id="uploadLlm" style="display: none;">
+                                    <button type="button" id="uploadLlmButton" class="btn btn-primary upload-file-btn" onclick="document.getElementById('uploadLlm').click();" style="display: none;"><i class="fas fa-upload"></i> Upload an LLM</button>
+                                    
                                     <br>
 
                                     <div  id="localLlmSelection" style="display: none;">
@@ -1626,7 +1640,7 @@
                         
                         document.getElementById('localLlmSelection').style.display = selection === 'local' ? 'block' : 'none';
                         document.getElementById('localLlmTemplateSelection').style.display = selection === 'local' ? 'block' : 'none';
-                        // document.getElementById('advancedLlmSettingsToggle').style.display = selection === 'local' ? 'inline-block' : 'none';
+                        document.getElementById('uploadLlmButton').style.display = selection === 'local' ? 'block' : 'none';
                         document.getElementById('apiLlmSelection').style.display = selection === 'api' ? 'block' : 'none';
                         
                         var advancedLlmSettingsToggle = document.getElementById('advancedLlmSettingsToggle');
@@ -2985,6 +2999,136 @@
                         });
                     }
                 }    
+            });
+
+
+            function handleUploadError(errorMessage) {
+                console.error('Error uploading file:', errorMessage);
+                alert("Error when trying to upload new LLM to models dir. Check console for more details.");
+                cleanupUpload();
+            }
+
+            function cleanupUpload() {
+                document.getElementById('UploadingLlmOverlay').style.display = 'none';
+                document.getElementById('uploadLlm').value = "";  // Clear the input value
+                document.getElementById('uploadProgress').style.display = 'none';
+                document.getElementById('progressPercentage').textContent = '0%';
+            }
+
+            // Upload LLMs to '/models' dir
+            document.getElementById('uploadLlm').addEventListener('change', function (event) {
+                if (this.value) {    // Check if a file is selected
+
+                    document.querySelector('.btn-close[data-bs-dismiss="modal"]').click();
+                    document.getElementById('UploadingLlmOverlay').style.display = 'block';
+                    document.getElementById('uploadProgress').style.display = 'block';
+                    
+                    let newFile = document.getElementById('uploadLlm');
+                    let file = newFile.files[0]
+
+                    if (file) {
+                        let formData = new FormData();
+                        formData.append('file', file);
+
+                        let xhr = new XMLHttpRequest();
+                        xhr.open('POST', '/upload_new_llm', true);
+
+                        xhr.upload.onprogress = function(e) {
+                            if (e.lengthComputable) {
+                                let percentComplete = (e.loaded / e.total) * 100;
+                                document.getElementById('progressPercentage').textContent = percentComplete.toFixed(2) + '%';
+                            }
+                        };
+
+                        xhr.onload = function() {
+                            if (xhr.status === 200) {
+                                let response;
+                                try {
+                                    response = JSON.parse(xhr.responseText);
+                                } catch(e) {
+                                    handleUploadError('Invalide JSON response from server');
+                                    return;
+                                }
+                                
+                                if (response.success) {
+                                    
+                                    const initKeysToRead = ['model_choice']
+                                    fetch('/config_reader_api', {
+                                        method: 'POST',
+                                        headers: {
+                                            'Content-Type': 'application/json',
+                                        },
+                                        body: JSON.stringify({keys: initKeysToRead})
+                                    })
+                                    .then(response => {
+                                        if (!response.ok) {
+                                            return response.json().then(err => { throw new Error(err.error)});
+                                        }
+                                        return response
+                                    })
+                                    .then(response => response.json())
+                                    .then(data => {
+                                        var values = data.values;
+                                        var model_choice = values.model_choice;
+
+                                        fetch('/load_local_models')
+                                        .then(response => {
+                                            if (!response.ok) {
+                                                return response.json().then(err => { throw new Error(err.error)});
+                                            }
+                                            return response
+                                        })
+                                        .then(response => response.json())
+                                        .then(data => {
+                                            if (data.success) {
+
+                                                const dropdown = document.getElementById('modelDropdown');
+                                                dropdown.innerHTML = '';
+                                                data.models.forEach(model => {
+                                                    const option = document.createElement('option');
+                                                    option.value = model;
+                                                    option.textContent = model;
+                                                    //console.log('Model:', model);
+
+                                                    if (typeof model !== 'undefined' && typeof model_choice !== 'undefined') {
+                                                        if (model.toLowerCase() == model_choice.toLowerCase()) {
+                                                            option.selected = true;
+                                                        }
+                                                    }
+                                                    dropdown.appendChild(option);
+                                                });
+
+                                                cleanupUpload();
+                                            
+                                            } else {
+                                                throw new Error('Data error when fetching model list');
+                                            }
+                                        })
+                                        .catch(error => {
+                                            handleUploadError(`There was an error in fetching the model list: ${error.message}`)
+                                        }); // END load_local_models
+
+                                    })
+                                    .catch(error => {
+                                        handleUploadError(`There was an error in reading config.json: ${error.message}`)
+                                    }); //END config_reader_api call
+
+                                } else {
+                                    handleUploadError('Server-side response indicates failure')
+                                }
+                            } else {
+                                    handleUploadError(`Non-200 response: ${xhr.status} ${xhr.statusText}`);
+                                }
+                        };
+
+                        xhr.onerror = function() {
+                            handleUploadError('Network error occured - xhr.onerror() triggered')
+                        };
+
+                        xhr.send(formData);
+
+                    }
+                }
             });
 
 
