@@ -17,7 +17,6 @@ RUN apt-get update && apt-get install -y \
 	libffi-dev \
 	libssl-dev \
 	poppler-utils \
-	wget \
 	libreoffice \
 	git \
 	net-tools \
@@ -29,6 +28,9 @@ RUN libreoffice --version
 
 # Copy the current directory contents into the container at /app
 COPY . /app
+
+# Clone specific llama.cpp release
+RUN git clone -b b3441 https://github.com/ggerganov/llama.cpp.git
 
 # Build llama.cpp
 WORKDIR /app/llama.cpp
