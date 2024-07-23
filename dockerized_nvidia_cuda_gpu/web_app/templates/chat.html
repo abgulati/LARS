@@ -2033,6 +2033,7 @@
                     let full_error_message = "There was an error in loading the LLM: " + String(error.message);
                     console.error(full_error_message);
                     alert(full_error_message);
+                    document.getElementById('ModelAndDBLoading').style.display = 'none';
                 })
                 .finally(() => {
                     //document.getElementById('ModelAndDBLoading').style.display = 'none';
