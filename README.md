@@ -145,7 +145,7 @@ There are many desktop applications for running LLMs locally, and LARS aims to b
     - Build with CUDA:   
     
     ```
-    cmake -B build -DGGML_CUDA=ON
+    cmake -B build -DGGML_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES="52;61;70;75;80;86"
     cmake --build build  --config Release
     ```
 
