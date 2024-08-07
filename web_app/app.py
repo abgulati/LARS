@@ -11,7 +11,11 @@ from whoosh.qparser import QueryParser
 from whoosh.index import create_in
 from whoosh.index import open_dir
 
-from transformers import TrOCRProcessor, VisionEncoderDecoderModel
+from google.auth.transport.requests import Request
+from google.oauth2.credentials import Credentials
+from google_auth_oauthlib.flow import InstalledAppFlow
+from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
 
 from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
 from langchain_community.embeddings import HuggingFaceBgeEmbeddings
@@ -24,14 +28,12 @@ from langchain.prompts import PromptTemplate
 from langchain.vectorstores import Chroma
 from langchain.chains import RetrievalQA
 from langchain.chains import ConversationChain
-from langchain.llms import CTransformers
 
 from langchain.chat_models import AzureChatOpenAI
 from langchain.schema import HumanMessage
 
 from pdf2image import convert_from_path
 from PIL import Image
-import pytesseract
 
 import fitz # PyMuPDF
 
@@ -112,6 +114,10 @@ HISTORY_SUMMARY = {}    #Set in stream() via HISTORY_MEMORY_WITH_BUFFER.load_mem
 
 # Dict for user queries:  queries[session_id] = user_input
 QUERIES = {}
+
+# If modifying these scopes, delete the file token.json.
+GDRIVE_SCOPES = ["https://www.googleapis.com/auth/drive.metadata.readonly"]
+GDRIVE_CREDS = None
 #########################------------------------------------------------###############################
 
 
@@ -1557,6 +1563,57 @@ def store_chat_history_to_db(user_query_for_history_db, model_response_for_histo
     conn.close()
 
 
+@app.route('/login_to_google_drive')
+def login_to_google_drive():
+    global GDRIVE_CREDS
+    if os.path.exists("gdrive_token.json"):
+        GDRIVE_CREDS = Credentials.from_authorized_user_file("gdrive_token.json", GDRIVE_SCOPES)
+    if not GDRIVE_CREDS or not GDRIVE_CREDS.valid:
+        if GDRIVE_CREDS and GDRIVE_CREDS.expired and GDRIVE_CREDS.refresh_token:
+            GDRIVE_CREDS.refresh(Request())
+        else:
+            flow = InstalledAppFlow.from_client_secrets_file(
+                "gdrive_credentials.json", GDRIVE_SCOPES
+            )
+            GDRIVE_CREDS = flow.run_local_server(port=0)
+            with open("gdrive_token.json", "w") as token:
+                token.write(GDRIVE_CREDS.to_json())
+    return jsonify(success=True)
+
+
+@app.route('/fetch_file_list_from_google_drive')
+def fetch_file_list_from_google_drive():
+    try:
+        service = build("drive", "v3", credentials=GDRIVE_CREDS)
+
+        about_result = service.about().get(fields="storageQuota,user").execute()
+        print(f"about_result: {about_result}")
+
+        results = (
+            service.files().list(
+                q="trashed=false",
+                pageSize=20,
+                fields="nextPageToken, files(id, name, mimeType, version)"
+            ).execute()
+        )
+        
+        items = results.get("files", [])
+        print(f"len(items): {len(items)}")
+
+        if not items:
+            print("No files found.")
+            return jsonify(success=True)
+        else:
+            print("\n\nFiles:\n\n")
+            print("Name       ID      mimeType        fileExtension       version")
+            for item in items:
+                print(f"{item['name']} ({item['id']}) {item['mimeType']} {item['version']}")
+    except Exception as e:
+        handle_api_error("Could not fetch GDrive files, encountered error: ", e)
+    
+    return jsonify(success=True)
+
+
 # Route for loading all models from model dir
 @app.route('/load_local_models')
 def load_local_models():
@@ -2796,6 +2853,13 @@ def setup_for_llama_cpp_response():
         else:
             formatted_prompt += f"<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n{base_template}<|eot_id|><|start_header_id|>user<|end_header_id|>\n\n{user_query}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n"
 
+    elif local_llm_chat_template_format == 'llama3.1':
+
+        if current_sequence_id > 0:
+            formatted_prompt += f"<|start_header_id|>user<|end_header_id|>\n\n{user_query}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n"
+        else:
+            formatted_prompt += f"<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n{base_template}<|eot_id|><|start_header_id|>user<|end_header_id|>\n\n{user_query}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n"
+
     elif local_llm_chat_template_format == 'llama2':
 
         if current_sequence_id > 0:
@@ -2889,6 +2953,8 @@ def get_references():
         handle_api_error("Could not read request content in method get_references, encountered error: ", e)
 
     if local_llm_chat_template_format == 'llama3':
+        formatted_user_prompt += f"{llm_response}<|eot_id|>"
+    elif local_llm_chat_template_format == 'llama3.1':
         formatted_user_prompt += f"{llm_response}<|eot_id|>"
     elif local_llm_chat_template_format == 'llama2':
         formatted_user_prompt += f"{llm_response}</s>"

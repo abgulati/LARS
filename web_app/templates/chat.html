@@ -805,7 +805,8 @@
                                 <a href="#" class="list-group-item list-group-item-action" data-content="option3">System Prompt</a>
                                 <a href="#" class="list-group-item list-group-item-action" data-content="option4">RAG Options</a>
                                 <a href="#" class="list-group-item list-group-item-action" data-content="option5">OCR Options</a>
-                                <a href="#" class="list-group-item list-group-item-action" data-content="option6">Additional Settings</a>
+                                <a href="#" class="list-group-item list-group-item-action" data-content="option6">Google Drive Loader</a>
+                                <a href="#" class="list-group-item list-group-item-action" data-content="option7">Additional Settings</a>
                                 <!--Add as Needed-->
                             </div>
 
@@ -1169,6 +1170,13 @@
 
                                 <div id="option6" class="d-none">
                                     <!--Option 6 Content-->
+                                    <h5>Google Drive Loader</h5>
+                                    <br>
+                                    <button class="btn btn-primary" type="button" id="googleDriveLogin">Log-in to your Google Drive</button>
+                                </div>
+
+                                <div id="option7" class="d-none">
+                                    <!--Option 6 Content-->
                                     <h5>Additional Settings</h5>
                                     <br>
                                     <p>Look forward to future updates!</p>
@@ -1224,28 +1232,33 @@
             let ascending = true;
             let LLM_MODEL;
 
+
+            function errorHandler(attempted_action, error_generator, error_message) {
+                let error_alert_message = "There was an error when "  + attempted_action + " in the method " + error_generator + ", more details can be viewed in the browser's console. "
+                let full_error_message =  error_alert_message + error_message;
+                console.error(full_error_message);
+                alert(error_alert_message);
+                document.getElementById('ModelAndDBLoading').style.display = 'none';
+            }
+
             const forceEnableRagCheckbox = document.getElementById('force_enable_rag_checkbox');
             const forceDisableRagCheckbox = document.getElementById('force_disable_rag_checkbox');
             const defaultRag = document.getElementById('default_rag_checkbox');
 
+            function updateCheckboxes(checkedBox) {
+                const checkboxes = [forceEnableRagCheckbox, forceDisableRagCheckbox, defaultRag];
+                checkboxes.forEach(checkbox => {
+                    checkbox.checked = checkbox === checkedBox;
+                });
+            }
+
             //Listeners for Checkbox Changes
-            forceEnableRagCheckbox.addEventListener('change', function() {
-                if (this.checked) {
-                    forceDisableRagCheckbox.checked = false;
-                    defaultRag.checked = false;
-                }
-            });
-            forceDisableRagCheckbox.addEventListener('change', function() {
-                if (this.checked) {
-                    forceEnableRagCheckbox.checked = false;
-                    defaultRag.checked = false;
-                }
-            });
-            defaultRag.addEventListener('change', function() {
-                if (this.checked) {
-                    forceEnableRagCheckbox.checked = false;
-                    forceDisableRagCheckbox.checked = false;
-                }
+            [forceEnableRagCheckbox, forceDisableRagCheckbox, defaultRag].forEach(checkbox => {
+                checkbox.addEventListener('change', function() {
+                    if (this.checked) {
+                        updateCheckboxes(this);
+                    }
+                });
             });
 
             
@@ -1317,13 +1330,11 @@
                                 sidenav.appendChild(newDiv);
                             }
                         } else {
-                            throw new Error('Error when fetching history-menu list');
+                            throw new Error('Internal Server Error: Check server-log and server command-line for more details.');
                         }
                     })
                     .catch(error => {
-                        let full_error_message = "There was an error in fetching the history-menu list: " + String(error.message);
-                        console.error(full_error_message);
-                        alert(full_error_message);
+                        errorHandler("fetching the history-menu list", "/load_chat_history_list", String(error.message))
                     });
             }
             
@@ -1404,13 +1415,11 @@
                             row.insertCell(3).innerHTML = row_list[i][3];   // Chunk Overlap
                         }
                     } else {
-                        throw new Error('data.success=false error when fetching file-list for vector database. ')
+                        throw new Error('Internal Server Error: Check server-log and server command-line for more details.')
                     }
                 })
                 .catch(error => {
-                    let full_error_message = "There was an error when fetching the file-list for the selected vector database.: " + String(error.message);
-                    console.error(full_error_message);
-                    alert(full_error_message);
+                    errorHandler("fetching file list for the selected vector database", "/fetch_file_list_for_vector_db", String(error.message))
                 });
             }
 
@@ -1443,13 +1452,11 @@
                             location.reload();
                         }
                     } else {
-                        throw new Error('data.success=false error when resetting the specified vector database. ');
+                        throw new Error('Internal Server Error: Check server-log and server command-line for more details.');
                     }
                 })
                 .catch(error => {
-                    let full_error_message = "There was an error in resetting the specified vector database: " + String(error.message);
-                    console.error(full_error_message);
-                    alert(full_error_message);
+                    errorHandler("resetting the specified vector database", "/reset_vector_db_on_disk", String(error.message))
                 });
             }
 
@@ -1477,24 +1484,88 @@
             }
 
 
-            /////////////---------DOMContentLoaded---------/////////////
-            document.addEventListener("DOMContentLoaded", function() {
+            function googleDriveLogin() {
+                fetch('/login_to_google_drive')
+                .then(response => {
+                    if (!response.ok) {
+                        return response.json().then(err => { throw new Error(err.error)});
+                    }
+                    return response
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert("Google Drive Login Successful!")
 
+                        fetch('/fetch_file_list_from_google_drive')
+                        .then(response => {
+                            if (!response.ok) {
+                                return response.json().then(err => { throw new Error(err.error)});
+                            }
+                            return response
+                        })
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.success) {
+                                alert("GDrive Files Fetched")
+
+                            } else {
+                                throw new Error('Internal Server Error: Check server-log and server command-line for more details.');
+                            }
+                        })
+                        .catch(error => {
+                            errorHandler("fetching file list from Google Drive", "/fetch_file_list_from_google_drive", String(error.message))
+                        });
+
+                    } else {
+                        throw new Error('Internal Server Error: Check server-log and server command-line for more details.');
+                    }
+                })
+                .catch(error => {
+                    errorHandler("logging into Google Drive", "/login_to_google_drive", String(error.message))
+                });
+            }
+
+            function initializeChatLink() {
                 var currentUrl = window.location.href;
                 var chatLink = document.getElementById('dynamicChatLink');
-                // chatLink.href = currentUrl + '/chat';
                 chatLink.href = currentUrl;
+            }
 
-                // document.body.addEventListener('click', function(event) {
-                //     console.log('Clicked element:', event.target);
-                // });
+            function initializeScrollDownButton() {
+                //Scroll all the way down button:
+                const scrollDownButton = document.getElementById('scrollDownButton');
+                const chatArea = document.getElementById('chat-area');
 
-                //Start initializing the chat session
-                document.getElementById('ModelAndDBLoading').style.display = 'block';
+                scrollDownButton.addEventListener('click', () => {
+                    chatArea.scrollTop = chatArea.scrollHeight;
+                });
+            }
 
-                // Get & Set Core Values - for the Settings dialog and subsequent app-loading functions
+            function initializeUI() {
+                initializeChatLink();
+                initializeScrollDownButton();
+            }
+
+            function setUIValues(values) {
+                document.getElementById('NumbGpuLayers').value = values.local_llm_gpu_layers;
+                document.getElementById('LlmCtxLgt').value = values.local_llm_context_length;
+                document.getElementById('MaxNewToks').value = values.local_llm_max_new_tokens;
+                document.getElementById('tempSlider').value = values.local_llm_temperature;
+                document.getElementById('tempSliderValue').textContent = values.local_llm_temperature;
+                document.getElementById('topkSlider').value = values.local_llm_top_k;
+                document.getElementById('topkSliderValue').textContent = values.local_llm_top_k;
+                document.getElementById('toppSlider').value = values.local_llm_top_p;
+                document.getElementById('toppSliderValue').textContent = values.local_llm_top_p;
+                document.getElementById('minpSlider').value = values.local_llm_min_p;
+                document.getElementById('minpSliderValue').textContent = values.local_llm_min_p;
+                document.getElementById('nkeepSlider').value = values.local_llm_n_keep;
+            }
+
+            function loadAndSetCoreValues() {
                 const initKeysToRead = ['model_choice', 'use_local_llm', 'use_gpu', 'embedding_model_choice', 'use_ocr', 'ocr_service_choice', 'local_llm_chat_template_format', 'force_enable_rag', 'force_disable_rag', 'base_template', 'local_llm_gpu_layers', 'local_llm_context_length', 'local_llm_max_new_tokens', 'local_llm_temperature', 'local_llm_top_k', 'local_llm_top_p', 'local_llm_min_p', 'local_llm_n_keep', 'azure_cv_free_tier']
-                fetch('/config_reader_api', {
+                
+                return fetch('/config_reader_api', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -1505,415 +1576,395 @@
                     if (!response.ok) {
                         return response.json().then(err => { throw new Error(err.error)});
                     }
+                    return response.json()
+                })
+                .then(data => {
+                    setUIValues(data.values);
+                    return data.values;
+                })
+                .catch(error => {
+                    errorHandler("reading config.json", "/config_reader_api", String(error.message))
+                });
+            }
+
+            function initializeModelDropdown(model_choice) {
+                fetch('/load_local_models')
+                .then(response => {
+                    if (!response.ok) {
+                        return response.json().then(err => { throw new Error(err.error)});
+                    }
                     return response
                 })
                 .then(response => response.json())
                 .then(data => {
-                    // console.log(data);
-                    // console.log("embedding_model_choice: ", data.embedding_model_choice);
-                    var values = data.values;
-                    var model_choice = values.model_choice;
-                    var use_gpu = values.use_gpu;
-                    var use_local_llm = values.use_local_llm;
-                    var embedding_model_choice = values.embedding_model_choice;
-                    var use_ocr = values.use_ocr;
-                    var ocr_service_choice = values.ocr_service_choice;
-                    var local_llm_chat_template_format = values.local_llm_chat_template_format;
-                    var force_enable_rag = values.force_enable_rag;
-                    var force_disable_rag = values.force_disable_rag;
-                    var base_template = values.base_template;
-                    var azure_cv_free_tier = values.azure_cv_free_tier;
-                    document.getElementById('NumbGpuLayers').value = values.local_llm_gpu_layers;
-                    document.getElementById('LlmCtxLgt').value = values.local_llm_context_length;
-                    document.getElementById('MaxNewToks').value = values.local_llm_max_new_tokens;
-                    document.getElementById('tempSlider').value = values.local_llm_temperature;
-                    document.getElementById('tempSliderValue').textContent = values.local_llm_temperature;
-                    document.getElementById('topkSlider').value = values.local_llm_top_k;
-                    document.getElementById('topkSliderValue').textContent = values.local_llm_top_k;
-                    document.getElementById('toppSlider').value = values.local_llm_top_p;
-                    document.getElementById('toppSliderValue').textContent = values.local_llm_top_p;
-                    document.getElementById('minpSlider').value = values.local_llm_min_p;
-                    document.getElementById('minpSliderValue').textContent = values.local_llm_min_p;
-                    document.getElementById('nkeepSlider').value = values.local_llm_n_keep;
-                    
-                    // console.log('model_choice:', model_choice);
+                    if (data.success) {
+                        //console.log('model_choice:', model_choice);
+                        const dropdown = document.getElementById('modelDropdown');
+                        data.models.forEach(model => {
+                            const option = document.createElement('option');
+                            option.value = model;
+                            option.textContent = model;
+                            //console.log('Model:', model);
 
-                    // 0 - Function to trigger change events as values are loaded and set
-                    function triggerChangeEvent(element) {
-                        var event = new Event('change', {
-                            bubbles: true,  // ensures event bubbles up through the DOM, allowing elements higher up in the DOM tree to listen and react
-                            cancelable: true   // cancellable events allow preventDefault() calls to prevent default behavoir, such as form submissions
-                        });
-                        element.dispatchEvent(event);
-                    }
-                    
-                    // 1. Set LLM Tab Details:
-
-                    // a. Fetch model list
-                    fetch('/load_local_models')
-                    .then(response => {
-                        if (!response.ok) {
-                            return response.json().then(err => { throw new Error(err.error)});
-                        }
-                        return response
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.success) {
-                            //console.log('model_choice:', model_choice);
-                            const dropdown = document.getElementById('modelDropdown');
-                            data.models.forEach(model => {
-                                const option = document.createElement('option');
-                                option.value = model;
-                                option.textContent = model;
-                                //console.log('Model:', model);
-
-                                if (typeof model !== 'undefined' && typeof model_choice !== 'undefined') {
-                                    if (model.toLowerCase() == model_choice.toLowerCase()) {
-                                        option.selected = true;
-                                    }
+                            if (typeof model !== 'undefined' && typeof model_choice !== 'undefined') {
+                                if (model.toLowerCase() == model_choice.toLowerCase()) {
+                                    option.selected = true;
                                 }
-                                dropdown.appendChild(option);
-                            });
-                        } else {
-                            throw new Error('Data error when fetching model list');
-                        }
-                    })
-                    .catch(error => {
-                        let full_error_message = "There was an error in fetching the model list: " + String(error.message);
-                        console.error(full_error_message);
-                        alert(full_error_message);
-                    });
-
-                    // b. set LLM System-Prompt Template:
-                    const llmTempDd = document.getElementById('llmTemplateDropdown');
-
-                    for (let option of llmTempDd.options) {
-                        if (option.value == local_llm_chat_template_format) {
-                            option.selected = true;
-                            break;
-                        }
-                    }
-
-                    
-                    // c. Set LLM's gpu_choice Radio button
-                    var gpuYes = document.getElementById('gpu_radio_yes');
-                    var gpuNo = document.getElementById('gpu_radio_no');
-
-                    if (use_gpu) {
-                        gpuYes.checked = true;
-                        gpuNo.checked = false;
-                    } else {
-                        gpuYes.checked = false;
-                        gpuNo.checked = true;
-                    }
-
-
-                    // d. LLM  Radio button
-                    var useLocalLlm = document.getElementById('local_llm_radio_button');
-                    var useApiLlm = document.getElementById('api_llm_radio_button');
-
-                    if (use_local_llm) {
-                        useLocalLlm.checked = true;
-                        useApiLlm.checked = false;
-                    } else {
-                        useLocalLlm.checked = false;
-                        
-                        // select API service from dropwdown
-                        var selectLlmApiForDropdown = document.getElementById('llmApiDropdown');
-
-                        for (var i = 0; i < selectLlmApiForDropdown.length; i++) {
-                            if (selectLlmApiForDropdown.options[i].value === model_choice) {
-                                selectLlmApiForDropdown.options[i].selected = true;
-                                break;
                             }
-                        }
-
-                        useApiLlm.checked = true;
-                    }
-
-                    // Now that all dets for the LLM tab are loaded, update UI:
-
-                    // 1a. Show or hide local-LLM selection:
-                    function toggleLocalLlmSelection() {
-                        var selection = document.querySelector('input[name="use_local_or_api_llm"]:checked').value;
-                        
-                        document.getElementById('localLlmSelection').style.display = selection === 'local' ? 'block' : 'none';
-                        document.getElementById('localLlmTemplateSelection').style.display = selection === 'local' ? 'block' : 'none';
-                        document.getElementById('uploadLlmButton').style.display = selection === 'local' ? 'block' : 'none';
-                        document.getElementById('apiLlmSelection').style.display = selection === 'api' ? 'block' : 'none';
-                        
-                        var advancedLlmSettingsToggle = document.getElementById('advancedLlmSettingsToggle');
-                        var advancedLlmSettings = document.getElementById('advancedLlmSettings');
-
-                        if (selection === 'local') {
-                            document.getElementById('azure_openai_api_form').style.display = 'none'; //Hide API-Details-Form if local selected
-                            advancedLlmSettingsToggle.style.display = 'inline-block';
-                        } else {
-                            advancedLlmSettingsToggle.style.display = 'none';
-                            // Collapse Advanced Settings if it's expanded
-                            if (advancedLlmSettings.classList.contains('show')) {
-                                var bsCollapse = new bootstrap.Collapse(advancedLlmSettings, {
-                                    toggle: false
-                                });
-                                bsCollapse.hide();
-                            }
-                        }
-                    }
-
-                    // 1b. Show or hide API form:
-                    function toggleLlmApiForm() {
-                        var selection = document.getElementById('llmApiDropdown').value;
-                        document.getElementById('azure_openai_api_form').style.display = selection === 'AzureOpenAI' ? 'block' : 'none';
-                        //Add more API form selectors here
-                    }
-
-                    // 1c. enable or disable ngl based on use_gpu
-                    function toggleNGL() {
-                        var selection = document.querySelector('input[name="use_gpu"]:checked').value;
-                        if(selection === 'y') {
-                            document.getElementById("NumbGpuLayers").disabled = false;
-                        } else {
-                            document.getElementById('NumbGpuLayers').value = "0";
-                            document.getElementById("NumbGpuLayers").disabled = true;
-                        }
-                    }
-
-                    // 1d. Event listener for radio buttons:
-                    document.getElementById('local_llm_radio_button').addEventListener('change', toggleLlmApiForm);
-                    document.getElementById('local_llm_radio_button').addEventListener('change', toggleLocalLlmSelection);
-
-                    document.getElementById('api_llm_radio_button').addEventListener('change', toggleLlmApiForm);
-                    document.getElementById('api_llm_radio_button').addEventListener('change', toggleLocalLlmSelection);
-
-                    // 1e. Event listener for API dropdown:
-                    document.getElementById('llmApiDropdown').addEventListener('change', toggleLlmApiForm);
-
-                    // 1f. Event Listener for toggle GPU:
-                    document.getElementById('gpu_radio_yes').addEventListener('change', toggleNGL);
-                    document.getElementById('gpu_radio_no').addEventListener('change', toggleNGL);
-
-                    // 1g. Event listener for Reset Defaults button:
-                    document.getElementById('resetLlmAdvancedDefaults').addEventListener('click', resetLlmAdvancedDefaults);    //aparently, adding parenthesis () here will cause resetLlmAdvancedDefaults to run immediately when the script executes, not on button click. Removing them allows the function to be passed as a reference correctly on click.
-
-                    // 1h. Initial state check:
-                    toggleLocalLlmSelection();
-                    toggleLlmApiForm();
-                    toggleNGL();
-
-                    // 1i. Slider listeners
-                    document.getElementById('tempSlider').addEventListener('input', function() {
-                        document.getElementById('tempSliderValue').textContent = this.value;
-                    });
-
-                    document.getElementById('topkSlider').addEventListener('input', function() {
-                        document.getElementById('topkSliderValue').textContent = this.value;
-                    });
-
-                    document.getElementById('toppSlider').addEventListener('input', function() {
-                        document.getElementById('toppSliderValue').textContent = this.value;
-                    });
-
-                    document.getElementById('minpSlider').addEventListener('input', function() {
-                        document.getElementById('minpSliderValue').textContent = this.value;
-                    });
-
-
-
-                    // 2 - Embedding Model
-                    var selectEmbedModelForDropdown = document.getElementById('embedding_model_dropdown');
-
-                    for (var i = 0; i < selectEmbedModelForDropdown.length; i++) {
-                        if (selectEmbedModelForDropdown.options[i].value === embedding_model_choice) {
-                            selectEmbedModelForDropdown.options[i].selected = true;
-                            clearDocsLoadedTable();
-                            populateDocsLoadedTable();
-                            break;
-                        }
-                    }
-
-                    // Now that all dets for the Embedding-Model tab are loaded, update UI:
-
-                    // 2a. Show or hide API form:
-                    function toggleAzureAdaApiForm() {
-                        var selection = document.getElementById('embedding_model_dropdown').value;
-                        document.getElementById('azure_openai_text_ada_api_form').style.display = selection === 'openai_text_ada' ? 'block' : 'none';
-                        //Add more API form selectors here
-                    }
-
-                    // 2b. Event listener for API dropdown:
-                    document.getElementById('embedding_model_dropdown').addEventListener('change', function() {
-                        populateDocsLoadedTable();
-                        toggleAzureAdaApiForm();
-                    });
-
-                    // 2b. Add Event Listener for ResetDB button:
-                    document.getElementById('resetVectorDB').addEventListener('click', resetVectorDBtoBlank);
-
-                    // 2c. Check init
-                    toggleAzureAdaApiForm();
-
-
-                    // 3 - Prompt Template Stuff:
-
-                    // 3a. Set the default template when the page loads
-                    setDefaultTemplate();
-                    let default_system_template = document.getElementById('template_dropdown_default').getAttribute('data-template');
-
-                    if (base_template.toLowerCase().trim() != default_system_template.toLowerCase().trim()) {
-                        document.getElementById('template_dropdown_custom').setAttribute('data-template', base_template);
-                        document.getElementById('templateContent').value = base_template;
-                        document.getElementById('templateContent').readOnly = false;
-                        document.getElementById('templateDropdown').textContent = 'Custom';
-                    }
-
-                    // 3b. Set event-listeners for the template-choices:
-                    let dropdownItems = document.querySelectorAll('.dropdown-item');    // Get a reference to the dropdown items and the textarea
-                    let textarea = document.getElementById('templateContent');
-
-                    // 3c. Loop through each dropdown item
-                    dropdownItems.forEach(function(item) {
-                        item.addEventListener('click', function(event) {
-
-                            event.preventDefault();
-
-                            // Get the template content from the clicked dropdown item's data-template attribute
-                            let templateContent = event.target.getAttribute('data-template');
-                            let isReadonly = event.target.getAttribute('data-readonly') === 'true'; // Convert string to boolean via '===' strict equality check: if the data-readonly attribute is true, the boolean isReadonly will be true, else false!
-
-                            // Set the textarea value to the template content
-                            textarea.value = templateContent;
-
-                            // Set readonly attribute and placeholder
-                            textarea.readOnly = isReadonly;
-                            textarea.placeholder = isReadonly ? "" : "Use this space to enter your own prompt"; // No placeholder if readonly
-
-                            // Change the dropdown button text to reflect the chosen template
-                            document.getElementById('templateDropdown').textContent = event.target.textContent;
-
+                            dropdown.appendChild(option);
                         });
-                    });
-
-
-                    // 4 - Set RAG-Checkbox
-                    const forceEnableRagCheckbox = document.getElementById('force_enable_rag_checkbox');
-                    const forceDisableRagCheckbox = document.getElementById('force_disable_rag_checkbox');
-                    const defaultRag = document.getElementById('default_rag_checkbox');
-
-                    if (force_enable_rag) {
-                        console.log("Force enabling RAG")
-                        forceEnableRagCheckbox.checked = true
-                        forceDisableRagCheckbox.checked = false;
-                        defaultRag.checked = false;
-                    } else if (force_disable_rag) {
-                        console.log("Force disabling RAG")
-                        forceEnableRagCheckbox.checked = false
-                        forceDisableRagCheckbox.checked = true;
-                        defaultRag.checked = false;
-                    } else if (!force_enable_rag && !force_disable_rag) {
-                        forceEnableRagCheckbox.checked = false
-                        forceDisableRagCheckbox.checked = false;
-                        defaultRag.checked = true;
-                    }
-
-
-                    // 5 - OCR Stuff
-                    var useOcr = document.getElementById('ocr_yes_radio_button');
-                    var usePypdf = document.getElementById('ocr_no_radio_button');
-
-                    if (use_ocr) {
-                        useOcr.checked = true;
-
-                        // select API service from dropwdown
-                        var selectOcrApiForDropdown = document.getElementById('ocrApiDropdown');
-
-                        for (var i = 0; i < selectOcrApiForDropdown.length; i++) {
-                            if (selectOcrApiForDropdown.options[i].value === ocr_service_choice) {
-                                selectOcrApiForDropdown.options[i].selected = true;
-                                break;
-                            }
-                        }
-                        
-                        if (azure_cv_free_tier){
-                            document.getElementById('is_azure_cv_free_tier').checked = true;
-                        } else {
-                            document.getElementById('is_azure_cv_free_tier').checked = false;
-                        }
-
-                        usePypdf.checked = false;
                     } else {
-                        useOcr.checked = false;
-                        usePypdf.checked = true;
+                        throw new Error('Internal Server Error: Check server-log and server command-line for more details.');
                     }
-
-                    document.getElementById('update_azure_gpt').addEventListener('change', function() {
-                        document.getElementById('azure_openai_api_url').disabled = !this.checked;   
-                        document.getElementById('azure_openai_api_key').disabled = !this.checked;   
-                        document.getElementById('azure_openai_deployment_name').disabled = !this.checked;
-                    });
-                    document.getElementById('update_azure_ada').addEventListener('change', function() {
-                        document.getElementById('azure_openai_text_ada_api_url').disabled = !this.checked;    
-                        document.getElementById('azure_openai_text_ada_api_key').disabled = !this.checked;   
-                        document.getElementById('azure_openai_text_ada_deployment_name').disabled = !this.checked;   
-                    });
-                    document.getElementById('update_azure_vision').addEventListener('change', function() {
-                        document.getElementById('azure_vision_api_url').disabled = !this.checked;    
-                        document.getElementById('azure_vision_api_key').disabled = !this.checked;
-                        document.getElementById('is_azure_cv_free_tier').disabled = !this.checked;  
-                    });
-                    document.getElementById('update_azure_doc_ai').addEventListener('change', function() {
-                        document.getElementById('azure_doc_ai_api_url').disabled = !this.checked;   // !this.check -> logical NOT to flip boolean. this.checked will be true when the box is checked, so !this.checked will be false... 
-                        document.getElementById('azure_doc_ai_api_key').disabled = !this.checked;   // ...and so disabled will be false. So if Update-Config is checked, the fields are enabled.
-                    });
-
-                    // Now that all dets for the OCR tab are loaded, update UI:
-                   
-                    // 5a. Show or hide OCR-Service selection:
-                    function toggleOcrSelection() {
-                        var selection = document.querySelector('input[name="specify_ocr_and_service"]:checked').value;
-                        document.getElementById('apiOcrSelection').style.display = selection === 'ocr' ? 'block' : 'none';
-                        if (selection === 'pypdf') {    //Hide API-Details-Form 
-                            document.getElementById('azure_vision_api_form').style.display = 'none'; 
-                            document.getElementById('azure_doc_ai_api_form').style.display = 'none';
-                        } else {
-                            if (document.getElementById('ocrApiDropdown').value != 'AzureVision') {
-                                document.getElementById('azure_vision_api_form').style.display = 'none'; //Hide API-Details-Form
-                            } else if (document.getElementById('ocrApiDropdown').value != 'AzureDocAi') {
-                                document.getElementById('azure_doc_ai_api_form').style.display = 'none';
-                            }
-                        }
-                    }
-
-                    // 5b. Show or hide API form:
-                    function toggleOcrApiForm() {
-                        var selection = document.getElementById('ocrApiDropdown').value;
-                        document.getElementById('azure_vision_api_form').style.display = selection === 'AzureVision' ? 'block' : 'none';
-                        document.getElementById('azure_doc_ai_api_form').style.display = selection === 'AzureDocAi' ? 'block' : 'none';
-                        //Add more API form selectors here
-                    }
-
-                    // 5c. Event listener for radio buttons:
-                    document.getElementById('ocr_yes_radio_button').addEventListener('change', toggleOcrApiForm);
-                    document.getElementById('ocr_yes_radio_button').addEventListener('change', toggleOcrSelection);
-
-                    document.getElementById('ocr_no_radio_button').addEventListener('change', toggleOcrApiForm);
-                    document.getElementById('ocr_no_radio_button').addEventListener('change', toggleOcrSelection);
-
-                    // 5d. Initial state check:
-                    toggleOcrSelection();
-                    toggleOcrApiForm();
-
-                    // 5e. Event listener for API dropdown:
-                    document.getElementById('ocrApiDropdown').addEventListener('change', toggleOcrApiForm);
-
                 })
                 .catch(error => {
-                    let full_error_message = "There was an error in reading config.json: " + String(error.message);
-                    console.error(full_error_message);
-                    alert(full_error_message);
-                }); //END config_reader_api call
+                    errorHandler("fetching the model list", "/load_local_models", String(error.message))
+                });
+            }
 
+            function initializeLLMTemplateDropdown(local_llm_chat_template_format) {
+                const llmTempDd = document.getElementById('llmTemplateDropdown');
 
+                for (let option of llmTempDd.options) {
+                    if (option.value == local_llm_chat_template_format) {
+                        option.selected = true;
+                        break;
+                    }
+                }
+            }
+
+            function initializeGPURadioButtons(use_gpu) {
+                var gpuYes = document.getElementById('gpu_radio_yes');
+                var gpuNo = document.getElementById('gpu_radio_no');
+
+                if (use_gpu) {
+                    gpuYes.checked = true;
+                    gpuNo.checked = false;
+                } else {
+                    gpuYes.checked = false;
+                    gpuNo.checked = true;
+                }
+            }
+
+            function initializeLLMRadioButtons(use_local_llm, model_choice) {
+                var useLocalLlm = document.getElementById('local_llm_radio_button');
+                var useApiLlm = document.getElementById('api_llm_radio_button');
+
+                if (use_local_llm) {
+                    useLocalLlm.checked = true;
+                    useApiLlm.checked = false;
+                } else {
+                    useLocalLlm.checked = false;
+                    
+                    // select API service from dropwdown
+                    var selectLlmApiForDropdown = document.getElementById('llmApiDropdown');
+
+                    for (var i = 0; i < selectLlmApiForDropdown.length; i++) {
+                        if (selectLlmApiForDropdown.options[i].value === model_choice) {
+                            selectLlmApiForDropdown.options[i].selected = true;
+                            break;
+                        }
+                    }
+                    useApiLlm.checked = true;
+                }
+            }
+
+            function toggleLocalLlmSelection() {    // Show or hide local-LLM selection:
+                var selection = document.querySelector('input[name="use_local_or_api_llm"]:checked').value;
+                
+                document.getElementById('localLlmSelection').style.display = selection === 'local' ? 'block' : 'none';
+                document.getElementById('localLlmTemplateSelection').style.display = selection === 'local' ? 'block' : 'none';
+                document.getElementById('uploadLlmButton').style.display = selection === 'local' ? 'block' : 'none';
+                document.getElementById('apiLlmSelection').style.display = selection === 'api' ? 'block' : 'none';
+                
+                var advancedLlmSettingsToggle = document.getElementById('advancedLlmSettingsToggle');
+                var advancedLlmSettings = document.getElementById('advancedLlmSettings');
+
+                if (selection === 'local') {
+                    document.getElementById('azure_openai_api_form').style.display = 'none'; //Hide API-Details-Form if local selected
+                    advancedLlmSettingsToggle.style.display = 'inline-block';
+                } else {
+                    advancedLlmSettingsToggle.style.display = 'none';
+                    // Collapse Advanced Settings if it's expanded
+                    if (advancedLlmSettings.classList.contains('show')) {
+                        var bsCollapse = new bootstrap.Collapse(advancedLlmSettings, {
+                            toggle: false
+                        });
+                        bsCollapse.hide();
+                    }
+                }
+            }
+
+            function toggleLlmApiForm() {   // Show or hide API form:
+                var selection = document.getElementById('llmApiDropdown').value;
+                document.getElementById('azure_openai_api_form').style.display = selection === 'AzureOpenAI' ? 'block' : 'none';
+                //Add more API form selectors here
+            }
+            
+            function toggleNGL() {  // Enable or disable ngl based on use_gpu
+                var selection = document.querySelector('input[name="use_gpu"]:checked').value;
+                if(selection === 'y') {
+                    document.getElementById("NumbGpuLayers").disabled = false;
+                } else {
+                    document.getElementById('NumbGpuLayers').value = "0";
+                    document.getElementById("NumbGpuLayers").disabled = true;
+                }
+            }
+
+            function initializeEventListenersForLLMTabRadioButtons() {
+                // Event listener for LLM/API radio buttons:
+                document.getElementById('local_llm_radio_button').addEventListener('change', toggleLlmApiForm);
+                document.getElementById('local_llm_radio_button').addEventListener('change', toggleLocalLlmSelection);
+
+                document.getElementById('api_llm_radio_button').addEventListener('change', toggleLlmApiForm);
+                document.getElementById('api_llm_radio_button').addEventListener('change', toggleLocalLlmSelection);
+
+                // Event listener for API dropdown:
+                document.getElementById('llmApiDropdown').addEventListener('change', toggleLlmApiForm);
+
+                // Event Listener for toggle GPU:
+                document.getElementById('gpu_radio_yes').addEventListener('change', toggleNGL);
+                document.getElementById('gpu_radio_no').addEventListener('change', toggleNGL);
+
+                // Event listener for Reset Defaults button:
+                document.getElementById('resetLlmAdvancedDefaults').addEventListener('click', resetLlmAdvancedDefaults);    //aparently, adding parenthesis () here will cause resetLlmAdvancedDefaults to run immediately when the script executes, not on button click. Removing them allows the function to be passed as a reference correctly on click.
+
+                // Initial state check:
+                toggleLocalLlmSelection();
+                toggleLlmApiForm();
+                toggleNGL();
+
+                document.getElementById('update_azure_gpt').addEventListener('change', function() {
+                    document.getElementById('azure_openai_api_url').disabled = !this.checked;   
+                    document.getElementById('azure_openai_api_key').disabled = !this.checked;   
+                    document.getElementById('azure_openai_deployment_name').disabled = !this.checked;
+                });
+            }
+
+            function initializeEventListenersForLLMTabSliders() {
+                document.getElementById('tempSlider').addEventListener('input', function() {
+                    document.getElementById('tempSliderValue').textContent = this.value;
+                });
+
+                document.getElementById('topkSlider').addEventListener('input', function() {
+                    document.getElementById('topkSliderValue').textContent = this.value;
+                });
+
+                document.getElementById('toppSlider').addEventListener('input', function() {
+                    document.getElementById('toppSliderValue').textContent = this.value;
+                });
+
+                document.getElementById('minpSlider').addEventListener('input', function() {
+                    document.getElementById('minpSliderValue').textContent = this.value;
+                });
+            }
+            
+            function initializeLLMTabComponents(values) {
+                initializeModelDropdown(values.model_choice);   
+                initializeLLMTemplateDropdown(values.local_llm_chat_template_format);
+                initializeGPURadioButtons(values.use_gpu);
+                initializeLLMRadioButtons(values.use_local_llm, values.model_choice);
+                initializeEventListenersForLLMTabRadioButtons();
+                initializeEventListenersForLLMTabSliders();
+            }
+
+            function initializeEmbeddingModelDropdown(embedding_model_choice) {
+                var selectEmbedModelForDropdown = document.getElementById('embedding_model_dropdown');
+
+                for (var i = 0; i < selectEmbedModelForDropdown.length; i++) {
+                    if (selectEmbedModelForDropdown.options[i].value === embedding_model_choice) {
+                        selectEmbedModelForDropdown.options[i].selected = true;
+                        clearDocsLoadedTable();
+                        populateDocsLoadedTable();
+                        break;
+                    }
+                }
+            }
+
+            function initializeEventListenersForEmbeddingModelTab() {
+                // Show or hide API form:
+                function toggleAzureAdaApiForm() {
+                    var selection = document.getElementById('embedding_model_dropdown').value;
+                    document.getElementById('azure_openai_text_ada_api_form').style.display = selection === 'openai_text_ada' ? 'block' : 'none';
+                    //Add more API form selectors here
+                }
+
+                // Event listener for API dropdown:
+                document.getElementById('embedding_model_dropdown').addEventListener('change', function() {
+                    populateDocsLoadedTable();
+                    toggleAzureAdaApiForm();
+                });
+
+                // Add Event Listener for ResetDB button:
+                document.getElementById('resetVectorDB').addEventListener('click', resetVectorDBtoBlank);
+
+                // Check init
+                toggleAzureAdaApiForm();
+
+                document.getElementById('update_azure_ada').addEventListener('change', function() {
+                    document.getElementById('azure_openai_text_ada_api_url').disabled = !this.checked;    
+                    document.getElementById('azure_openai_text_ada_api_key').disabled = !this.checked;   
+                    document.getElementById('azure_openai_text_ada_deployment_name').disabled = !this.checked;   
+                });
+            }
+
+            function initializeEmbeddingModelTabComponents(values) {
+                initializeEmbeddingModelDropdown(values.embedding_model_choice);
+                initializeEventListenersForEmbeddingModelTab();
+            }
+
+            function initializeSystemPromptTabListeners(base_template) {
+                let default_system_template = document.getElementById('template_dropdown_default').getAttribute('data-template');
+
+                if (base_template.toLowerCase().trim() != default_system_template.toLowerCase().trim()) {
+                    document.getElementById('template_dropdown_custom').setAttribute('data-template', base_template);
+                    document.getElementById('templateContent').value = base_template;
+                    document.getElementById('templateContent').readOnly = false;
+                    document.getElementById('templateDropdown').textContent = 'Custom';
+                }
+
+                // 3b. Set event-listeners for the template-choices:
+                let dropdownItems = document.querySelectorAll('.dropdown-item');    // Get a reference to the dropdown items and the textarea
+                let textarea = document.getElementById('templateContent');
+
+                // 3c. Loop through each dropdown item
+                dropdownItems.forEach(function(item) {
+                    item.addEventListener('click', function(event) {
+
+                        event.preventDefault();
+
+                        // Get the template content from the clicked dropdown item's data-template attribute
+                        let templateContent = event.target.getAttribute('data-template');
+                        let isReadonly = event.target.getAttribute('data-readonly') === 'true'; // Convert string to boolean via '===' strict equality check: if the data-readonly attribute is true, the boolean isReadonly will be true, else false!
+
+                        // Set the textarea value to the template content
+                        textarea.value = templateContent;
+
+                        // Set readonly attribute and placeholder
+                        textarea.readOnly = isReadonly;
+                        textarea.placeholder = isReadonly ? "" : "Use this space to enter your own prompt"; // No placeholder if readonly
+
+                        // Change the dropdown button text to reflect the chosen template
+                        document.getElementById('templateDropdown').textContent = event.target.textContent;
+
+                    });
+                });
+            }
+
+            function initializeSystemPromptTabComponents(values) {
+                setDefaultTemplate();   // Set the default template when the page loads
+                initializeSystemPromptTabListeners(values.base_template);
+            }
+
+            function initializeRAGTabCheckbox(force_enable_rag, force_disable_rag) {
+                // Set RAG-Checkbox       
+                if (force_enable_rag) {
+                    console.log("Force enabling RAG")
+                    updateCheckboxes(forceEnableRagCheckbox);
+                } else if (force_disable_rag) {
+                    console.log("Force disabling RAG")
+                    updateCheckboxes(forceDisableRagCheckbox);
+                } else {
+                    updateCheckboxes(defaultRag);
+                }
+            }
+
+            function initializeRAGTabComponents(values) {
+                initializeRAGTabCheckbox(values.force_enable_rag , values.force_disable_rag);
+            }
+
+            function initializeOCRTabRadios(use_ocr, ocr_service_choice, azure_cv_free_tier) {
+                var useOcr = document.getElementById('ocr_yes_radio_button');
+                var usePypdf = document.getElementById('ocr_no_radio_button');
+
+                if (use_ocr) {
+                    useOcr.checked = true;
+
+                    // select API service from dropwdown
+                    var selectOcrApiForDropdown = document.getElementById('ocrApiDropdown');
+
+                    for (var i = 0; i < selectOcrApiForDropdown.length; i++) {
+                        if (selectOcrApiForDropdown.options[i].value === ocr_service_choice) {
+                            selectOcrApiForDropdown.options[i].selected = true;
+                            break;
+                        }
+                    }
+                    
+                    if (azure_cv_free_tier){
+                        document.getElementById('is_azure_cv_free_tier').checked = true;
+                    } else {
+                        document.getElementById('is_azure_cv_free_tier').checked = false;
+                    }
+
+                    usePypdf.checked = false;
+                } else {
+                    useOcr.checked = false;
+                    usePypdf.checked = true;
+                }
+            }
+
+            function toggleOcrSelection() { //Show or hide OCR-Service selection:
+                var selection = document.querySelector('input[name="specify_ocr_and_service"]:checked').value;
+                document.getElementById('apiOcrSelection').style.display = selection === 'ocr' ? 'block' : 'none';
+                if (selection === 'pypdf') {    //Hide API-Details-Form 
+                    document.getElementById('azure_vision_api_form').style.display = 'none'; 
+                    document.getElementById('azure_doc_ai_api_form').style.display = 'none';
+                } else {
+                    if (document.getElementById('ocrApiDropdown').value != 'AzureVision') {
+                        document.getElementById('azure_vision_api_form').style.display = 'none'; //Hide API-Details-Form
+                    } else if (document.getElementById('ocrApiDropdown').value != 'AzureDocAi') {
+                        document.getElementById('azure_doc_ai_api_form').style.display = 'none';
+                    }
+                }
+            }
+
+            function toggleOcrApiForm() {   //Show or hide API form:
+                var selection = document.getElementById('ocrApiDropdown').value;
+                document.getElementById('azure_vision_api_form').style.display = selection === 'AzureVision' ? 'block' : 'none';
+                document.getElementById('azure_doc_ai_api_form').style.display = selection === 'AzureDocAi' ? 'block' : 'none';
+                //Add more API form selectors here
+            }
+
+            function initializeOCRTabListeners() {
+                document.getElementById('update_azure_vision').addEventListener('change', function() {
+                    document.getElementById('azure_vision_api_url').disabled = !this.checked;    
+                    document.getElementById('azure_vision_api_key').disabled = !this.checked;
+                    document.getElementById('is_azure_cv_free_tier').disabled = !this.checked;  
+                });
+                document.getElementById('update_azure_doc_ai').addEventListener('change', function() {
+                    document.getElementById('azure_doc_ai_api_url').disabled = !this.checked;   // !this.check -> logical NOT to flip boolean. this.checked will be true when the box is checked, so !this.checked will be false... 
+                    document.getElementById('azure_doc_ai_api_key').disabled = !this.checked;   // ...and so disabled will be false. So if Update-Config is checked, the fields are enabled.
+                });
+
+                // Event listener for radio buttons:
+                document.getElementById('ocr_yes_radio_button').addEventListener('change', toggleOcrApiForm);
+                document.getElementById('ocr_yes_radio_button').addEventListener('change', toggleOcrSelection);
+
+                document.getElementById('ocr_no_radio_button').addEventListener('change', toggleOcrApiForm);
+                document.getElementById('ocr_no_radio_button').addEventListener('change', toggleOcrSelection);
+
+                // Initial state check:
+                toggleOcrSelection();
+                toggleOcrApiForm();
+
+                // Event listener for API dropdown:
+                document.getElementById('ocrApiDropdown').addEventListener('change', toggleOcrApiForm);
+            }
+
+            function initializeOCRTabComponents(values) {
+                initializeOCRTabRadios(values.use_ocr, values.ocr_service_choice, values.azure_cv_free_tier);
+                initializeOCRTabListeners();
+            }
+
+            function initializeGoogleDriveTabListeners() {
+                document.getElementById('googleDriveLogin').addEventListener('click', googleDriveLogin);
+            }
+
+            function initializeGoogleDriveTabComponents(values) {
+                initializeGoogleDriveTabListeners();
+            }
+
+            function initializeSettingsModalTabCycleListener() {
                 // Now that all on-load setup for Modal-Setting's Tabs based on config.json is completed, set listeners to cycle between tabs:
                 let options = document.querySelectorAll('[data-content]');
 
@@ -1937,13 +1988,30 @@
                         // 4) Reveal details for clicked option, by first hiding the detail divs for all options
                         let selectDetail = document.getElementById(option.getAttribute('data-content'));
                         selectDetail.classList.remove('d-none');
-
                     });
                 });
+            }
 
+            function updateUIWithChatInfo(chat_id, llm_model) {
+                curr_chat_id = chat_id
+                curr_chat_id = " Chat ".concat(String(curr_chat_id))
 
-                // Finally, trigger the LLM & vectorDB starter!
-                fetch('/llama_cpp_server_starter')
+                display_chatid_and_model = String(curr_chat_id).concat(": ", String(llm_model))
+
+                document.getElementById('model_header').innerHTML = display_chatid_and_model;
+                document.getElementById('model_header').style.display = 'block';
+                
+                document.getElementById('ModelAndDBLoading').style.display = 'none';
+                document.getElementById('ReadyToChat').style.display = 'block';
+                
+                var timeoutDelayInMilliseconds = 1500; //1.5 seconds
+                setTimeout(function() {
+                    document.getElementById('ReadyToChat').style.display = 'none';
+                }, timeoutDelayInMilliseconds);
+            }
+
+            function initChatHistoryDB(llm_model) {
+                return fetch('/init_chat_history_db')
                 .then(response => {
                     if (!response.ok) {
                         return response.json().then(err => { throw new Error(err.error)});
@@ -1953,168 +2021,93 @@
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-
-                        llm_model = data.llm_model
-                        LLM_MODEL = String(data.llm_model)
-
-
-                        // Once the llama.cpp server is up (the LLM is loaded), load the VectorDB
-                        fetch('/load_vectordb')
-                        .then(response => {
-                            if (!response.ok) {
-                                return response.json().then(err => { throw new Error(err.error)});
-                            }
-                            return response
-                        })
-                        .then(response => response.json())
-                        .then(data => {
-
-                            // Now that LARS core (LLM + VectorDB) is loaded up, perform loadChatHistoryMenu & init_chat_history_db:
-                            loadChatHistoryMenu();  // should be done regardless of errors
-
-                            if (data.success) {
-                                fetch('/init_chat_history_db')
-                                .then(response => {
-                                    if (!response.ok) {
-                                        return response.json().then(err => { throw new Error(err.error)});
-                                    }
-                                    return response
-                                })
-                                .then(response => response.json())
-                                .then(data => {
-                                    if (data.success) {
-                                        // If LLM, VectorDB and chat history DB initialized successfully, continue
-
-                                        CHAT_ID = data.chat_id;
-
-                                        curr_chat_id = data.chat_id
-                                        curr_chat_id = " Chat ".concat(String(curr_chat_id))
-
-                                        display_chatid_and_model = String(curr_chat_id).concat(": ", String(llm_model))
-
-                                        document.getElementById('model_header').innerHTML = display_chatid_and_model;
-                                        document.getElementById('model_header').style.display = 'block';
-                                        
-                                        document.getElementById('ModelAndDBLoading').style.display = 'none';
-                                        document.getElementById('ReadyToChat').style.display = 'block';
-                                        
-                                        var timeoutDelayInMilliseconds = 1500; //1.5 seconds
-                                        setTimeout(function() {
-                                            document.getElementById('ReadyToChat').style.display = 'none';
-                                        }, timeoutDelayInMilliseconds);
-                                        
-                                    } else {
-                                        throw new Error('Error when initializing the chat history DB');
-                                    }
-                                })
-                                .catch(error => {
-                                    let full_error_message = "There was an error in initializing the chat history DB: " + String(error.message);
-                                    console.error(full_error_message);
-                                    alert(full_error_message);
-                                    document.getElementById('ModelAndDBLoading').style.display = 'none';
-                                });
-
-                            } else {
-                                throw new Error('Error when loading the vector database');
-                            }
-                        })
-                        .catch(error => {
-                            let full_error_message = "There was an error when loading the VectorDB: " + String(error.message);
-                            console.error(full_error_message);
-                            alert(full_error_message);
-                            document.getElementById('ModelAndDBLoading').style.display = 'none';
-                        });
-
+                        // If LLM, VectorDB and chat history DB initialized successfully, continue:
+                        CHAT_ID = data.chat_id;
+                        updateUIWithChatInfo(data.chat_id, llm_model)
                     } else {
-                        throw new Error('Data error when loading the model or vectorDB');
+                        throw new Error('Internal Server Error: Check server-log and server command-line for more details.');
                     }
                 })
                 .catch(error => {
-                    let full_error_message = "There was an error in loading the LLM: " + String(error.message);
-                    console.error(full_error_message);
-                    alert(full_error_message);
-                    document.getElementById('ModelAndDBLoading').style.display = 'none';
+                    errorHandler("initializing the chat history DB", "/init_chat_history_db", String(error.message))
+                });
+            }
+
+            function loadVectorDB(llm_model) {
+                // Once the llama.cpp server is up (the LLM is loaded), load the VectorDB
+                return fetch('/load_vectordb')
+                .then(response => {
+                    if (!response.ok) {
+                        return response.json().then(err => { throw new Error(err.error)});
+                    }
+                    return response
                 })
-                .finally(() => {
-                    //document.getElementById('ModelAndDBLoading').style.display = 'none';
+                .then(response => response.json())
+                .then(data => {
+
+                    // Now that LARS core (LLM + VectorDB) is loaded up, perform loadChatHistoryMenu & init_chat_history_db:
+                    
+
+                    if (data.success) {
+                        return initChatHistoryDB(llm_model);
+                    } else {
+                        throw new Error('Internal Server Error: Check server-log and server command-line for more details.');
+                    }
+                })
+                .catch(error => {
+                    errorHandler("loading the VectorDB", "/load_vectordb", String(error.message))
                 });
+            }
 
+            function startLLMAndVectorDB() {
+                // Finally, trigger the LLM & vectorDB starter!
+                return fetch('/llama_cpp_server_starter')
+                .then(response => {
+                    if (!response.ok) {
+                        return response.json().then(err => { throw new Error(err.error)});
+                    }
+                    return response
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        const llm_model = data.llm_model;
+                        LLM_MODEL = String(data.llm_model);
+                        return loadVectorDB(llm_model);
+                    } else {
+                        throw new Error('Internal Server Error: Check server-log and server command-line for more details.');
+                    }
+                })
+                .catch(error => {
+                    errorHandler("loading the LLM", "/llama_cpp_server_starter", String(error.message))
+                })
+            }
 
-                //Make a GET request to the server to load the LLM & vectorDB
-                // fetch('/load_model_and_vectordb')
-                // .then(response => {
-                //     if (!response.ok) {
-                //         return response.json().then(err => { throw new Error(err.error)});
-                //     }
-                //     return response
-                // })
-                // .then(response => response.json())
-                // .then(data => {
-                //     if (data.success) {
+            /////////////---------DOMContentLoaded---------/////////////
+            document.addEventListener("DOMContentLoaded", function() {
+                initializeUI();
+                document.getElementById('ModelAndDBLoading').style.display = 'block';   //Start initializing the chat session
 
-                //         llm_model = data.llm_model
-                //         LLM_MODEL = String(data.llm_model)
-                        
-                //         // If LLM & VectorDB loaded successfully, init the chat history DB 
-                //         fetch('/init_chat_history_db')
-                //             .then(response => {
-                //                 if (!response.ok) {
-                //                     return response.json().then(err => { throw new Error(err.error)});
-                //                 }
-                //                 return response
-                //             })
-                //             .then(response => response.json())
-                //             .then(data => {
-                //                 if (data.success) {
-                //                     // If LLM, VectorDB and chat history DB initialized successfully, continue
+                loadAndSetCoreValues()
+                    .then(values => {
+                        initializeLLMTabComponents(values);
+                        initializeEmbeddingModelTabComponents(values);
+                        initializeSystemPromptTabComponents(values);
+                        initializeRAGTabComponents(values);
+                        initializeOCRTabComponents(values);
+                        initializeGoogleDriveTabComponents(values);
+                        initializeSettingsModalTabCycleListener();
+                        return startLLMAndVectorDB();
+                    })
+                    .then(() => {
+                        loadChatHistoryMenu();  // should be done regardless of errors
+                    })
+                    .catch(error => {
+                        errorHandler("initializing the application", "DOMContentLoaded", String(error.message));
+                    })
+                    .finally(() => {
 
-                //                     curr_chat_id = data.chat_id
-
-                //                     curr_chat_id = " Chat ".concat(String(curr_chat_id))
-
-                //                     display_chatid_and_model = String(curr_chat_id).concat(": ", String(llm_model))
-
-                //                     document.getElementById('model_header').innerHTML = display_chatid_and_model;
-                //                     document.getElementById('model_header').style.display = 'block';
-
-                //                     // Load menu items for the chat history menu
-                //                     loadChatHistoryMenu();
-                //                     document.getElementById('ModelAndDBLoading').style.display = 'none';
-                //                     document.getElementById('ReadyToChat').style.display = 'block';
-                                    
-                //                     var timeoutDelayInMilliseconds = 1500; //1.5 seconds
-                //                     setTimeout(function() {
-                //                         document.getElementById('ReadyToChat').style.display = 'none';
-                //                     }, timeoutDelayInMilliseconds);
-                                    
-                //                 } else {
-                //                     throw new Error('Error when initializing the chat history DB');
-                //                 }
-                //             })
-                //             .catch(error => {
-                //                 let full_error_message = "There was an error in initializing the chat history DB: " + String(error.message);
-                //                 console.error(full_error_message);
-                //                 alert(full_error_message);
-                //             });
-                //     } else {
-                //         throw new Error('Data error when loading the model or vectorDB');
-                //     }
-                // })
-                // .catch(error => {
-                //     let full_error_message = "There was an error in loading the model or vectorDB: " + String(error.message);
-                //     console.error(full_error_message);
-                //     alert(full_error_message);
-                // });
-                
-                
-                //Scroll all the way down button:
-                const scrollDownButton = document.getElementById('scrollDownButton');
-                const chatArea = document.getElementById('chat-area');
-
-                scrollDownButton.addEventListener('click', () => {
-                    chatArea.scrollTop = chatArea.scrollHeight;
-                });
-
+                    });
             });//########### End DOMContentLoaded !
 
 
@@ -2145,11 +2138,7 @@
 
                 ////######### 2 - Save RAG Options:
                 let force_enable_rag = false;
-                let force_disable_rag = false;
-
-                const forceEnableRagCheckbox = document.getElementById('force_enable_rag_checkbox');
-                const forceDisableRagCheckbox = document.getElementById('force_disable_rag_checkbox');
-                const defaultRag = document.getElementById('default_rag_checkbox');
+                let force_disable_rag = false; 
 
                 if (forceEnableRagCheckbox.checked) {
                     console.log("Force enabling RAG")
@@ -2338,15 +2327,13 @@
                     }
                 })
                 .catch(error => {
-                    let full_error_message = "There was an error in writing to config.json: " + String(error.message);
-                    console.error(full_error_message);
-                    alert(full_error_message);
-                }); //END config_writer_api call
+                    errorHandler("writing to config.json", "/config_writer_api", String(error.message))
+                });
+
+            }); //END saveChangesButton submit-event
 
 
-            });
-
-
+            
             function loadChatHistory(chatID) {
 
                 CHAT_ID = chatID;
@@ -2392,13 +2379,11 @@
                         }
 
                     } else {
-                        throw new Error('Error fetching chat history data');
+                        throw new Error('Internal Server Error: Check server-log and server command-line for more details.');
                     }
                 })
                 .catch(error => {
-                    let full_error_message = "There was an error in fetching chat history data: " + String(error.message);
-                    console.error(full_error_message);
-                    alert(full_error_message);
+                    errorHandler("fetching chat history data", "/load_chat_history", String(error.message))
                 });
                 closeNav();
             }
@@ -2417,7 +2402,6 @@
                 return text;
                 //return "test";
             }
-
 
 
             function requestFormattedPrompt() {
@@ -2584,7 +2568,7 @@
 
                                 await processChunk();   // processChunk() is an async-Fn and thus returns a promise. Here, via await, we pause execution until the promise is resolved or rejected.
                             } catch (error) {
-                                console.error('Failed to fetch streaming response: ', error);
+                                errorHandler("fetching event-streaming response", "localhost:8080/completions", String(error))
                             }
                         }
 
@@ -2636,13 +2620,11 @@
                                         document.getElementById(masterWrapperID).innerHTML += data.pdf_frame;
                                     }
                                 } else {
-                                    throw new Error('Error fetching relevant reference material');
+                                    throw new Error('Internal Server Error: Check server-log and server command-line for more details.');
                                 }
                             })
                             .catch(error => {
-                                let full_error_message = "There was an error in fetching relevant reference material: " + String(error.message);
-                                console.error(full_error_message);
-                                alert(full_error_message);
+                                errorHandler("fetching relevant reference material", "/get_references", String(error.message))
                             })
                             .finally(() => {
                                 document.getElementById('processingQnS').style.display  = 'none';
@@ -2650,20 +2632,15 @@
                             });
 
                         }).catch(error => {
-                            let full_error_message = "Error with event stream: " + String(error.message);
-                            console.error(full_error_message);
-                            alert(full_error_message);
+                            errorHandler("fetching event-streaming response", "async fetchEventStream()", String(error.message))
                         });
 
-
                     } else {
-                        throw new Error('Error in setting up the streaming response');
+                        throw new Error('Internal Server Error: Check server-log and server command-line for more details.');
                     }
                 })
                 .catch(error => {
-                    let full_error_message = "There was an error in setting up the streaming response: " + String(error.message);
-                    console.error(full_error_message);
-                    alert(full_error_message);
+                    errorHandler("setting up the streaming response", "/setup_for_llama_cpp_response", String(error.message))
                 })
                 .finally(() => {
                     sendButton.disabled = false; // Re-enable the send button
@@ -2814,23 +2791,19 @@
                                     document.getElementById('processingQnS').style.display  = 'none';
                                     document.getElementById('processingQnS').innerHTML = '';
                                 } else {
-                                    throw new Error('Error fetching relevant reference material');
+                                    throw new Error('Internal Server Error: Check server-log and server command-line for more details.');
                                 }
                             })
                             .catch(error => {
-                                let full_error_message = "There was an error in fetching relevant reference material: " + String(error.message);
-                                console.error(full_error_message);
-                                alert(full_error_message);
+                                errorHandler("fetching relevant reference material", "/lc_get_references", String(error.message))
                             });
                         });
                     } else {
-                        throw new Error('Error in setting up the streaming response');
+                        throw new Error('Internal Server Error: Check server-log and server command-line for more details.');
                     }
                 })
                 .catch(error => {
-                    let full_error_message = "There was an error in setting up the streaming response: " + String(error.message);
-                    console.error(full_error_message);
-                    alert(full_error_message);
+                    errorHandler("setting up for the streaming response", "/setup_for_streaming_response", String(error.message))
                 });
             }
 
@@ -2847,67 +2820,6 @@
             }
 
 
-            function sendMessage() {
-    
-                document.getElementById('processingQ').style.display = 'block';
-    
-                let userInput = document.getElementById('user-input').value;
-    
-                // Append user input to the chat area
-                document.getElementById('chat-area').innerHTML += '<div class="user-message">' + userInput + '</div>';
-    
-                // Make AJAX call to the app.py server to get the models response
-                fetch('/get_response', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({'message': userInput})
-                })
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error(`Server-side error! Status: ${response.status}`);
-                    }
-                    return response
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        CHAT_ID = data.chat_id;
-                        SEQUENCE_ID = data.sequence_id;
-
-                        document.getElementById('processingQ').style.display = 'none';
-                        const responseAndRating = `
-                        <div class="llm-wrapper">
-                            <div class="llm-response">
-                                ${data.response}
-                            </div>
-                            <div class="star-rating" data-rated="False" rating-chat-id=${data.chat_id} rating-sequence-id=${data.sequence_id}>
-                                <i class="far fa-star" data-rate="1"></i>
-                                <i class="far fa-star" data-rate="2"></i>
-                                <i class="far fa-star" data-rate="3"></i>
-                                <i class="far fa-star" data-rate="4"></i>
-                                <i class="far fa-star" data-rate="5"></i>
-                            </div>
-                        </div>
-                        `;
-                        document.getElementById('chat-area').innerHTML += responseAndRating;
-                        //document.getElementById('chat-area').innerHTML += '<div class="llm-response">' + data.response + '</div>';
-                    } else {
-                        throw new Error('Error fetching response');
-                    }
-                })
-                .catch(error => {
-                    let full_error_message = "Error fetching response: " + String(error.message);
-                    console.error(full_error_message);
-                    alert(full_error_message);
-                });
-    
-                // Clear the input field
-                document.getElementById('user-input').value = '';
-            }
-
-
             // Call sendMessage() if the user presses the 'Enter' key
             const maxRows = 5; // Replace this value with the maximum allowed number of rows you want
             const inputTextAreaElement = document.getElementById("user-input");
@@ -2920,7 +2832,7 @@
                     // Prevent the default action (i.e., adding a new line)
                     event.preventDefault();
                     // Call the send function
-                    //sendMessage()
+                    // sendMessage()
                     if(!sendButton.disabled) {  //Only trigger a send event if the button is not disabled, i.e. another stream is in progress!
                         inputTextAreaElement.rows = 1;
                         //sendMessageAndProcessResponseStream()
@@ -2988,13 +2900,11 @@
                                 document.getElementById('overlay').style.display = 'none';
                                 document.getElementById('fileInput').value = "";  // Clear the input value
                             } else {
-                                throw new Error(`Error processing file`);
+                                throw new Error(`Internal Server Error: Check server-log and server command-line for more details.`);
                             }
                         })
                         .catch(error => {
-                            let full_error_message = "Error processing file: " + String(error.message);
-                            console.error(full_error_message);
-                            alert(full_error_message);
+                            errorHandler("processing file", "/process_new_file", String(error.message))
                             document.getElementById('overlay').style.display = 'none';
                             document.getElementById('fileInput').value = "";  // Clear the input value
                         });
@@ -3102,7 +3012,7 @@
                                                 cleanupUpload();
                                             
                                             } else {
-                                                throw new Error('Data error when fetching model list');
+                                                throw new Error('Internal Server Error: Check server-log and server command-line for more details.');
                                             }
                                         })
                                         .catch(error => {
@@ -3165,9 +3075,7 @@
                             }
                         })
                         .catch(error => {
-                            let full_error_message = "There was an error in storing the user's rating: " + String(error.message);
-                            console.error(full_error_message);
-                            alert(full_error_message);
+                            errorHandler("storing the user's rating", "/store_user_rating", String(error.message))
                         });
                     }
                 }
@@ -3182,28 +3090,6 @@
                     infoBox.style.display = 'none';
                 }
             }
-
-
-            // TEMPLATE: Make a GET request to the server
-            //    fetch('/init_chat_history_db')
-            //         .then(response => {
-            //             if (!response.ok) {
-            //                 throw new Error(`Server-side HTTP error! Status: ${response.status}`);
-            //             }
-            //             return response
-            //         })
-            //         .then(response => response.json())
-            //         .then(data => {
-            //             if (data.success) {
-
-                            
-            //             } else {
-            //                 throw new Error('Data error when fetching history-menu list');
-            //             }
-            //         })
-            //         .catch(error => {
-            //             console.error("There was an error in fetching the history-menu list: ", error.message);
-            //         });
 
         </script>
 
