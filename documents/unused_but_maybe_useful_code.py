@@ -1480,3 +1480,149 @@ def lc_get_references():
 
 
 
+//Make a GET request to the server to load the LLM & vectorDB
+                // fetch('/load_model_and_vectordb')
+                // .then(response => {
+                //     if (!response.ok) {
+                //         return response.json().then(err => { throw new Error(err.error)});
+                //     }
+                //     return response
+                // })
+                // .then(response => response.json())
+                // .then(data => {
+                //     if (data.success) {
+
+                //         llm_model = data.llm_model
+                //         LLM_MODEL = String(data.llm_model)
+                        
+                //         // If LLM & VectorDB loaded successfully, init the chat history DB 
+                //         fetch('/init_chat_history_db')
+                //             .then(response => {
+                //                 if (!response.ok) {
+                //                     return response.json().then(err => { throw new Error(err.error)});
+                //                 }
+                //                 return response
+                //             })
+                //             .then(response => response.json())
+                //             .then(data => {
+                //                 if (data.success) {
+                //                     // If LLM, VectorDB and chat history DB initialized successfully, continue
+
+                //                     curr_chat_id = data.chat_id
+
+                //                     curr_chat_id = " Chat ".concat(String(curr_chat_id))
+
+                //                     display_chatid_and_model = String(curr_chat_id).concat(": ", String(llm_model))
+
+                //                     document.getElementById('model_header').innerHTML = display_chatid_and_model;
+                //                     document.getElementById('model_header').style.display = 'block';
+
+                //                     // Load menu items for the chat history menu
+                //                     loadChatHistoryMenu();
+                //                     document.getElementById('ModelAndDBLoading').style.display = 'none';
+                //                     document.getElementById('ReadyToChat').style.display = 'block';
+                                    
+                //                     var timeoutDelayInMilliseconds = 1500; //1.5 seconds
+                //                     setTimeout(function() {
+                //                         document.getElementById('ReadyToChat').style.display = 'none';
+                //                     }, timeoutDelayInMilliseconds);
+                                    
+                //                 } else {
+                //                     throw new Error('Error when initializing the chat history DB');
+                //                 }
+                //             })
+                //             .catch(error => {
+                //                 let full_error_message = "There was an error in initializing the chat history DB: " + String(error.message);
+                //                 console.error(full_error_message);
+                //                 alert(full_error_message);
+                //             });
+                //     } else {
+                //         throw new Error('Data error when loading the model or vectorDB');
+                //     }
+                // })
+                // .catch(error => {
+                //     let full_error_message = "There was an error in loading the model or vectorDB: " + String(error.message);
+                //     console.error(full_error_message);
+                //     alert(full_error_message);
+                // });
+                
+
+                // TEMPLATE: Make a GET request to the server
+            //    fetch('/init_chat_history_db')
+            //         .then(response => {
+            //             if (!response.ok) {
+            //                 throw new Error(`Server-side HTTP error! Status: ${response.status}`);
+            //             }
+            //             return response
+            //         })
+            //         .then(response => response.json())
+            //         .then(data => {
+            //             if (data.success) {
+
+                            
+            //             } else {
+            //                 throw new Error('Data error when fetching history-menu list');
+            //             }
+            //         })
+            //         .catch(error => {
+            //             console.error("There was an error in fetching the history-menu list: ", error.message);
+            //         });
+
+
+            function sendMessage() {
+    
+                document.getElementById('processingQ').style.display = 'block';
+    
+                let userInput = document.getElementById('user-input').value;
+    
+                // Append user input to the chat area
+                document.getElementById('chat-area').innerHTML += '<div class="user-message">' + userInput + '</div>';
+    
+                // Make AJAX call to the app.py server to get the models response
+                fetch('/get_response', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({'message': userInput})
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`Server-side error! Status: ${response.status}`);
+                    }
+                    return response
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        CHAT_ID = data.chat_id;
+                        SEQUENCE_ID = data.sequence_id;
+
+                        document.getElementById('processingQ').style.display = 'none';
+                        const responseAndRating = `
+                        <div class="llm-wrapper">
+                            <div class="llm-response">
+                                ${data.response}
+                            </div>
+                            <div class="star-rating" data-rated="False" rating-chat-id=${data.chat_id} rating-sequence-id=${data.sequence_id}>
+                                <i class="far fa-star" data-rate="1"></i>
+                                <i class="far fa-star" data-rate="2"></i>
+                                <i class="far fa-star" data-rate="3"></i>
+                                <i class="far fa-star" data-rate="4"></i>
+                                <i class="far fa-star" data-rate="5"></i>
+                            </div>
+                        </div>
+                        `;
+                        document.getElementById('chat-area').innerHTML += responseAndRating;
+                        //document.getElementById('chat-area').innerHTML += '<div class="llm-response">' + data.response + '</div>';
+                    } else {
+                        throw new Error('Internal Server Error: Check server-log and server command-line for more details.');
+                    }
+                })
+                .catch(error => {
+                    errorHandler("fetching response", "/get_response", String(error.message))
+                });
+    
+                // Clear the input field
+                document.getElementById('user-input').value = '';
+            }
