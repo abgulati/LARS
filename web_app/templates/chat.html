@@ -1483,49 +1483,6 @@
                 document.getElementById(modalId).style.display = 'none';
             }
 
-
-            function googleDriveLogin() {
-                fetch('/login_to_google_drive')
-                .then(response => {
-                    if (!response.ok) {
-                        return response.json().then(err => { throw new Error(err.error)});
-                    }
-                    return response
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        alert("Google Drive Login Successful!")
-
-                        fetch('/fetch_file_list_from_google_drive')
-                        .then(response => {
-                            if (!response.ok) {
-                                return response.json().then(err => { throw new Error(err.error)});
-                            }
-                            return response
-                        })
-                        .then(response => response.json())
-                        .then(data => {
-                            if (data.success) {
-                                alert("GDrive Files Fetched")
-
-                            } else {
-                                throw new Error('Internal Server Error: Check server-log and server command-line for more details.');
-                            }
-                        })
-                        .catch(error => {
-                            errorHandler("fetching file list from Google Drive", "/fetch_file_list_from_google_drive", String(error.message))
-                        });
-
-                    } else {
-                        throw new Error('Internal Server Error: Check server-log and server command-line for more details.');
-                    }
-                })
-                .catch(error => {
-                    errorHandler("logging into Google Drive", "/login_to_google_drive", String(error.message))
-                });
-            }
-
             function initializeChatLink() {
                 var currentUrl = window.location.href;
                 var chatLink = document.getElementById('dynamicChatLink');
@@ -1956,6 +1913,48 @@
                 initializeOCRTabListeners();
             }
 
+            function googleDriveLogin() {
+                fetch('/login_to_google_drive')
+                .then(response => {
+                    if (!response.ok) {
+                        return response.json().then(err => { throw new Error(err.error)});
+                    }
+                    return response
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert("Google Drive Login Successful!")
+
+                        fetch('/fetch_file_list_from_google_drive')
+                        .then(response => {
+                            if (!response.ok) {
+                                return response.json().then(err => { throw new Error(err.error)});
+                            }
+                            return response
+                        })
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.success) {
+                                alert("GDrive Files Fetched")
+
+                            } else {
+                                throw new Error('Internal Server Error: Check server-log and server command-line for more details.');
+                            }
+                        })
+                        .catch(error => {
+                            errorHandler("fetching file list from Google Drive", "/fetch_file_list_from_google_drive", String(error.message))
+                        });
+
+                    } else {
+                        throw new Error('Internal Server Error: Check server-log and server command-line for more details.');
+                    }
+                })
+                .catch(error => {
+                    errorHandler("logging into Google Drive", "/login_to_google_drive", String(error.message))
+                });
+            }
+
             function initializeGoogleDriveTabListeners() {
                 document.getElementById('googleDriveLogin').addEventListener('click', googleDriveLogin);
             }
@@ -2044,10 +2043,6 @@
                 })
                 .then(response => response.json())
                 .then(data => {
-
-                    // Now that LARS core (LLM + VectorDB) is loaded up, perform loadChatHistoryMenu & init_chat_history_db:
-                    
-
                     if (data.success) {
                         return initChatHistoryDB(llm_model);
                     } else {
@@ -2333,7 +2328,7 @@
             }); //END saveChangesButton submit-event
 
 
-            
+
             function loadChatHistory(chatID) {
 
                 CHAT_ID = chatID;
