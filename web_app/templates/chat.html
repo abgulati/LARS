@@ -1483,12 +1483,15 @@
                 document.getElementById(modalId).style.display = 'none';
             }
 
+            
+            ////////////////////////---------DOMContentLoaded Block Begins---------////////////////////////////
             function initializeChatLink() {
                 var currentUrl = window.location.href;
                 var chatLink = document.getElementById('dynamicChatLink');
                 chatLink.href = currentUrl;
             }
 
+            
             function initializeScrollDownButton() {
                 //Scroll all the way down button:
                 const scrollDownButton = document.getElementById('scrollDownButton');
@@ -1499,11 +1502,13 @@
                 });
             }
 
+            
             function initializeUI() {
                 initializeChatLink();
                 initializeScrollDownButton();
             }
 
+            
             function setUIValues(values) {
                 document.getElementById('NumbGpuLayers').value = values.local_llm_gpu_layers;
                 document.getElementById('LlmCtxLgt').value = values.local_llm_context_length;
@@ -1519,6 +1524,7 @@
                 document.getElementById('nkeepSlider').value = values.local_llm_n_keep;
             }
 
+            
             function loadAndSetCoreValues() {
                 const initKeysToRead = ['model_choice', 'use_local_llm', 'use_gpu', 'embedding_model_choice', 'use_ocr', 'ocr_service_choice', 'local_llm_chat_template_format', 'force_enable_rag', 'force_disable_rag', 'base_template', 'local_llm_gpu_layers', 'local_llm_context_length', 'local_llm_max_new_tokens', 'local_llm_temperature', 'local_llm_top_k', 'local_llm_top_p', 'local_llm_min_p', 'local_llm_n_keep', 'azure_cv_free_tier']
                 
@@ -1544,6 +1550,7 @@
                 });
             }
 
+            
             function initializeModelDropdown(model_choice) {
                 fetch('/load_local_models')
                 .then(response => {
@@ -1579,6 +1586,7 @@
                 });
             }
 
+            
             function initializeLLMTemplateDropdown(local_llm_chat_template_format) {
                 const llmTempDd = document.getElementById('llmTemplateDropdown');
 
@@ -1590,6 +1598,7 @@
                 }
             }
 
+            
             function initializeGPURadioButtons(use_gpu) {
                 var gpuYes = document.getElementById('gpu_radio_yes');
                 var gpuNo = document.getElementById('gpu_radio_no');
@@ -1603,6 +1612,7 @@
                 }
             }
 
+            
             function initializeLLMRadioButtons(use_local_llm, model_choice) {
                 var useLocalLlm = document.getElementById('local_llm_radio_button');
                 var useApiLlm = document.getElementById('api_llm_radio_button');
@@ -1626,6 +1636,7 @@
                 }
             }
 
+            
             function toggleLocalLlmSelection() {    // Show or hide local-LLM selection:
                 var selection = document.querySelector('input[name="use_local_or_api_llm"]:checked').value;
                 
@@ -1652,11 +1663,13 @@
                 }
             }
 
+            
             function toggleLlmApiForm() {   // Show or hide API form:
                 var selection = document.getElementById('llmApiDropdown').value;
                 document.getElementById('azure_openai_api_form').style.display = selection === 'AzureOpenAI' ? 'block' : 'none';
                 //Add more API form selectors here
             }
+            
             
             function toggleNGL() {  // Enable or disable ngl based on use_gpu
                 var selection = document.querySelector('input[name="use_gpu"]:checked').value;
@@ -1668,6 +1681,7 @@
                 }
             }
 
+            
             function initializeEventListenersForLLMTabRadioButtons() {
                 // Event listener for LLM/API radio buttons:
                 document.getElementById('local_llm_radio_button').addEventListener('change', toggleLlmApiForm);
@@ -1698,6 +1712,7 @@
                 });
             }
 
+            
             function initializeEventListenersForLLMTabSliders() {
                 document.getElementById('tempSlider').addEventListener('input', function() {
                     document.getElementById('tempSliderValue').textContent = this.value;
@@ -1716,6 +1731,7 @@
                 });
             }
             
+            
             function initializeLLMTabComponents(values) {
                 initializeModelDropdown(values.model_choice);   
                 initializeLLMTemplateDropdown(values.local_llm_chat_template_format);
@@ -1725,6 +1741,7 @@
                 initializeEventListenersForLLMTabSliders();
             }
 
+            
             function initializeEmbeddingModelDropdown(embedding_model_choice) {
                 var selectEmbedModelForDropdown = document.getElementById('embedding_model_dropdown');
 
@@ -1738,6 +1755,7 @@
                 }
             }
 
+            
             function initializeEventListenersForEmbeddingModelTab() {
                 // Show or hide API form:
                 function toggleAzureAdaApiForm() {
@@ -1765,11 +1783,13 @@
                 });
             }
 
+            
             function initializeEmbeddingModelTabComponents(values) {
                 initializeEmbeddingModelDropdown(values.embedding_model_choice);
                 initializeEventListenersForEmbeddingModelTab();
             }
 
+            
             function initializeSystemPromptTabListeners(base_template) {
                 let default_system_template = document.getElementById('template_dropdown_default').getAttribute('data-template');
 
@@ -1808,11 +1828,13 @@
                 });
             }
 
+            
             function initializeSystemPromptTabComponents(values) {
                 setDefaultTemplate();   // Set the default template when the page loads
                 initializeSystemPromptTabListeners(values.base_template);
             }
 
+            
             function initializeRAGTabCheckbox(force_enable_rag, force_disable_rag) {
                 // Set RAG-Checkbox       
                 if (force_enable_rag) {
@@ -1826,10 +1848,12 @@
                 }
             }
 
+            
             function initializeRAGTabComponents(values) {
                 initializeRAGTabCheckbox(values.force_enable_rag , values.force_disable_rag);
             }
 
+            
             function initializeOCRTabRadios(use_ocr, ocr_service_choice, azure_cv_free_tier) {
                 var useOcr = document.getElementById('ocr_yes_radio_button');
                 var usePypdf = document.getElementById('ocr_no_radio_button');
@@ -1860,6 +1884,7 @@
                 }
             }
 
+            
             function toggleOcrSelection() { //Show or hide OCR-Service selection:
                 var selection = document.querySelector('input[name="specify_ocr_and_service"]:checked').value;
                 document.getElementById('apiOcrSelection').style.display = selection === 'ocr' ? 'block' : 'none';
@@ -1875,6 +1900,7 @@
                 }
             }
 
+            
             function toggleOcrApiForm() {   //Show or hide API form:
                 var selection = document.getElementById('ocrApiDropdown').value;
                 document.getElementById('azure_vision_api_form').style.display = selection === 'AzureVision' ? 'block' : 'none';
@@ -1882,6 +1908,7 @@
                 //Add more API form selectors here
             }
 
+            
             function initializeOCRTabListeners() {
                 document.getElementById('update_azure_vision').addEventListener('change', function() {
                     document.getElementById('azure_vision_api_url').disabled = !this.checked;    
@@ -1908,11 +1935,13 @@
                 document.getElementById('ocrApiDropdown').addEventListener('change', toggleOcrApiForm);
             }
 
+            
             function initializeOCRTabComponents(values) {
                 initializeOCRTabRadios(values.use_ocr, values.ocr_service_choice, values.azure_cv_free_tier);
                 initializeOCRTabListeners();
             }
 
+            
             function googleDriveLogin() {
                 fetch('/login_to_google_drive')
                 .then(response => {
@@ -1955,14 +1984,17 @@
                 });
             }
 
+            
             function initializeGoogleDriveTabListeners() {
                 document.getElementById('googleDriveLogin').addEventListener('click', googleDriveLogin);
             }
 
+            
             function initializeGoogleDriveTabComponents(values) {
                 initializeGoogleDriveTabListeners();
             }
 
+            
             function initializeSettingsModalTabCycleListener() {
                 // Now that all on-load setup for Modal-Setting's Tabs based on config.json is completed, set listeners to cycle between tabs:
                 let options = document.querySelectorAll('[data-content]');
@@ -1991,6 +2023,7 @@
                 });
             }
 
+            
             function updateUIWithChatInfo(chat_id, llm_model) {
                 curr_chat_id = chat_id
                 curr_chat_id = " Chat ".concat(String(curr_chat_id))
@@ -2009,6 +2042,7 @@
                 }, timeoutDelayInMilliseconds);
             }
 
+            
             function initChatHistoryDB(llm_model) {
                 return fetch('/init_chat_history_db')
                 .then(response => {
@@ -2032,6 +2066,7 @@
                 });
             }
 
+            
             function loadVectorDB(llm_model) {
                 // Once the llama.cpp server is up (the LLM is loaded), load the VectorDB
                 return fetch('/load_vectordb')
@@ -2054,6 +2089,7 @@
                 });
             }
 
+            
             function startLLMAndVectorDB() {
                 // Finally, trigger the LLM & vectorDB starter!
                 return fetch('/llama_cpp_server_starter')
@@ -2078,7 +2114,7 @@
                 })
             }
 
-            /////////////---------DOMContentLoaded---------/////////////
+
             document.addEventListener("DOMContentLoaded", function() {
                 initializeUI();
                 document.getElementById('ModelAndDBLoading').style.display = 'block';   //Start initializing the chat session
@@ -2103,16 +2139,90 @@
                     .finally(() => {
 
                     });
-            });//########### End DOMContentLoaded !
+            });//########### End DOMContentLoaded Block!
 
 
-            document.getElementById('saveChangesButton').addEventListener('click', function() {
+            ///////////////////////---------SaveConfig Block Begins---------////////////////////////////
+            function getLlmConfig() {
+                const useLocalLlmRadioButton = document.getElementById('local_llm_radio_button');
+                const useApiRadioButton = document.getElementById('api_llm_radio_button');
+                const useGpuForLocalLlm = document.getElementById('gpu_radio_yes');
+                const update_azure_gpt_config = document.getElementById('update_azure_gpt').checked;
 
-                // console.log(document.getElementById('templateContent').value);
+                let config = {
+                    'use_local_llm': useLocalLlmRadioButton.checked,
+                    'use_azure_open_ai':false,
+                    'use_gpu': false,
+                    'model_choice':"",
+                    'local_llm_chat_template_format':"",
+                    'local_llm_gpu_layers': document.getElementById('NumbGpuLayers').value,
+                    'local_llm_context_length': document.getElementById('LlmCtxLgt').value,
+                    'local_llm_max_new_tokens': document.getElementById('MaxNewToks').value,
+                    'local_llm_temperature': parseFloat(document.getElementById('tempSlider').value),
+                    'local_llm_top_k': parseInt(document.getElementById('topkSlider').value),
+                    'local_llm_top_p': parseFloat(document.getElementById('toppSlider').value),
+                    'local_llm_min_p': parseFloat(document.getElementById('minpSlider').value),
+                    'local_llm_n_keep': parseInt(document.getElementById('nkeepSlider').value)
+                };
+
+                if (useLocalLlmRadioButton.checked) {
+                    config.model_choice = document.getElementById('modelDropdown').value;
+                    config.local_llm_chat_template_format = document.getElementById('llmTemplateDropdown').value;
+                    config.use_gpu = useGpuForLocalLlm.checked;
+                } else if (useApiRadioButton.checked) {
+                    config.model_choice = document.getElementById('llmApiDropdown').value;
+                    if (config.model_choice === "AzureOpenAI") {
+                        config.use_azure_open_ai = true;
+                        if (update_azure_gpt_config) {
+                            config.azure_openai_base_url = document.getElementById("azure_openai_api_url").value;
+                            config.azure_openai_api_key = document.getElementById("azure_openai_api_key").value;
+                            config.azure_openai_deployment_name = document.getElementById("azure_openai_deployment_name").value;
+                        }
+                    }
+                }
+
+                return config;
+            }
+
+            
+            function getVectorEmbeddingsConfig() {
+                const embedding_model_choice = document.getElementById('embedding_model_dropdown').value;
+                const update_azure_ada_config = document.getElementById('update_azure_ada').checked;
+
+                let config= {
+                    'embedding_model_choice': embedding_model_choice,
+                    'use_openai_embeddings': false,
+                    'use_bge_large_embeddings': false,
+                    'use_bge_base_embeddings': false,
+                    'use_sbert_embeddings': false
+                };
                 
-                //######### 1 - Save Prompt Template: Get the value of the dropdown from it's associated button
-                let selectedTemplateName = document.getElementById('templateDropdown').textContent.trim();
+                switch(embedding_model_choice) {
+                    case 'bge_large':
+                        config.use_bge_large_embeddings = true;
+                        break;
+                    case 'bge_base':
+                        config.use_bge_base_embeddings = true;
+                        break;
+                    case 'sbert_mpnet_base_v2':
+                        config.use_sbert_embeddings = true;
+                        break;
+                    case 'openai_text_ada':
+                        config.use_openai_embeddings = true;
+                        if (update_azure_ada_config) {
+                            config.azure_openai_text_ada_api_url = document.getElementById("azure_openai_text_ada_api_url").value;
+                            config.azure_openai_text_ada_api_key = document.getElementById("azure_openai_text_ada_api_key").value;
+                            config.azure_openai_text_ada_deployment_name = document.getElementById("azure_openai_text_ada_deployment_name").value;
+                        }
+                        break;
+                }
 
+                return config;
+            }
+
+            
+            function getSysPromptConfig() {
+                const selectedTemplateName = document.getElementById('templateDropdown').textContent.trim();
                 let prompt_template;
 
                 switch(selectedTemplateName) {
@@ -2122,199 +2232,81 @@
                     case 'Custom':
                         prompt_template = String(document.getElementById('templateContent').value);
                         break;
-                    // case 'None':
-                    //     prompt_template = ""
-                    //     break;
-                    // case 'Zero-Shot Prompt':
-                    //     prompt_template = "Analyze the user's query and respond to the best of your knowledge using the given context."
-                    //     break;
                 }
 
+                return {'base_template': prompt_template};
+            }
 
-                ////######### 2 - Save RAG Options:
+            
+            function getRagConfig() {
                 let force_enable_rag = false;
                 let force_disable_rag = false; 
 
                 if (forceEnableRagCheckbox.checked) {
-                    console.log("Force enabling RAG")
                     force_enable_rag = true;
-                    force_disable_rag = false;
                 } else if (forceDisableRagCheckbox.checked) {
-                    console.log("Force disabling RAG")
-                    force_enable_rag = false;
                     force_disable_rag = true;
-                } else if (defaultRag.checked) {
-                    force_enable_rag = false;
-                    force_disable_rag = false;
                 }
 
-                let additional_settings = {}
+                return {'force_enable_rag': force_enable_rag, 'force_disable_rag': force_disable_rag};
+            }
 
-                ////######### 3 - Save LLM Options:
-                let use_local_llm = false;
-                let use_azure_open_ai = false;
-                let use_gpu = false;
-                let model_choice = "";
-                let local_llm_chat_template_format = "";
+            
+            function getOcrConfig() {
+                const azure_ocr_form = document.getElementById("azure_vision_api_form");
+                const azure_doc_ai_form = document.getElementById("azure_doc_ai_api_form");
+                const update_azure_vision_config = document.getElementById('update_azure_vision').checked;
+                const update_azure_doc_ai_config = document.getElementById('update_azure_doc_ai').checked;
 
-                const useLocalLlmRadioButton = document.getElementById('local_llm_radio_button');
-                const useApiRadioButton = document.getElementById('api_llm_radio_button');
-                const useGpuForLocalLlm = document.getElementById('gpu_radio_yes');
-                const noGpuForLocalLlm = document.getElementById('gpu_radio_no');
-                var update_azure_gpt_config = document.getElementById('update_azure_gpt').checked;
+                let config = {
+                    'ocr_service_choice': 'None',
+                    'use_ocr': false
+                };
 
-
-                if (useLocalLlmRadioButton.checked) {
-
-                    use_local_llm = true;
-                    use_azure_open_ai = false;
-
-                    var selectedLocalLlm = document.getElementById('modelDropdown').value;
-                    model_choice = selectedLocalLlm;
-
-                    var selectedTemplateFormat = document.getElementById('llmTemplateDropdown').value;
-                    local_llm_chat_template_format = selectedTemplateFormat;
-
-                    if (useGpuForLocalLlm.checked) {
-                        use_gpu = true;
-                    } else if (noGpuForLocalLlm.checked) {
-                        use_gpu = false;
-                    }
-                } else if (useApiRadioButton.checked) {
-
-                    use_local_llm = false;
-
-                    model_choice = document.getElementById('llmApiDropdown').value;
-
-                    if (model_choice === "AzureOpenAI") {
-                        use_azure_open_ai = true;
-                        if (update_azure_gpt_config) {
-                            additional_settings['azure_openai_base_url'] = document.getElementById("azure_openai_api_url").value;
-                            additional_settings['azure_openai_api_key'] = document.getElementById("azure_openai_api_key").value;
-                            additional_settings['azure_openai_deployment_name'] = document.getElementById("azure_openai_deployment_name").value;
-                        }
-                    }
-
-                    use_gpu = false;
-                }
-
-
-                ////######### 4 - Save Embedding-Model Options:
-                let embedding_model_choice = document.getElementById('embedding_model_dropdown').value;
-                let use_openai_embeddings = false;
-                let use_bge_large_embeddings = false;
-                let use_bge_base_embeddings = false;
-                let use_sbert_embeddings = true;
-                var update_azure_ada_config = document.getElementById('update_azure_ada').checked;
-                
-                if (embedding_model_choice == 'bge_large') {
-                    use_openai_embeddings = false;
-                    use_bge_large_embeddings = true;
-                    use_bge_base_embeddings = false;
-                    use_sbert_embeddings = false;
-                } else if (embedding_model_choice == 'bge_base') {
-                    use_openai_embeddings = false;
-                    use_bge_large_embeddings = false;
-                    use_bge_base_embeddings = true;
-                    use_sbert_embeddings = false;
-                } else if (embedding_model_choice == 'sbert_mpnet_base_v2') {
-                    use_openai_embeddings = false;
-                    use_bge_large_embeddings = false;
-                    use_bge_base_embeddings = false;
-                    use_sbert_embeddings = true;
-                } else if (embedding_model_choice == 'openai_text_ada') {
-                    if (update_azure_ada_config) {
-                        additional_settings['azure_openai_text_ada_api_url'] = document.getElementById("azure_openai_text_ada_api_url").value;
-                        additional_settings['azure_openai_text_ada_api_key'] = document.getElementById("azure_openai_text_ada_api_key").value;
-                        additional_settings['azure_openai_text_ada_deployment_name'] = document.getElementById("azure_openai_text_ada_deployment_name").value;
-                    }
-                    use_openai_embeddings = true;
-                    use_bge_large_embeddings = false;
-                    use_bge_base_embeddings = false;
-                    use_sbert_embeddings = false;
-                }
-
-
-                let config_updates = {
-                    'use_local_llm': use_local_llm,
-                    'use_azure_open_ai':use_azure_open_ai,
-                    'use_gpu': use_gpu,
-                    'model_choice':model_choice,
-                    'local_llm_chat_template_format':local_llm_chat_template_format,
-                    'force_enable_rag': force_enable_rag,
-                    'force_disable_rag':force_disable_rag,
-                    'base_template':prompt_template,
-                    'use_sbert_embeddings': use_sbert_embeddings,
-                    'use_bge_base_embeddings': use_bge_base_embeddings,
-                    'use_bge_large_embeddings': use_bge_large_embeddings,
-                    'use_openai_embeddings': use_openai_embeddings,
-                    'embedding_model_choice': embedding_model_choice,
-                    'local_llm_gpu_layers': document.getElementById('NumbGpuLayers').value,
-                    'local_llm_context_length': document.getElementById('LlmCtxLgt').value,
-                    'local_llm_max_new_tokens': document.getElementById('MaxNewToks').value,
-                    'local_llm_temperature': document.getElementById('tempSlider').value,
-                    'local_llm_top_k': document.getElementById('topkSlider').value,
-                    'local_llm_top_p': document.getElementById('toppSlider').value,
-                    'local_llm_min_p': document.getElementById('minpSlider').value,
-                    'local_llm_n_keep': document.getElementById('nkeepSlider').value
-                }
-
-
-                if (Object.keys(additional_settings).length > 0) {  // If additional API config options exist
-                    Object.assign(config_updates, additional_settings); // Merge additional_settings into config_updates
-                }
-
-
-                ////######### 5 - Save OCR Options:
-                var azzure_ocr_modal_form = document.getElementById("azure_vision_api_form");
-                var azure_ocr_form_style = window.getComputedStyle(azzure_ocr_modal_form);
-                var azzure_doc_ai_modal_form = document.getElementById("azure_doc_ai_api_form");
-                var azure_doc_ai_form_style = window.getComputedStyle(azzure_doc_ai_modal_form);
-                var update_azure_vision_config = document.getElementById('update_azure_vision').checked;
-                var update_azure_doc_ai_config = document.getElementById('update_azure_doc_ai').checked;
-                var update_is_azure_cv_free_tier = document.getElementById('is_azure_cv_free_tier').checked;
-                
-                if (azure_ocr_form_style.display != 'none') {
+                if (window.getComputedStyle(azure_ocr_form).display != 'none') {
+                    config.ocr_service_choice = 'AzureVision';
+                    config.use_ocr = true;
                     if (update_azure_vision_config) {
-                        if (update_is_azure_cv_free_tier) {
-                            config_updates['azure_cv_free_tier'] = true;
-                        } else {
-                            config_updates['azure_cv_free_tier'] = false;
-                        }
-                        config_updates['azure_ocr_endpoint'] = document.getElementById("azure_vision_api_url").value;
-                        config_updates['azure_ocr_subscription_key'] = document.getElementById("azure_vision_api_key").value;
+                        config.azure_cv_free_tier = document.getElementById('is_azure_cv_free_tier').checked;
+                        config.azure_ocr_endpoint = document.getElementById("azure_vision_api_url").value;
+                        config.azure_ocr_subscription_key = document.getElementById("azure_vision_api_key").value;
                     }
-                    config_updates['ocr_service_choice'] = 'AzureVision';
-                    config_updates['use_ocr'] = true;
-                } else if (azure_doc_ai_form_style.display != 'none') {
+                } else if (window.getComputedStyle(azure_doc_ai_form).display != 'none') {
+                    config.ocr_service_choice = 'AzureDocAi';
+                    config.use_ocr = true;
                     if (update_azure_doc_ai_config) {
-                        config_updates['azure_doc_ai_endpoint'] = document.getElementById("azure_doc_ai_api_url").value;
-                        config_updates['azure_doc_ai_subscription_key'] = document.getElementById("azure_doc_ai_api_key").value;
+                        config.azure_doc_ai_endpoint = document.getElementById("azure_doc_ai_api_url").value;
+                        config.azure_doc_ai_subscription_key = document.getElementById("azure_doc_ai_api_key").value;
                     }
-                    config_updates['ocr_service_choice'] = 'AzureDocAi';
-                    config_updates['use_ocr'] = true;
-                } else {
-                    config_updates['ocr_service_choice'] = 'None';
-                    config_updates['use_ocr'] = false;
                 }
-                
 
+                return config;
+            }
+
+            
+            function getGoogleDriveConfig() {
+                config = {
+
+                };
+                return config;
+            }
+
+            function saveConfigToServer(config) {
                 fetch('/config_writer_api', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({
-                        'config_updates': config_updates
+                        'config_updates': config
                     })
                 })
                 .then(response => {
                     if (!response.ok) {
                         return response.json().then(err => { throw new Error(err.error)});
                     }
-                    return response
+                    return response.json()
                 })
-                .then(response => response.json())
                 .then(data => {
                     console.log(data);
                     if (data.restart_required) {    // Refresh the page
@@ -2324,9 +2316,24 @@
                 .catch(error => {
                     errorHandler("writing to config.json", "/config_writer_api", String(error.message))
                 });
+            }
 
-            }); //END saveChangesButton submit-event
 
+            function handleSaveChanges() {
+                const config = {
+                    ...getLlmConfig(),
+                    ...getVectorEmbeddingsConfig(),
+                    ...getSysPromptConfig(),
+                    ...getRagConfig(),
+                    ...getOcrConfig(),
+                    ...getGoogleDriveConfig()
+                };
+                console.log("handleSaveChanges config: ", config);
+                saveConfigToServer(config);
+            }
+
+            document.getElementById('saveChangesButton').addEventListener('click', handleSaveChanges);
+            //########### End SaveConfig block!
 
 
             function loadChatHistory(chatID) {
@@ -2481,10 +2488,10 @@
                             const requestData = {
                                 prompt: formatted_user_prompt,
                                 stream: true,
-                                temperature: parseInt(document.getElementById('tempSlider').value),
+                                temperature: parseFloat(document.getElementById('tempSlider').value),
                                 top_k: parseInt(document.getElementById('topkSlider').value),
-                                top_p: parseInt(document.getElementById('toppSlider').value),
-                                min_p: parseInt(document.getElementById('minpSlider').value),
+                                top_p: parseFloat(document.getElementById('toppSlider').value),
+                                min_p: parseFloat(document.getElementById('minpSlider').value),
                                 n_keep: parseInt(document.getElementById('nkeepSlider').value)
                             };
 
