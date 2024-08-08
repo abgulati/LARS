@@ -2853,13 +2853,6 @@ def setup_for_llama_cpp_response():
         else:
             formatted_prompt += f"<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n{base_template}<|eot_id|><|start_header_id|>user<|end_header_id|>\n\n{user_query}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n"
 
-    elif local_llm_chat_template_format == 'llama3.1':
-
-        if current_sequence_id > 0:
-            formatted_prompt += f"<|start_header_id|>user<|end_header_id|>\n\n{user_query}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n"
-        else:
-            formatted_prompt += f"<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n{base_template}<|eot_id|><|start_header_id|>user<|end_header_id|>\n\n{user_query}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n"
-
     elif local_llm_chat_template_format == 'llama2':
 
         if current_sequence_id > 0:
@@ -2953,8 +2946,6 @@ def get_references():
         handle_api_error("Could not read request content in method get_references, encountered error: ", e)
 
     if local_llm_chat_template_format == 'llama3':
-        formatted_user_prompt += f"{llm_response}<|eot_id|>"
-    elif local_llm_chat_template_format == 'llama3.1':
         formatted_user_prompt += f"{llm_response}<|eot_id|>"
     elif local_llm_chat_template_format == 'llama2':
         formatted_user_prompt += f"{llm_response}</s>"
