@@ -1581,8 +1581,164 @@ def login_to_google_drive():
     return jsonify(success=True)
 
 
+def categorize_mimetype(mimetype):
+    mimetype = mimetype.lower()
+
+    word_mimetypes = {
+        # Microsoft Word (modern formats)
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "application/vnd.ms-word.document.macroEnabled.12",
+        "application/vnd.ms-word.template.macroEnabled.12",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.template",
+
+        # Microsoft Word (legacy format)
+        "application/msword",
+
+        # Google Docs
+        "application/vnd.google-apps.document",
+
+        # OpenDocument Presentation
+        "application/vnd.oasis.opendocument.text",
+        "application/vnd.oasis.opendocument.text-template",
+        "application/vnd.oasis.opendocument.text-web"
+    }
+
+    excel_mimetypes = {
+        # Microsoft Excel (modern formats)
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "application/vnd.ms-excel.sheet.macroEnabled.12",
+        "application/vnd.ms-excel.template.macroEnabled.12",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.template",
+
+        # Microsoft Excel (legacy format)
+        "application/vnd.ms-excel",
+
+        # Google Sheets
+        "application/vnd.google-apps.spreadsheet",
+
+        # OpenDocument Presentation
+        "application/vnd.oasis.opendocument.spreadsheet",
+        "application/vnd.oasis.opendocument.spreadsheet-template",
+        "text/csv",
+        "text/tab-separated-values"
+    }
+
+    presentation_mimetypes = {
+        # Microsoft PowerPoint (modern formats)
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation",  # .pptx
+        "application/vnd.ms-powerpoint.presentation.macroEnabled.12",  # .pptm
+        "application/vnd.openxmlformats-officedocument.presentationml.template",  # .potx
+        "application/vnd.ms-powerpoint.template.macroEnabled.12",  # .potm
+        "application/vnd.openxmlformats-officedocument.presentationml.slideshow",  # .ppsx
+        "application/vnd.ms-powerpoint.slideshow.macroEnabled.12",  # .ppsm
+
+        # Microsoft PowerPoint (legacy format)
+        "application/vnd.ms-powerpoint",  # .ppt, .pot, .pps
+
+        # Google Slides
+        "application/vnd.google-apps.presentation",
+
+        # OpenDocument Presentation
+        "application/vnd.oasis.opendocument.presentation",  # .odp
+        "application/vnd.oasis.opendocument.presentation-template"  # .otp
+    }
+
+    pdf_mimetypes = {
+        "application/pdf",
+        "application/x-pdf",
+        "application/acrobat",
+        "application/vnd.pdf",
+        "text/pdf",
+        "text/x-pdf"
+    }
+
+    text_mimetypes = {
+        "application/rtf",
+        "text/rtf",
+        "text/plain"
+    }
+
+    image_mimetypes = {
+        "image/jpeg",
+        "image/png",
+        "image/gif",
+        "image/bmp",
+        "image/webp",
+        "image/svg+xml",
+        "image/tiff",
+        "image/x-icon",
+        "image/vnd.microsoft.icon",
+        "image/heic",
+        "image/heif"
+    }
+
+    video_mimetypes = {
+        "video/mp4",
+        "video/mpeg",
+        "video/x-msvideo",
+        "video/quicktime",
+        "video/x-ms-wmv",
+        "video/x-flv",
+        "video/webm",
+        "video/3gpp",
+        "video/3gpp2",
+        "video/x-matroska"
+    }
+
+    audio_mimetypes = {
+        "audio/mpeg",
+        "audio/x-wav",
+        "audio/wav",
+        "audio/x-m4a",
+        "audio/aac",
+        "audio/ogg",
+        "audio/webm",
+        "audio/flac",
+        "audio/x-ms-wma",
+        "audio/x-aiff"
+    }
+
+    folder_mimetypes = {
+        "application/vnd.google-apps.folder",  # Google Drive folder
+        "application/x-directory",             # Generic directory mime type
+        "inode/directory",                     # Often used in Unix-like systems
+        "folder",                              # Some systems might use this
+    }
+
+    # Word file
+    if mimetype in word_mimetypes:
+        return "word"
+    # Excel files
+    elif mimetype in excel_mimetypes:
+        return "excel"
+    # Presentation files
+    elif mimetype in presentation_mimetypes:
+        return "presentation"
+    # Text files
+    elif mimetype in text_mimetypes:
+        return "text"
+    # PDFs
+    elif mimetype in pdf_mimetypes:
+        return "pdf"
+    # Images
+    elif mimetype in image_mimetypes:
+        return "image"
+    # Videos
+    elif mimetype in video_mimetypes:
+        return "video"
+    # Audio files
+    elif mimetype in audio_mimetypes:
+        return "audio"
+    # Folders
+    elif mimetype in folder_mimetypes:
+        return "folder"
+    # Other
+    else:
+        return "other"
+
 @app.route('/fetch_file_list_from_google_drive')
 def fetch_file_list_from_google_drive():
+    gdrive_files = []
     try:
         service = build("drive", "v3", credentials=GDRIVE_CREDS)
 
@@ -1602,16 +1758,24 @@ def fetch_file_list_from_google_drive():
 
         if not items:
             print("No files found.")
-            return jsonify(success=True)
+            return jsonify(success=True, gdrive_files=gdrive_files)
         else:
-            print("\n\nFiles:\n\n")
-            print("Name       ID      mimeType        fileExtension       version")
+            # print("\n\nFiles:\n\n")
+            # print("Name       ID      mimeType        fileExtension       Category      version")
             for item in items:
-                print(f"{item['name']} ({item['id']}) {item['mimeType']} {item['version']}")
+                category = categorize_mimetype(item['mimeType'])
+                #print(f"{item['name']}      ({item['id']})      {item['mimeType']}      {category}        {item['version']}")
+                gdrive_files.append({
+                    'name': item['name'],
+                    # 'id': item['id'],
+                    'version': item['version'],
+                    'type': category
+                })
+
     except Exception as e:
         handle_api_error("Could not fetch GDrive files, encountered error: ", e)
     
-    return jsonify(success=True)
+    return jsonify({'success': True, 'gdrive_files': gdrive_files})
 
 
 # Route for loading all models from model dir
