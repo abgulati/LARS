@@ -2022,7 +2022,7 @@
             }
 
             
-            function populateTable(gdrive_files) {
+            function populateGoogleDriveTable(gdrive_files) {
                 const gdriveTableBody = document.querySelector('#google_drive_files_tables tbody');
 
                 gdrive_files.forEach((file, index) => {
@@ -2069,7 +2069,7 @@
                                 console.log(data.gdrive_files);
                                 if (data.gdrive_files.length > 0) {
                                     clearGoogleDriveTable();
-                                    populateTable(data.gdrive_files);
+                                    populateGoogleDriveTable(data.gdrive_files);
                                     document.getElementById('googleDriveSyncAction').style.display = 'block';
                                 }
                             } else {
