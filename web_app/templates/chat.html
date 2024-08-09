@@ -525,6 +525,30 @@
                 overflow-wrap: break-word;
             }
 
+            #google_drive_files_tables {
+                width: 100%;
+            }
+
+            #google_drive_files_tables th, #google_drive_files_tables td {
+                word-wrap: break-word;
+                overflow-wrap: break-word;
+                text-align: center;
+            }
+
+            #googleDriveSyncAction {
+                margin-top: 10px;
+                float: left;
+            }
+
+            .checkbox-cell {
+                text-align: center;
+            }
+
+            .checkbox-cell input[type="checkbox"] {
+                margin: 0;
+                vertical-align: middle;
+            }
+
             table {
                 border-collapse: collapse;
                 width: 100%;
@@ -1179,9 +1203,6 @@
 
                                     <label>Google Drive File Browser:</label>
 
-                                    <br>
-                                    <br>
-
                                     <div id="loader" class="loader" style="display: none;"></div>
 
                                     <div id="google_drive_file_browser">
@@ -1189,9 +1210,9 @@
                                         <table id="google_drive_files_tables">  <!--TODO: table wrap per div width-->
                                             <thead>
                                                 <tr>
-                                                    <th>Selected?</th>
-                                                    <th>Name</th>
-                                                    <th>Type</th>
+                                                    <th>Sync</th>
+                                                    <th style="text-align: left;">Name</th>
+                                                    <th style="text-align: left;">Type</th>
                                                     <th>Icon</th>
                                                     <th>Document Version</th>
                                                 </tr>
@@ -1202,6 +1223,7 @@
                                         </table>
 
                                     </div>
+                                    <button class="btn btn-primary" type="button" id="googleDriveSyncAction" style="display: none;">Sync Files</button>
                                 </div>
 
                                 <div id="option7" class="d-none">
@@ -1406,6 +1428,14 @@
 
             function clearDocsLoadedTable() {
                 var table = document.getElementById('docs_loaded_details_table');
+
+                for (var i = table.rows.length - 1; i > 0; i--) {   // HTML tables start at row 0, so the header row is 0 and won't be deleted thanks to the i > 0 condition. The length-1 is to account for 0-indexing as length may be 10, but max row index will be 9. 
+                    table.deleteRow(i);
+                }
+            }
+
+            function clearGoogleDriveTable() {
+                var table = document.getElementById('google_drive_files_tables');
 
                 for (var i = table.rows.length - 1; i > 0; i--) {   // HTML tables start at row 0, so the header row is 0 and won't be deleted thanks to the i > 0 condition. The length-1 is to account for 0-indexing as length may be 10, but max row index will be 9. 
                     table.deleteRow(i);
@@ -1996,15 +2026,17 @@
                 const gdriveTableBody = document.querySelector('#google_drive_files_tables tbody');
 
                 gdrive_files.forEach((file, index) => {
-                    const row = gdriveTableBody.insertRow();
                     const iconClass = getFileIconClass(file.type);
-                    row.innerHTML = `
-                        <td style="text-align:center"><input type="checkbox" id="select-${index}"></td>
-                        <td>${file.name}</td>
-                        <td>${file.type}</td>
-                        <td style="text-align:center"><i class="file-icon fa-solid ${iconClass}"></i></td>
-                        <td style="text-align:center">v${file.version}</td>
+                    const rowHTML = `
+                        <tr data-gdrive-file-id="${file.id}">
+                            <td class="checkbox-cell"><input type="checkbox" id="select-${index}"></td>
+                            <td style="text-align:left">${file.name}</td>
+                            <td style="text-align:left">${file.type}</td>
+                            <td style="text-align:center"><i class="file-icon fa-solid ${iconClass}"></i></td>
+                            <td style="text-align:center">v${file.version}</td>
+                        <tr>
                     `;
+                    gdriveTableBody.insertAdjacentHTML('beforeend', rowHTML);
                 });
             }
 
@@ -2035,7 +2067,11 @@
                                 hideLoader();
                                 console.log("GDrive Files Fetched");
                                 console.log(data.gdrive_files);
-                                populateTable(data.gdrive_files);
+                                if (data.gdrive_files.length > 0) {
+                                    clearGoogleDriveTable();
+                                    populateTable(data.gdrive_files);
+                                    document.getElementById('googleDriveSyncAction').style.display = 'block';
+                                }
                             } else {
                                 throw new Error('Internal Server Error: Check server-log and server command-line for more details.');
                             }

@@ -1767,7 +1767,7 @@ def fetch_file_list_from_google_drive():
                 #print(f"{item['name']}      ({item['id']})      {item['mimeType']}      {category}        {item['version']}")
                 gdrive_files.append({
                     'name': item['name'],
-                    # 'id': item['id'],
+                    'id': item['id'],
                     'version': item['version'],
                     'type': category
                 })
