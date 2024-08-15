@@ -248,6 +248,28 @@
                 border-radius: 50%;
             }
 
+            .cell-loader {
+                border: 2px solid #f3f3f3;
+                border-top: 2px solid #3498db;
+                border-radius: 50%;
+                width: 20px;
+                height: 20px;
+                animation: spin 1s linear infinite;
+                display: inline-block;
+            }
+
+            .waiting {
+                color: #f39c12;
+            }
+
+            .success {
+                color: #2ecc71;
+            }
+
+            .failure {
+                color: #e74c3c;
+            }
+
             #overlay {
                 /* ... your existing styles ... */
                 backdrop-filter: blur(10px);
@@ -484,6 +506,18 @@
                 background-color: darkslateblue;
             }
 
+            .btn-outline-secondary {
+                background-color: white;
+                color: black;
+                border-style: double;
+                border-color: black;
+            }
+
+            .btn-outline-secondary:hover {
+                background-color: darkorange;
+            }
+
+
             #saveChangesButton {
                 background-color: darkslategray;
                 border-width: 0;
@@ -527,6 +561,7 @@
 
             #google_drive_files_tables {
                 width: 100%;
+                table-layout: fixed;
             }
 
             #google_drive_files_tables th, #google_drive_files_tables td {
@@ -558,6 +593,7 @@
                 padding: 7px;
                 text-align: left;
                 border-bottom: 1px solid #DDD;
+                border-top: 1px solid #DDD;
             }
 
             tr:hover {
@@ -854,157 +890,173 @@
 
                                     <br>
 
-                                    <input type="file" name="llmFile" id="uploadLlm" style="display: none;">
-                                    <button type="button" id="uploadLlmButton" class="btn btn-primary upload-file-btn" onclick="document.getElementById('uploadLlm').click();" style="display: none;"><i class="fas fa-upload"></i> Upload an LLM</button>
-                                    
-                                    <br>
-
-                                    <div  id="localLlmSelection" style="display: none;">
-                                        <label style="margin-bottom: 3px;">Select a local LLM:</label>
+                                    <div id="local_llm_server_select_div" style="display: none;">
+                                        <label style="margin-bottom: 3px;">Select an LLM Server:</label>
                                         <br>
-                                        <select class="modal-selects" name="model_choice" id="modelDropdown">
-                                            
+                                        <select class="modal-selects" name="local_llm_server_selector" id="local_llm_server_select_dropdown">
+                                            <option value="hf-waitress">HF-Waitress</option>
+                                            <option value="llama-cpp">llama.cpp</option>
+                                            <!-- Add more embedding models here!-->
                                         </select>
                                     </div>
 
                                     <br>
 
-                                    <div  id="localLlmTemplateSelection" style="display: none;">
-                                        <label style="margin-bottom: 3px;">Select a Prompt-Template Format</label>
+                                    <div id="llama_cpp_div" style="display: none;">
+
+                                        <input type="file" name="llmFile" id="uploadLlm" style="display: none;">
+                                        <button type="button" id="uploadLlmButton" class="btn btn-primary upload-file-btn" onclick="document.getElementById('uploadLlm').click();" style="display: none;"><i class="fas fa-upload"></i> Upload an LLM</button>
+                                        
                                         <br>
-                                        <select class="modal-selects" name="llm_template_choice" id="llmTemplateDropdown">
-                                            <option value="">Please select</option>
-                                            <option value="llama3">Llama-3 & 3.1 Prompt Template Format</option>
-                                            <option value="llama2">Llama-2 Prompt Template Format (Mistral Nemo-12B Instruct, Instruct-7B & MoE - v0.1 & v0.2, etc.)</option>
-                                            <option value="chatml">ChatML Prompt Template Format (Open & Nous Hermes-Mistral & MoE, etc.) </option>
-                                            <option value="phi3">Microsoft Phi-3 Prompt Template Format</option>
-                                            <option value="command-r">Cohere Command-R & Command-R+ Prompt Template Format</option>
-                                            <option value="deepseek">Deepseek-Coder Prompt Template Format</option>
-                                            <option value="deepseek-coder-v2">Deepseek-Coder-V2 Prompt Template Format</option>
-                                            <option value="gemma2">Google Gemma2 Prompt Template Format</option>
-                                            <option value="vicuna">Nous-Capybara Vicuna Prompt Template Format</option>
-                                            <option value="openchat">OpenChat-3.5-0106 Prompt Template Format</option>
-                                        </select>
-                                    </div>
-                                                        
-                                    <div id="apiLlmSelection" style="display: none;">
-                                        <label style="margin-bottom: 3px;">Select an LLM-API Inferencing Service:</label>
-                                        <br>
-                                        <select class="modal-selects" name="llm_api_choice" id="llmApiDropdown">
-                                            <option value="">Please select</option>
-                                            <option value="AzureOpenAI">Azure OpenAI Service</option>
-                                            <!-- Add more API services here!-->
-                                        </select>
-                                    </div>
-                                    
-                                    <br>
 
-                                    <form action="" class="api_form" id="azure_openai_api_form" style="display: none;">
-                                        <div class="form-group">
-                                            <input type="checkbox" id="update_azure_gpt" name="update_azure_gpt">
-                                            <label for="update_azure_gpt">Update Configuration</label>
-                                        </div>
-                                        <div class="form-group">
-                                            <label for="azure_openai_api_url">Azure OpenAI Base URL:</label>
-                                            <input type="text" id="azure_openai_api_url" name="azure_openai_api_url" disabled>
-                                        </div>
-                                        <div class="form-group">
-                                            <label for="azure_openai_api_key">Azure OpenAI GPT Key:</label>
-                                            <input type="text" id="azure_openai_api_key" name="azure_openai_api_key" disabled>
-                                        </div>
-                                        <div class="form-group">
-                                            <label for="azure_openai_deployment_name">Azure OpenAI GPT Deployment Name:</label>
-                                            <input type="text" id="azure_openai_deployment_name" name="azure_openai_deployment_name" disabled>
-                                        </div>
-                                        <br>
-                                    </form>
-
-                                    <!--Advanced Settings Section Begins-->
-                                    <a href="#" class="btn btn-link btn-primary llm-adv-set-toggle" id="advancedLlmSettingsToggle" data-bs-toggle="collapse" data-bs-target="#advancedLlmSettings" aria-expanded="false" aria-controls="advancedLlmSettings" style="display: none;">
-                                        Advanced Settings >>>
-                                    </a>
-
-                                    <div class="collapse" id="advancedLlmSettings">
-                                        <div class="card card-body" style="background-color: #181A1B; border: none;">
-                                            
-                                            <!-- Add options here | TODO: style "Advanced Settings" button! -->
-
-                                            <button class="btn btn-primary" type="button" id="resetLlmAdvancedDefaults">Reset to Defaults</button>
-
+                                        <div  id="localLlmSelection" style="display: none;">
+                                            <label style="margin-bottom: 3px;">Select a local LLM:</label>
                                             <br>
+                                            <select class="modal-selects" name="model_choice" id="modelDropdown">
+                                                
+                                            </select>
+                                        </div>
 
-                                            <div class="settings-requiring-restart-container">
+                                        <br>
 
-                                                <div id="gpu_choice" class="restart-settings-group">
-                                                    <label>Use GPU?</label>
-                                                    <input type="radio" id="gpu_radio_yes" name="use_gpu" value="y" style="margin-left: 7px;"> Yes (NvCUDA)
-                                                    <input type="radio" id="gpu_radio_no" name="use_gpu" value="n" style="margin-left: 7px;"> No
-                                                    <br><label for="NumbGpuLayers">Number of Model-layers to offload to the GPU (-ngl): </label>
-                                                    <input type="number" id="NumbGpuLayers" name="NumbGpuLayers" min="-1" style="width: 15%;" value="47">
+                                        <div  id="localLlmTemplateSelection" style="display: none;">
+                                            <label style="margin-bottom: 3px;">Select a Prompt-Template Format</label>
+                                            <br>
+                                            <select class="modal-selects" name="llm_template_choice" id="llmTemplateDropdown">
+                                                <option value="">Please select</option>
+                                                <option value="llama3">Llama-3 & 3.1 Prompt Template Format</option>
+                                                <option value="llama2">Llama-2 Prompt Template Format (Mistral Nemo-12B Instruct, Instruct-7B & MoE - v0.1 & v0.2, etc.)</option>
+                                                <option value="chatml">ChatML Prompt Template Format (Open & Nous Hermes-Mistral & MoE, etc.) </option>
+                                                <option value="phi3">Microsoft Phi-3 Prompt Template Format</option>
+                                                <option value="command-r">Cohere Command-R & Command-R+ Prompt Template Format</option>
+                                                <option value="deepseek">Deepseek-Coder Prompt Template Format</option>
+                                                <option value="deepseek-coder-v2">Deepseek-Coder-V2 Prompt Template Format</option>
+                                                <option value="gemma2">Google Gemma2 Prompt Template Format</option>
+                                                <option value="vicuna">Nous-Capybara Vicuna Prompt Template Format</option>
+                                                <option value="openchat">OpenChat-3.5-0106 Prompt Template Format</option>
+                                            </select>
+                                        </div>
+                                                            
+                                        <div id="apiLlmSelection" style="display: none;">
+                                            <label style="margin-bottom: 3px;">Select an LLM-API Inferencing Service:</label>
+                                            <br>
+                                            <select class="modal-selects" name="llm_api_choice" id="llmApiDropdown">
+                                                <option value="">Please select</option>
+                                                <option value="AzureOpenAI">Azure OpenAI Service</option>
+                                                <!-- Add more API services here!-->
+                                            </select>
+                                        </div>
+                                        
+                                        <br>
+
+                                        <form action="" class="api_form" id="azure_openai_api_form" style="display: none;">
+                                            <div class="form-group">
+                                                <input type="checkbox" id="update_azure_gpt" name="update_azure_gpt">
+                                                <label for="update_azure_gpt">Update Configuration</label>
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="azure_openai_api_url">Azure OpenAI Base URL:</label>
+                                                <input type="text" id="azure_openai_api_url" name="azure_openai_api_url" disabled>
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="azure_openai_api_key">Azure OpenAI GPT Key:</label>
+                                                <input type="text" id="azure_openai_api_key" name="azure_openai_api_key" disabled>
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="azure_openai_deployment_name">Azure OpenAI GPT Deployment Name:</label>
+                                                <input type="text" id="azure_openai_deployment_name" name="azure_openai_deployment_name" disabled>
+                                            </div>
+                                            <br>
+                                        </form>
+
+                                        <!--Advanced Settings Section Begins-->
+                                        <a href="#" class="btn btn-link btn-primary llm-adv-set-toggle" id="advancedLlmSettingsToggle" data-bs-toggle="collapse" data-bs-target="#advancedLlmSettings" aria-expanded="false" aria-controls="advancedLlmSettings" style="display: none;">
+                                            Advanced Settings >>>
+                                        </a>
+
+                                        <div class="collapse" id="advancedLlmSettings">
+                                            <div class="card card-body" style="background-color: #181A1B; border: none;">
+                                                
+                                                <!-- Add options here | TODO: style "Advanced Settings" button! -->
+    
+                                                <button class="btn btn-primary" type="button" id="resetLlmAdvancedDefaults">Reset to Defaults</button>
+    
+                                                <br>
+    
+                                                <div class="settings-requiring-restart-container">
+    
+                                                    <div id="gpu_choice" class="restart-settings-group">
+                                                        <label>Use GPU?</label>
+                                                        <input type="radio" id="gpu_radio_yes" name="use_gpu" value="y" style="margin-left: 7px;"> Yes (NvCUDA)
+                                                        <input type="radio" id="gpu_radio_no" name="use_gpu" value="n" style="margin-left: 7px;"> No
+                                                        <br><label for="NumbGpuLayers">Number of Model-layers to offload to the GPU (-ngl): </label>
+                                                        <input type="number" id="NumbGpuLayers" name="NumbGpuLayers" min="-1" style="width: 15%;" value="47">
+                                                    </div>
+        
+                                                    <br>
+        
+                                                    <div id="ctx_length" class="restart-settings-group">
+                                                        <label for="LlmCtxLgt">Context-Length (-c): </label>
+                                                        <input type="number" id="LlmCtxLgt" name="LlmCtxLgt" min="128" style="width: 15%;" value="8192">
+                                                    </div>
+        
+                                                    <br>
+        
+                                                    <div id="llm_max_new_tokens" class="restart-settings-group">
+                                                        <label for="MaxNewToks">Maximum tokens to predict (-n): </label>
+                                                        <input type="number" id="MaxNewToks" name="MaxNewToks" min="-1" style="width: 15%;" value="2048">
+                                                    </div>
+    
+                                                    <br>
+    
+                                                    <div class="restart-warning">
+                                                        <i class="fa-solid fa-exclamation-triangle"></i> Changes trigger restart!
+                                                    </div>
+    
                                                 </div>
     
                                                 <br>
     
-                                                <div id="ctx_length" class="restart-settings-group">
-                                                    <label for="LlmCtxLgt">Context-Length (-c): </label>
-                                                    <input type="number" id="LlmCtxLgt" name="LlmCtxLgt" min="128" style="width: 15%;" value="8192">
+                                                <div id="temperature_value">
+                                                    <label for="tempSlider">Temperature (Randomness of generated text): </label>
+                                                    <input type="range" id="tempSlider" name="tempSlider" min="0" max="2" step="0.1" value="0.8">
+                                                    <span id="tempSliderValue">0.8</span>
                                                 </div>
     
                                                 <br>
     
-                                                <div id="llm_max_new_tokens" class="restart-settings-group">
-                                                    <label for="MaxNewToks">Maximum tokens to predict (-n): </label>
-                                                    <input type="number" id="MaxNewToks" name="MaxNewToks" min="-1" style="width: 15%;" value="2048">
+                                                <div id="topk_value">
+                                                    <label for="topkSlider">Limit to K most probable tokens (top_k): </label>
+                                                    <input type="range" id="topkSlider" name="topkSlider" min="-1" max="100" step="1" value="40">
+                                                    <span id="topkSliderValue">40</span>
                                                 </div>
-
+    
                                                 <br>
-
-                                                <div class="restart-warning">
-                                                    <i class="fa-solid fa-exclamation-triangle"></i> Changes trigger restart!
+    
+                                                <div id="topp_value">
+                                                    <label for="toppSlider">Limit to a subset of tokens with a cumulative probability above (top_p): </label>
+                                                    <input type="range" id="toppSlider" name="toppSlider" min="0" max="1" step="0.01" value="0.95">
+                                                    <span id="toppSliderValue">0.95</span>
                                                 </div>
-
+    
+                                                <br>
+    
+                                                <div id="minp_value">
+                                                    <label for="minpSlider">Minimum probability for considering a token, relative to most likely (min_p): </label>
+                                                    <input type="range" id="minpSlider" name="minpSlider" min="0" max="1" step="0.01" value="0.05">
+                                                    <span id="minpSliderValue">0.05</span>
+                                                </div>
+    
+                                                <br>
+    
+                                                <div id="nkeep_value">
+                                                    <label for="nkeepSlider">Prompt-tokens retained when context-size exceeded (n_keep, -1 to retain all): </label>
+                                                    <input type="number" id="nkeepSlider" name="nkeepSlider" min="-1" style="width: 15%;" value="0">
+                                                </div>
+                                                
                                             </div>
-
-                                            <br>
-
-                                            <div id="temperature_value">
-                                                <label for="tempSlider">Temperature (Randomness of generated text): </label>
-                                                <input type="range" id="tempSlider" name="tempSlider" min="0" max="2" step="0.1" value="0.8">
-                                                <span id="tempSliderValue">0.8</span>
-                                            </div>
-
-                                            <br>
-
-                                            <div id="topk_value">
-                                                <label for="topkSlider">Limit to K most probable tokens (top_k): </label>
-                                                <input type="range" id="topkSlider" name="topkSlider" min="-1" max="100" step="1" value="40">
-                                                <span id="topkSliderValue">40</span>
-                                            </div>
-
-                                            <br>
-
-                                            <div id="topp_value">
-                                                <label for="toppSlider">Limit to a subset of tokens with a cumulative probability above (top_p): </label>
-                                                <input type="range" id="toppSlider" name="toppSlider" min="0" max="1" step="0.01" value="0.95">
-                                                <span id="toppSliderValue">0.95</span>
-                                            </div>
-
-                                            <br>
-
-                                            <div id="minp_value">
-                                                <label for="minpSlider">Minimum probability for considering a token, relative to most likely (min_p): </label>
-                                                <input type="range" id="minpSlider" name="minpSlider" min="0" max="1" step="0.01" value="0.05">
-                                                <span id="minpSliderValue">0.05</span>
-                                            </div>
-
-                                            <br>
-
-                                            <div id="nkeep_value">
-                                                <label for="nkeepSlider">Prompt-tokens retained when context-size exceeded (n_keep, -1 to retain all): </label>
-                                                <input type="number" id="nkeepSlider" name="nkeepSlider" min="-1" style="width: 15%;" value="0">
-                                            </div>
-                                            
                                         </div>
+
                                     </div>
 
                                 </div>
@@ -1206,19 +1258,41 @@
                                     <div id="loader" class="loader" style="display: none;"></div>
 
                                     <div id="google_drive_file_browser">
+                                        <div class="mb-3">
+                                            <select id="filterDocType" class="form-select">
+                                                <option value="">All Document Types</option>
+                                            </select>
+                                        </div>
                                         
-                                        <table id="google_drive_files_tables">  <!--TODO: table wrap per div width-->
+                                        <table id="google_drive_files_tables" class="gdrive-table">  <!--TODO: table wrap per div width-->
                                             <thead>
-                                                <tr>
+                                                <!-- <tr>
                                                     <th>Sync</th>
                                                     <th style="text-align: left;">Name</th>
                                                     <th style="text-align: left;">Type</th>
                                                     <th>Icon</th>
                                                     <th>Document Version</th>
+                                                    <th>Sync Status</th>
+                                                </tr> -->
+                                                <tr>
+                                                    <th>
+                                                        <input type="checkbox" id="selectAll">
+                                                        <button id="sortSelected" class="btn btn-sm btn-outline-secondary">Sort Selected</button>
+                                                    </th>
+                                                    <th style="text-align: left;">
+                                                        Name
+                                                        <button class="sort-btn" data-sort="name" data-order="none">↕</button>
+                                                    </th>
+                                                    <th style="text-align: left;">
+                                                        Type
+                                                        <button class="sort-btn" data-sort="type" data-order="none">↕</button>
+                                                    </th>
+                                                    <th>Icon</th>
+                                                    <th>Document Version</th>
+                                                    <th>Sync Status</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                <!-- Table rows will be populated here -->
                                             </tbody>
                                         </table>
 
@@ -1436,10 +1510,12 @@
 
             function clearGoogleDriveTable() {
                 var table = document.getElementById('google_drive_files_tables');
-
-                for (var i = table.rows.length - 1; i > 0; i--) {   // HTML tables start at row 0, so the header row is 0 and won't be deleted thanks to the i > 0 condition. The length-1 is to account for 0-indexing as length may be 10, but max row index will be 9. 
-                    table.deleteRow(i);
-                }
+                var tbody = table.querySelector('tbody');
+                tbody.innerHTML = '';
+                document.querySelectorAll('.sort-btn').forEach(button => {
+                    button.setAttribute('data-order', 'none');
+                    button.textContent = '↕';
+                });
             }
 
 
@@ -1549,6 +1625,304 @@
                 document.getElementById(modalId).style.display = 'none';
             }
 
+
+            function xdrp_populateGoogleDriveTable(gdrive_files) {
+                const gdriveTableBody = document.querySelector('#google_drive_files_tables tbody');
+
+                gdrive_files.forEach((file, index) => {
+                    const iconClass = getFileIconClass(file.type);
+                    const rowHTML = `
+                        <tr data-gdrive-file-id="${file.id}" data-gdrive-mime-type="${file.mimeType}">
+                            <td class="checkbox-cell"><input type="checkbox" id="select-${parseInt(index)+1}"></td>
+                            <td style="text-align:left">${file.name}</td>
+                            <td style="text-align:left">${file.type}</td>
+                            <td style="text-align:center"><i class="file-icon fa-solid ${iconClass}"></i></td>
+                            <td style="text-align:center">v${file.version}</td>
+                            <td style="text-align:center"><i class="fas fa-cloud-arrow-down"></i></td>
+                        </tr>
+                    `;
+                    gdriveTableBody.insertAdjacentHTML('beforeend', rowHTML);
+                });
+            }
+
+            function sortSelected() {
+                const tbody = document.querySelector('#google_drive_files_tables tbody');
+                const rows = Array.from(tbody.querySelectorAll('tr'));
+                rows.sort((a,b) => {    // JS's built-in sort() method for arrays takes a comparison function as an argument, determining the order for two rows in this case
+                    const aChecked = a.querySelector('input[type="checkbox"]').checked;
+                    const bChecked = b.querySelector('input[type="checkbox"]').checked;
+                    return bChecked - aChecked;     // Clever bit! In JS, true is treated as 1, and false 0, and in sorting a positive number comes first - thus putting checked rows first while maintaining the ordering when both rows are checked/unchecked!
+                });
+                tbody.innerHTML = '';
+                tbody.append(...rows);
+            }
+
+            function sortByColumn(button) {
+                const table = document.getElementById('google_drive_files_tables');
+                const tbody = table.querySelector('tbody');
+                const rows = Array.from(tbody.querySelectorAll('tr'));
+                const column = button.dataset.sort;
+                const index = column === 'name' ? 1 : 2;    //determines which column to sort: 1 for Name, 2 for Type
+                
+                // Get current order, default to 'none' if not set
+                const currentOrder = button.getAttribute('data-order') || 'none';
+                const newOrder = currentOrder === 'none' || currentOrder === 'desc' ? 'asc' : 'desc';
+
+                // Sort rows
+                rows.sort((a,b) => {
+                    const aValue = a.cells[index].textContent.trim();
+                    const bValue = b.cells[index].textContent.trim();
+                    const comparison = aValue.localeCompare(bValue, undefined, {numeric: true, sensitivity: 'base'});   //sorts the rows based on the text content of the cells in the chosen column -> localeCompare() is used for string comparison, which handles alphabetical sorting well; undefined: This is the locale parameter. By leaving it undefined, we're using the default locale of the browser; sensitivity: 'base': This setting makes the comparison insensitive to case and diacritics. For instance, "a" and "A" would be considered equal, as would "é" and "e".
+                    return newOrder === 'asc' ? comparison : -comparison    //localeCompare() returns a negative number if a should be sorted before b, and a positive number otherwise. If newOrder is 'asc', it returns `comparison` as is (ascending order) and if it's 'desc', then by negating the comparison result (-comparison), we reverse the sort order!
+                });
+                
+                // Update button state
+                button.setAttribute('data-order', newOrder);
+                button.textContent = newOrder === 'asc' ? '↑' : '↓';
+
+                // Reset other buttons as should be sorted basis one column at any given time!
+                table.querySelectorAll('.sort-btn').forEach(btn => {
+                    if (btn !== button) {
+                        btn.setAttribute('data-order', 'none');
+                        btn.textContent = '↕';
+                    }
+                });
+
+                // Clear and re-append the sorted rows!
+                tbody.innerHTML = '';
+                tbody.append(...rows);
+            }
+
+            function filterByDocType(e) {
+                const filterValue = e.target.value.toLowerCase();
+                const tbody = document.querySelector('#google_drive_files_tables tbody');
+                const rows = Array.from(tbody.querySelectorAll('tr'));
+                rows.forEach(row => {
+                    const type = row.cells[2].textContent.toLowerCase();
+                    row.style.display = filterValue === '' || type === filterValue ? '' : 'none';   //If the filter value is empty (showing all types) OR the row's type matches the filter value, set the row's display style to an empty string (which means "display normally"). Otherwise, set the row's display style to 'none!
+                }); 
+            }
+
+            function selectAll(e) {
+                const tbody = document.querySelector('#google_drive_files_tables tbody');
+                const rows = Array.from(tbody.querySelectorAll('tr'));
+                rows.forEach(row => {
+                    row.querySelector('input[type="checkbox"]').checked = e.target.checked; //`e.target` refers to the checkbox that triggered the event (the "Select All" checkbox) and `e.target.checked` is a boolean value indicating whether this checkbox is checked or not, basis which the checkbox for all other rows is set via the querySelector.
+                });
+            }
+
+            function initSortingAndFiltering() {
+                // Sort by selected
+                document.getElementById('sortSelected').addEventListener('click', sortSelected);
+
+                // Sort by column
+                
+                // Approach 1 (Event Delegation) - unnecessary in this case as:
+                // 1) Only two buttons, not a large number of elements
+                // 2) Static elements in the header, not dynamically changing content
+                // 3) Buttons themselves are not removed/added dynamically
+                // document.getElementById('google_drive_files_tables').addEventListener('click', function(e) {
+                //     const target = e.target;
+                //     if (target.classList.contains('sort-btn')) {
+                //         sortByColumn(target);
+                //     }
+                // });
+
+                 // Approach 2 (Direct Attachment):
+                const table = document.getElementById('google_drive_files_tables');
+                table.querySelectorAll('.sort-btn').forEach(button => {
+                    button.addEventListener('click', () => sortByColumn(button));
+                });
+
+                // Filter by document type
+                document.getElementById('filterDocType').addEventListener('change', filterByDocType);
+
+                // Select all checkboxes
+                document.getElementById('selectAll').addEventListener('change', selectAll);
+            }
+
+            function populateGoogleDriveTable(gdrive_files) {
+                const gdriveTableBody = document.querySelector('#google_drive_files_tables tbody');
+                const filterSelect = document.getElementById('filterDocType');
+                const docTypes = new Set();
+
+                gdriveTableBody.innerHTML = '';
+                filterSelect.innerHTML = '<option value="">All Document Types</option>';
+
+                gdrive_files.forEach((file, index) => {
+                    const iconClass = getFileIconClass(file.type);
+                    const rowHTML = `
+                        <tr data-gdrive-file-id="${file.id}" data-gdrive-mime-type="${file.mimeType}">
+                            <td class="checkbox-cell"><input type="checkbox" id="select-${parseInt(index)+1}"></td>
+                            <td style="text-align:left">${file.name}</td>
+                            <td style="text-align:left">${file.type}</td>
+                            <td style="text-align:center"><i class="file-icon fa-solid ${iconClass}"></i></td>
+                            <td style="text-align:center">v${file.version}</td>
+                            <td style="text-align:center"><i class="fas fa-cloud-arrow-down"></i></td>
+                        </tr>
+                    `;
+                    gdriveTableBody.insertAdjacentHTML('beforeend', rowHTML);
+
+                    docTypes.add(file.type);
+                });
+
+                // Populate filter options
+                docTypes.forEach(type => {
+                    filterSelect.insertAdjacentHTML('beforeend', `<option value="${type}">${type}</option>`);
+                });
+            }
+
+            function loadGoogleDriveDoc(file_id, file_mimeType) {
+                let formData = new FormData();
+                formData.append('file_id', file_id);
+                formData.append('file_mimeType', file_mimeType);
+
+                return fetch('/google_drive_loader', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    console.log(data)
+                    if (!data.success) {
+                        throw new Error('Failed to load document from Google Drive');
+                    }
+                    return data;
+                })
+                .catch(error => {
+                    errorHandler("loading document from Google Drive", "/google_drive_loader", String(error.message));
+                    throw error;  // Re-throw the error for handling in the calling function
+                });
+            }
+
+            function updateUIForFile(row, status) {
+                let statusCell = row.cells[row.cells.length - 1];
+
+                statusCell.textContent = ''; // Clear existing content
+
+                switch(status) {
+                    case 'loading':
+                        statusCell.innerHTML = '<div class="cell-loader"></div>';
+                        break;
+                    case 'waiting':
+                        statusCell.innerHTML = '<i class="fas fa-clock waiting" title="Waiting"></i>';
+                        break;
+                    case 'success':
+                        statusCell.innerHTML = '<i class="fas fa-check-circle success" title="Success"></i>';
+                        break;
+                    case 'failure':
+                        statusCell.innerHTML = '<i class="fas fa-times-circle failure" title="Failed"></i>';
+                        break;
+                }
+            }
+
+            function triggerSyncGoogleDrive() {
+                const table = document.getElementById('google_drive_files_tables');
+                const syncButton = document.getElementById('googleDriveSyncAction');
+                const selectedFiles = [];
+
+                if (!table || !syncButton) {
+                    console.error('Required elements not found');
+                    return;
+                }
+                // console.log('Table element:', table);
+                // console.log('Table innerHTML:', table.innerHTML)
+                // console.log('Number of rows:', table.rows.length);
+                // if (table.rows.length > 0) {
+                //     console.log('First row:', table.rows[1].outerHTML);
+                //     console.log('First row cells:', table.rows[1].cells.length);
+                //     console.log('First row first cell:', table.rows[1].cells[0]);
+                // }
+
+                syncButton.disabled = true;
+
+                for (let i = 1; i < table.rows.length; i++) {
+                    const checkbox = table.rows[i].cells[0].querySelector('input[type="checkbox"]');
+                    if (checkbox && checkbox.checked) {
+                        selectedFiles.push({
+                            id: table.rows[i].getAttribute('data-gdrive-file-id'),
+                            mimeType: table.rows[i].getAttribute('data-gdrive-mime-type'),
+                            row: table.rows[i]
+                        });
+                        // Add status cell if it doesn't exist
+                        if (table.rows[i].cells.length < 6) {
+                            table.rows[i].insertCell(-1);
+                        }
+                        updateUIForFile(table.rows[i], 'waiting');
+                    }
+                }
+
+                // Process files sequentially
+                selectedFiles.reduce((promise, file, index) => {
+                    return promise.then(() => {
+                        updateUIForFile(file.row, 'loading');
+                        return loadGoogleDriveDoc(file.id, file.mimeType)
+                            .then(() => {
+                                console.log(`File ${index + 1} loaded successfully`);
+                                clearDocsLoadedTable();
+                                populateDocsLoadedTable();
+                                updateUIForFile(file.row, 'success');
+                            })
+                            .catch(error => {
+                                console.error(`Error loading file ${index + 1}:`, error);
+                                updateUIForFile(file.row, 'failure');
+                            });
+                    });
+                }, Promise.resolve())
+                .finally(() => {
+                    syncButton.disabled = false;
+                    alert('Google Drive Synchronization completed!');
+                });
+            }
+
+            function googleDriveLogin() {
+                showLoader();
+                fetch('/login_to_google_drive')
+                .then(response => {
+                    if (!response.ok) {
+                        return response.json().then(err => { throw new Error(err.error)});
+                    }
+                    return response
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        //alert("Google Drive Login Successful!")
+
+                        fetch('/fetch_file_list_from_google_drive')
+                        .then(response => {
+                            if (!response.ok) {
+                                return response.json().then(err => { throw new Error(err.error)});
+                            }
+                            return response.json()
+                        })
+                        .then(data => {
+                            if (data.success) {
+                                hideLoader();
+                                console.log("GDrive Files Fetched");
+                                console.log(data.gdrive_files);
+                                if (data.gdrive_files.length > 0) {
+                                    clearGoogleDriveTable();
+                                    populateGoogleDriveTable(data.gdrive_files);
+                                    document.getElementById('googleDriveSyncAction').style.display = 'block';
+                                }
+                            } else {
+                                throw new Error('Internal Server Error: Check server-log and server command-line for more details.');
+                            }
+                        })
+                        .catch(error => {
+                            errorHandler("fetching file list from Google Drive", "/fetch_file_list_from_google_drive", String(error.message))
+                        });
+
+                    } else {
+                        throw new Error('Internal Server Error: Check server-log and server command-line for more details.');
+                    }
+                })
+                .catch(error => {
+                    errorHandler("logging into Google Drive", "/login_to_google_drive", String(error.message))
+                });
+            }
+
             
             ////////////////////////---------DOMContentLoaded Block Begins---------////////////////////////////
             function initializeChatLink() {
@@ -1592,7 +1966,7 @@
 
             
             function loadAndSetCoreValues() {
-                const initKeysToRead = ['model_choice', 'use_local_llm', 'use_gpu', 'embedding_model_choice', 'use_ocr', 'ocr_service_choice', 'local_llm_chat_template_format', 'force_enable_rag', 'force_disable_rag', 'base_template', 'local_llm_gpu_layers', 'local_llm_context_length', 'local_llm_max_new_tokens', 'local_llm_temperature', 'local_llm_top_k', 'local_llm_top_p', 'local_llm_min_p', 'local_llm_n_keep', 'azure_cv_free_tier']
+                const initKeysToRead = ['local_llm_server', 'model_choice', 'use_local_llm', 'use_gpu', 'embedding_model_choice', 'use_ocr', 'ocr_service_choice', 'local_llm_chat_template_format', 'force_enable_rag', 'force_disable_rag', 'base_template', 'local_llm_gpu_layers', 'local_llm_context_length', 'local_llm_max_new_tokens', 'local_llm_temperature', 'local_llm_top_k', 'local_llm_top_p', 'local_llm_min_p', 'local_llm_n_keep', 'azure_cv_free_tier']
                 
                 return fetch('/config_reader_api', {
                     method: 'POST',
@@ -1616,6 +1990,19 @@
                 });
             }
 
+            
+            function initializeLocalLLMServerDropdown(local_llm_server) {
+                const llmServerDd = document.getElementById('local_llm_server_select_dropdown');
+
+                for (let option of llmServerDd.options) {
+                    if (option.value == local_llm_server) {
+                        option.selected = true;
+                        break;
+                    }
+                }
+
+                document.getElementById('llama_cpp_div').style.display = local_llm_server === 'llama-cpp' ? 'block' : 'none';
+            }
             
             function initializeModelDropdown(model_choice) {
                 fetch('/load_local_models')
@@ -1706,6 +2093,7 @@
             function toggleLocalLlmSelection() {    // Show or hide local-LLM selection:
                 var selection = document.querySelector('input[name="use_local_or_api_llm"]:checked').value;
                 
+                document.getElementById('local_llm_server_select_div').style.display = selection === 'local' ? 'block' : 'none';
                 document.getElementById('localLlmSelection').style.display = selection === 'local' ? 'block' : 'none';
                 document.getElementById('localLlmTemplateSelection').style.display = selection === 'local' ? 'block' : 'none';
                 document.getElementById('uploadLlmButton').style.display = selection === 'local' ? 'block' : 'none';
@@ -1729,6 +2117,12 @@
                 }
             }
 
+
+            function toggleLocalLLMSettingsForms() {
+                var selection = document.getElementById('local_llm_server_select_dropdown').value;
+                document.getElementById('llama_cpp_div').style.display = selection === 'llama-cpp' ? 'block' : 'none';
+            }
+
             
             function toggleLlmApiForm() {   // Show or hide API form:
                 var selection = document.getElementById('llmApiDropdown').value;
@@ -1749,6 +2143,9 @@
 
             
             function initializeEventListenersForLLMTabRadioButtons() {
+                // Event listener for Local LLM Server selection:
+                document.getElementById('local_llm_server_select_dropdown').addEventListener('change', toggleLocalLLMSettingsForms);
+
                 // Event listener for LLM/API radio buttons:
                 document.getElementById('local_llm_radio_button').addEventListener('change', toggleLlmApiForm);
                 document.getElementById('local_llm_radio_button').addEventListener('change', toggleLocalLlmSelection);
@@ -1799,6 +2196,7 @@
             
             
             function initializeLLMTabComponents(values) {
+                initializeLocalLLMServerDropdown(values.local_llm_server);
                 initializeModelDropdown(values.model_choice);   
                 initializeLLMTemplateDropdown(values.local_llm_chat_template_format);
                 initializeGPURadioButtons(values.use_gpu);
@@ -2022,76 +2420,10 @@
             }
 
             
-            function populateGoogleDriveTable(gdrive_files) {
-                const gdriveTableBody = document.querySelector('#google_drive_files_tables tbody');
-
-                gdrive_files.forEach((file, index) => {
-                    const iconClass = getFileIconClass(file.type);
-                    const rowHTML = `
-                        <tr data-gdrive-file-id="${file.id}">
-                            <td class="checkbox-cell"><input type="checkbox" id="select-${index}"></td>
-                            <td style="text-align:left">${file.name}</td>
-                            <td style="text-align:left">${file.type}</td>
-                            <td style="text-align:center"><i class="file-icon fa-solid ${iconClass}"></i></td>
-                            <td style="text-align:center">v${file.version}</td>
-                        <tr>
-                    `;
-                    gdriveTableBody.insertAdjacentHTML('beforeend', rowHTML);
-                });
-            }
-
-
-            function googleDriveLogin() {
-                showLoader();
-                fetch('/login_to_google_drive')
-                .then(response => {
-                    if (!response.ok) {
-                        return response.json().then(err => { throw new Error(err.error)});
-                    }
-                    return response
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        //alert("Google Drive Login Successful!")
-
-                        fetch('/fetch_file_list_from_google_drive')
-                        .then(response => {
-                            if (!response.ok) {
-                                return response.json().then(err => { throw new Error(err.error)});
-                            }
-                            return response.json()
-                        })
-                        .then(data => {
-                            if (data.success) {
-                                hideLoader();
-                                console.log("GDrive Files Fetched");
-                                console.log(data.gdrive_files);
-                                if (data.gdrive_files.length > 0) {
-                                    clearGoogleDriveTable();
-                                    populateGoogleDriveTable(data.gdrive_files);
-                                    document.getElementById('googleDriveSyncAction').style.display = 'block';
-                                }
-                            } else {
-                                throw new Error('Internal Server Error: Check server-log and server command-line for more details.');
-                            }
-                        })
-                        .catch(error => {
-                            errorHandler("fetching file list from Google Drive", "/fetch_file_list_from_google_drive", String(error.message))
-                        });
-
-                    } else {
-                        throw new Error('Internal Server Error: Check server-log and server command-line for more details.');
-                    }
-                })
-                .catch(error => {
-                    errorHandler("logging into Google Drive", "/login_to_google_drive", String(error.message))
-                });
-            }
-
-            
             function initializeGoogleDriveTabListeners() {
                 document.getElementById('googleDriveLogin').addEventListener('click', googleDriveLogin);
+                initSortingAndFiltering();  // Inititalize sorting and filtering
+                document.getElementById('googleDriveSyncAction').addEventListener('click', triggerSyncGoogleDrive);
             }
 
             

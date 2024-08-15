@@ -7,7 +7,7 @@ from werkzeug.utils import secure_filename
 
 from whoosh.fields import Schema, TEXT, ID, NUMERIC
 from whoosh.qparser import MultifieldParser
-from whoosh.qparser import QueryParser
+from whoosh.qparser import QueryParser, OrGroup, AndGroup
 from whoosh.index import create_in
 from whoosh.index import open_dir
 
@@ -16,6 +16,7 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
+from googleapiclient.http import MediaIoBaseDownload, MediaDownloadProgress
 
 from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
 from langchain_community.embeddings import HuggingFaceBgeEmbeddings
@@ -36,6 +37,7 @@ from pdf2image import convert_from_path
 from PIL import Image
 
 import fitz # PyMuPDF
+from rapidfuzz import process, fuzz
 
 from urllib.parse import unquote
 from threading import Thread
@@ -116,7 +118,7 @@ HISTORY_SUMMARY = {}    #Set in stream() via HISTORY_MEMORY_WITH_BUFFER.load_mem
 QUERIES = {}
 
 # If modifying these scopes, delete the file token.json.
-GDRIVE_SCOPES = ["https://www.googleapis.com/auth/drive.metadata.readonly"]
+GDRIVE_SCOPES = ["https://www.googleapis.com/auth/drive.metadata.readonly", "https://www.googleapis.com/auth/drive.readonly"]
 GDRIVE_CREDS = None
 #########################------------------------------------------------###############################
 
@@ -262,7 +264,7 @@ def read_config(keys, default_value=None, filename='config.json'):
                 'unix_and_docker_base_directory':'/app/storage',
                 'mac_base_directory':'app',
                 'upload_folder':base_directory + '/uploaded_pdfs',
-                'vectordb_sbert_folder':base_directory + '/chroma_db_250_sbert_embeddings',
+                'vectordb_sbert_folder':base_directory + '/chroma_db_sbert_embeddings',
                 'vectordb_openai_folder':base_directory + '/chroma_db_openai_embeddings',
                 'vectordb_bge_large_folder':base_directory + '/chroma_db_bge_large_embeddings',
                 'vectordb_bge_base_folder':base_directory + '/chroma_db_bge_base_embeddings',
@@ -274,6 +276,7 @@ def read_config(keys, default_value=None, filename='config.json'):
                 'highlighted_docs':base_directory + '/highlighted_pdfs',
                 'ocr_pdfs':base_directory + '/ocr_pdfs',
                 'pdfs_to_txts':base_directory + '/pdfs_to_txts',
+                'local_llm_server':'hf-waitress',
                 'model_choice':'Meta-Llama-3-8B-Instruct.f16.gguf',
                 'do_rag':True,
                 'force_enable_rag':False,
@@ -337,12 +340,12 @@ def config_reader_api():
     try:
         keys = request.json.get('keys', []) # Could also do keys = request.json['keys'] but this way we can provide a default list should 'keys' be missing!
     except Exception as e:
-        handle_api_error("Server-side error - could not read keys for config_reader_api request. Encountered error:", e)
+        return handle_api_error("Server-side error - could not read keys for config_reader_api request. Encountered error:", e)
 
     try:
         values = read_config(keys)  # send list of keys, get dict of key:values
     except Exception as e:
-        handle_api_error("Server-side error - could not read keys from config.json. Encountered error: ", e)
+        return handle_api_error("Server-side error - could not read keys from config.json. Encountered error: ", e)
     
     return jsonify(success=True, values=values)
 
@@ -355,12 +358,12 @@ def config_writer_api():
         config_updates = request.json['config_updates']
         print(f"config_updates for config_writer_api: {config_updates}")
     except Exception as e:
-        handle_api_error("Server-side error - could not read values for config_writer_api request. Encountered error: ", e)
+        return handle_api_error("Server-side error - could not read values for config_writer_api request. Encountered error: ", e)
     
     try:
         write_return = write_config(config_updates)
     except Exception as e:
-        handle_api_error("Server-side error - could not write keys to config.json. Encountered error: ", e)
+        return handle_api_error("Server-side error - could not write keys to config.json. Encountered error: ", e)
     
     return jsonify({"success": write_return['success'], "restart_required": write_return['restart_required']})
 
@@ -374,6 +377,7 @@ if platform.system() == 'Windows':
     from msrest.authentication import CognitiveServicesCredentials
     from azure.ai.formrecognizer import DocumentAnalysisClient
     from azure.core.credentials import AzureKeyCredential
+    from azure.core.exceptions import HttpResponseError
     import azure.ai.vision as sdk
     
     #BASE_DIRECTORY = 'C:/temp_web_app_storage'
@@ -388,6 +392,7 @@ elif platform.system() == 'Linux':
     from msrest.authentication import CognitiveServicesCredentials
     from azure.ai.formrecognizer import DocumentAnalysisClient
     from azure.core.credentials import AzureKeyCredential
+    from azure.core.exceptions import HttpResponseError
     import azure.ai.vision as sdk
     
     #BASE_DIRECTORY = '/app/storage'
@@ -799,8 +804,25 @@ def PDFtoAzureOCRTXT(input_filepath):
             else:
                 print(f"Submitting page {page_number} to AzureComputerVision for OCR")
                 result = computervision_client.recognize_printed_text_in_stream(image=img_stream)
+        except HttpResponseError as e:
+            print(f"\n\nHttpResponseError e: {e}\n\n")
+            if e.status_code == 429:
+                print("Exceeded free-tier usage limits, waiting for one-minute and retrying")
+                time.sleep(63)  #free tier restrictions!
+                img_stream.seek(0)
+                print(f"Submitting page {page_number} to AzureComputerVision for OCR")
+                result = computervision_client.recognize_printed_text_in_stream(image=img_stream)
+                calls_made = 1  #reset counter
         except Exception as e:
-            handle_local_error("Could not convert image to Byte Stream for Azure OCR, encountered error: ", e)
+            if "(429)" in str(e):
+                print("Exceeded free-tier usage limits, waiting for one-minute and retrying")
+                time.sleep(63)  #free tier restrictions!
+                img_stream.seek(0)
+                print(f"Submitting page {page_number} to AzureComputerVision for OCR")
+                result = computervision_client.recognize_printed_text_in_stream(image=img_stream)
+                calls_made = 1  #reset counter\
+            else:
+                handle_local_error("Could not convert image to Byte Stream for Azure OCR, encountered error: ", e)
 
         for region in result.regions:
             for line in region.lines:
@@ -968,6 +990,12 @@ def extract_images_from_pdf(pdf_path):
 
         for page_num in range(len(pdf_reader.pages)):
             page = pdf_reader.pages[page_num]
+
+            text = page.extract_text().strip()
+            if not text:
+                print("Scanned page, skipping")
+                continue
+
             if '/XObject' in page['/Resources']:
                 xObject = page['/Resources']['/XObject'].get_object()
                 for obj in xObject:
@@ -1194,7 +1222,7 @@ def LoadNewDocument(input_file):
     #finally:
         #loader.stop()
 
-    chunk_sz = 250
+    chunk_sz = 500
     chunk_olp = 0
 
     ### L2 - Chunk Source Data ###
@@ -1221,7 +1249,6 @@ def LoadNewDocument(input_file):
 
     ### L3 - Store Chunks in VectorDB ###
     print("Storing to VectorDB: ChromaDB")
-    #chroma_persist_directory=upload_folder + '/chroma_db_250'
     #loader.start()
     try:
         # Return VectorStore initialized from documents and embeddings.
@@ -1275,7 +1302,7 @@ def LoadNewDocument(input_file):
 
 def find_images_in_db(reference_pages):
 
-    print("Searching for relevant Images")
+    print("\nSearching for relevant Images\n")
 
     try:
         read_return = read_config(['sqlite_images_db'])
@@ -1301,7 +1328,6 @@ def find_images_in_db(reference_pages):
 
             # Only search for non-empty search strings
             if search_string:
-                print(f"String found for image search: {search_string}")
                 try:
                     images = conn.execute('SELECT DISTINCT id, image_data FROM images WHERE surrounding_text LIKE ?', ('%' + search_string + '%',)).fetchall()
                 except Exception as e:
@@ -1320,12 +1346,14 @@ def find_images_in_db(reference_pages):
 
 def highlight_text_on_page(highlight_list, stream_session_id):
 
-    print(f"highlight_list: {highlight_list}")
+    print("\nHighlighting Document\n")
+    # print(f"\nhighlight_list: {highlight_list}\n")
+    threshold = 80
 
     try:
         read_return = read_config(['upload_folder', 'highlighted_docs'])
         upload_folder = read_return['upload_folder']
-        highlighted_pdfs = read_return['highlighted_docs']
+        highlighted_pdfs_path = read_return['highlighted_docs']
     except Exception as e:
         handle_local_error("Missing upload_folder in config.json for method highlight_text_on_page. Error: ", e)
     
@@ -1335,10 +1363,10 @@ def highlight_text_on_page(highlight_list, stream_session_id):
             pdf_path = os.path.join(upload_folder, doc).replace("\\","/")
             output_file_extension = "_" + stream_session_id + '.pdf'
             output_file_name = doc.replace(".pdf",output_file_extension) 
-            output_pdf_path = os.path.join(highlighted_pdfs, output_file_name).replace("\\","/")
+            output_pdf_path = os.path.join(highlighted_pdfs_path, output_file_name).replace("\\","/")
 
-            print(f"stream_session_id:{stream_session_id}")
-            print(f"\npdf_path:{pdf_path}")
+            # print(f"stream_session_id:{stream_session_id}")
+            # print(f"\npdf_path:{pdf_path}")
 
             highlight_doc = fitz.open(pdf_path)
         except Exception as e:
@@ -1351,23 +1379,40 @@ def highlight_text_on_page(highlight_list, stream_session_id):
                 text_to_highlight = re.sub(r'Row \d+, Column \d+: ', '', text_to_highlight)
                 page_number = int(target[0])
                 
-                print(f"text_to_highlight: {text_to_highlight}")
-                print(f"page_number: {page_number}")
+                # print(f"text_to_highlight: {text_to_highlight}")
+                # print(f"page_number: {page_number}")
 
                 page = highlight_doc.load_page(page_number-1)
-                text_instances = page.search_for(text_to_highlight)
+                page_text = page.get_text("text")
+
+                # Split the page text into overlapping phrases
+                words = page_text.split()
+                phrases = [' '.join(words[i:i+len(text_to_highlight.split())]) for i in range(len(words))]
+
+                # Find fuzzy matches
+                good_matches = []
+                for phrase in phrases:
+                    score = fuzz.partial_ratio(text_to_highlight.lower(), phrase.lower())
+                    if score >= threshold:
+                        good_matches.append(phrase)
+
+                # print(f"\ngood_matches: {good_matches}\n")
+
+                for match in good_matches:
+                    if len(str(match)) > 3:
+                        text_instances = page.search_for(match)
+                        for inst in text_instances:
+                            try:
+                                print(f"HIGHLIGHTING inst {inst} in document {doc}")
+                                page.add_highlight_annot(inst)
+                            except Exception as e:
+                                handle_error_no_return("Could not highlight text instance, encountered error: ", e)
+                                continue
+
             except Exception as e:
                 handle_error_no_return("Error loading page or searching for text to highlight, encountered error: ", e)
                 continue
             
-            for inst in text_instances:
-                try:
-                    print("HIGHLIGHTING", inst)
-                    page.add_highlight_annot(inst)
-                except Exception as e:
-                    handle_error_no_return("Could not highlight text instance, encountered error: ", e)
-                    continue
-        
         try:
             highlight_doc.save(output_pdf_path, garbage=0, deflate=False, clean=False)
         except Exception as e:
@@ -1379,7 +1424,7 @@ def highlight_text_on_page(highlight_list, stream_session_id):
 
 def whoosh_text_in_pdf_and_highlight(reference_pages, stream_session_id):
 
-    print("Searching Index")
+    print("Searching Whoosh Index")
 
     try:
         read_return = read_config(['index_dir'])
@@ -1389,6 +1434,7 @@ def whoosh_text_in_pdf_and_highlight(reference_pages, stream_session_id):
 
     user_should_refer_pages_in_doc = {}
     docs_have_relevant_info = False
+    min_search_string_word_count = 5
 
     highlight_list = {}
 
@@ -1398,11 +1444,12 @@ def whoosh_text_in_pdf_and_highlight(reference_pages, stream_session_id):
 
         # Create a 'searcher' object
         with ix.searcher() as searcher:
-            query_parser = QueryParser("content", ix.schema)
+            query_parser = QueryParser("content", ix.schema, group=OrGroup)
 
             for doc in reference_pages:
                 
                 source_filename = os.path.basename(doc)
+                print(f"\nsource_filename basename: {source_filename}\n")
                 output_file_extension = "_" + stream_session_id + '.pdf'
                 output_file_name = source_filename.replace(".pdf",output_file_extension) 
                 page_numbers = []
@@ -1411,26 +1458,27 @@ def whoosh_text_in_pdf_and_highlight(reference_pages, stream_session_id):
                 for search_string in reference_pages[doc]:
 
                     # Only search for non-empty search strings
-                    if search_string:
-
-                        query = query_parser.parse(search_string)
-
+                    if search_string and len(str(search_string).split()) >= min_search_string_word_count:
+                        query = query_parser.parse(str(search_string).lower())
                         results = searcher.search(query)
 
                         for hit in results:
-                            print(f"\n\nFound in {hit['title']} on page {hit['pagenumber']}")
-                            page_numbers.append(int(hit['pagenumber']))
-                            docs_have_relevant_info = True
-                            
-                            highlight_target = [hit['pagenumber'], search_string]
-                            highlight_strings.append(highlight_target)
+                            if source_filename in str(hit['title']):    # Whoosh hits can occur on all titles in the index, ensure it's actually present in the current similarity_search result
+                                print(f"Whoosh search positive hit in title {hit['title']} on page {hit['pagenumber']}")
+                                page_numbers.append(int(hit['pagenumber']))
+                                docs_have_relevant_info = True
+                                
+                                highlight_target = [hit['pagenumber'], search_string]
+                                highlight_strings.append(highlight_target)
 
-                page_numbers = set(page_numbers)
-                user_should_refer_pages_in_doc[output_file_name] = page_numbers
+                if len(page_numbers) > 0:
+                    page_numbers = set(page_numbers)
+                    user_should_refer_pages_in_doc[output_file_name] = page_numbers
 
-                highlight_strings_set = set(tuple(inner_list) for inner_list in highlight_strings)  # Because using a set directly on a list of lists won't work because lists are mutable and cannot be hashed, which is a requirement for the elements of a set. 
-                highlight_strings = [list(inner_tuple) for inner_tuple in highlight_strings_set]
-                highlight_list[source_filename] = highlight_strings
+                if len(highlight_strings) > 0:
+                    highlight_strings_set = set(tuple(inner_list) for inner_list in highlight_strings)  # Because using a set directly on a list of lists won't work because lists are mutable and cannot be hashed, which is a requirement for the elements of a set. 
+                    highlight_strings = [list(inner_tuple) for inner_tuple in highlight_strings_set]
+                    highlight_list[source_filename] = highlight_strings
 
     except Exception as e:
         handle_error_no_return("Could not search Whoosh Index, encountered error: ", e)
@@ -1748,7 +1796,7 @@ def fetch_file_list_from_google_drive():
         results = (
             service.files().list(
                 q="trashed=false",
-                pageSize=20,
+                pageSize=1000,
                 fields="nextPageToken, files(id, name, mimeType, version)"
             ).execute()
         )
@@ -1768,14 +1816,179 @@ def fetch_file_list_from_google_drive():
                 gdrive_files.append({
                     'name': item['name'],
                     'id': item['id'],
+                    'mimeType': item['mimeType'],
                     'version': item['version'],
                     'type': category
                 })
 
     except Exception as e:
-        handle_api_error("Could not fetch GDrive files, encountered error: ", e)
+        return handle_api_error("Could not fetch GDrive files, encountered error: ", e)
     
     return jsonify({'success': True, 'gdrive_files': gdrive_files})
+
+
+def download_folder(service, folder_id, path, indent=''):
+
+    print(f"\n\nDownloading GoogleDrive Folder with id: {folder_id}\n\n")
+
+    try:
+        if not os.path.exists(path):
+            os.makedirs(path)
+    except Exception as e:
+        return handle_api_error("Server-side error - could not create nested directory in the download_folder() method: ", e)
+
+    query = f"'{folder_id}' in parents"
+    fields = "files(id, name, mimeType)"
+    
+    gdrive_folder_contents = service.files().list(q=query, fields=fields).execute()
+    items = gdrive_folder_contents.get('files', [])
+
+    for item in items:
+        file_id = item['id']
+        filename = item['name']
+        mime_type = item['mimeType']
+        print(f"folder item mime_type f{mime_type}")
+
+        if "folder" in str(mime_type):
+            sub_folder_path = os.path.join(path, filename)    # in this case, filename will be the folder name
+
+            try:
+                download_folder(service, file_id, sub_folder_path)  # in this case, file_or_folder_id will be the folder id
+            except Exception as e:
+                return handle_api_error("Could not download_folder in the download_folder() method, encountered error: ", e)
+        else:
+            try:
+                filename_with_extension, file_content = download_gdrive_file(service, file_id, filename, mime_type)
+            except Exception as e:
+                return handle_api_error("Server-side error - could not get_file_content in the download_folder() method: ", e)
+
+            try:
+                # filepath = os.path.join(path, secure_filename(filename_with_extension))
+                filepath = os.path.join(app.config['UPLOAD_FOLDER'], secure_filename(filename_with_extension))
+                print(f"Saving {filename_with_extension} to {filepath}")
+                with open(filepath, 'wb') as f:
+                    f.write(file_content)
+
+                try:
+                    vector_embed_filepath(filename_with_extension, filepath)
+                except Exception as e:
+                    return handle_api_error("Could not vector_embed_filepath() in the download_folder() method, encountered error: ", e)
+
+            except Exception as e:
+                return handle_api_error("Server-side error - could not save Google Drive file in the download_folder() method: ", e)
+
+    return True
+
+
+def download_gdrive_file(service, file_id, filename, mime_type):
+
+    print(f"\n\nDownloading GoogleDrive File with mime_type: {mime_type}\n\n")
+
+    file_mime_category = categorize_mimetype(mime_type)
+
+    filename_with_extension = filename
+
+    try:
+        if file_mime_category in ["word", "excel", "presentation"]:
+            # Handle Google Docs Editors files
+            if 'google-apps' in mime_type:
+                if file_mime_category == "word":
+                    export_mime_type = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+                    file_extension = '.docx'
+                elif file_mime_category == "excel":
+                    export_mime_type = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                    file_extension = '.xlsx'
+                elif file_mime_category == "presentation":
+                    export_mime_type = 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+                    file_extension = '.pptx'
+                
+                print(f"Downloading google-apps file with mimeType {file_mime_category}")
+                gdrive_request = service.files().export_media(fileId=file_id, mimeType=export_mime_type)
+                if not filename.endswith(file_extension):
+                    filename_with_extension += file_extension
+            
+            else:
+                # For non-Google formats, use get_media
+                print(f"Downloading office file with non google-apps mimeType {file_mime_category}")
+                gdrive_request = service.files().get_media(fileId=file_id)
+        else:
+            print(f"Downloading non-office file with mimeType {file_mime_category}")
+            gdrive_request = service.files().get_media(fileId=file_id)
+        
+        file = io.BytesIO()
+        downloader = MediaIoBaseDownload(file, gdrive_request)
+        
+        done = False
+        while done is False:
+            status, done = downloader.next_chunk()
+            print(f"Download {int(status.progress() * 100)}%.")
+    
+    except Exception as e:
+        return handle_api_error("Error downloading file from Google Drive in the download_gdrive_file() method: ", e)
+    
+    try:
+        file_content = file.getvalue()
+    except Exception as e:
+        return handle_api_error("Server-side error - could not getValue() for downloaded Google Drive file  in the download_gdrive_file() method: ", e)
+
+    return filename_with_extension, file_content
+
+
+def gdrive_downloader(service, file_or_folder_id, filename, mime_type, path=app.config['UPLOAD_FOLDER']):
+    file_mime_category = categorize_mimetype(mime_type)
+
+    if file_mime_category == "folder":
+        download_path = os.path.join(path, secure_filename(filename))    # in this case, filename will be the folder name
+        download_folder(service, file_or_folder_id, download_path)
+        return filename, None    # Return None for file_content as it's a folder
+    else:
+        filename_with_extension, file_content = download_gdrive_file(service, file_or_folder_id, filename, mime_type)
+        return filename_with_extension, file_content
+
+
+@app.route('/google_drive_loader', methods=['POST'])
+def google_drive_loader():
+
+    try:
+        gdrive_file_id = str(request.form['file_id'])
+        gdrive_file_mimeType = str(request.form['file_mimeType'])
+    except Exception as e:
+        return handle_api_error("Server-side error reading Google Drive file details for download in the google_drive_loader() method: ", e)
+    
+    try:
+        service = build("drive", "v3", credentials=GDRIVE_CREDS)
+    except Exception as e:
+        return handle_api_error("Could not create Google service handler in the google_drive_loader() method, check credentials and re-try: ", e)
+
+    try:
+        file_metadata = service.files().get(fileId=gdrive_file_id, fields='name, mimeType').execute()
+        original_filename = file_metadata.get('name', 'untitled')
+        mime_type = file_metadata.get('mimeType', gdrive_file_mimeType)
+    except Exception as e:
+        return handle_api_error("Could not read GoogleDrive file metadata in the google_drive_loader() method, encountered error: ", e)
+    
+    try:
+        filename_with_extension, file_content = gdrive_downloader(service, gdrive_file_id, original_filename, mime_type)
+    except Exception as e:
+        return handle_api_error("Server-side error - could not getValue() for downloaded Google Drive file in the google_drive_loader() method: ", e)
+
+    if file_content is not None:
+        try:
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], secure_filename(filename_with_extension))
+
+            print(f"Saving {filename_with_extension} to {filepath}")
+            with open(filepath, 'wb') as f:
+                f.write(file_content)
+
+            try:
+                vector_embed_filepath(filename_with_extension, filepath)
+            except Exception as e:
+                return handle_api_error("Could not vector_embed_filepath() in the google_drive_loader() method, encountered error: ", e)
+
+        except Exception as e:
+            return handle_api_error("Server-side error - could not save file downloaded from Google Drive in the google_drive_loader() method: ", e)
+    
+    return jsonify({'success': True})
 
 
 # Route for loading all models from model dir
@@ -1786,12 +1999,12 @@ def load_local_models():
         read_return = read_config(['model_dir'])
         model_dir = read_return['model_dir']
     except Exception as e:
-        handle_api_error("Missing model_dir in config.json for method load_local_models. Error: ", e)
+        return handle_api_error("Missing model_dir in config.json for method load_local_models. Error: ", e)
     
     try:
         models = [f for f in os.listdir(model_dir) if os.path.isfile(os.path.join(model_dir, f))]
     except Exception as e:
-        handle_api_error("Could not load list of local models, encountered error: ", e)
+        return handle_api_error("Could not load list of local models, encountered error: ", e)
         
     #print(f"locally available models: {models}")
     return jsonify({'success': True, 'models': models})
@@ -1804,12 +2017,12 @@ def upload_new_llm():
         read_return = read_config(['model_dir'])
         model_dir = read_return['model_dir']
     except Exception as e:
-        handle_api_error("Could not determine model_dir in upload_new_llm. Error: ", e)
+        return handle_api_error("Could not determine model_dir in upload_new_llm. Error: ", e)
 
     try:
         input_file = request.files['file']
     except Exception as e:
-        handle_api_error("Server-side error recieving LLM file: ", e)
+        return handle_api_error("Server-side error recieving LLM file: ", e)
 
     # Ensure the filename is secure
     filename = secure_filename(input_file.filename)
@@ -1823,7 +2036,7 @@ def upload_new_llm():
         # Save the uploaded file to the specified path
         input_file.save(filepath)
     except Exception as e:
-        handle_api_error("Failed to save LLM to model_dir, encountered error: ", e)
+        return handle_api_error("Failed to save LLM to model_dir, encountered error: ", e)
 
     return jsonify(success=True)
 
@@ -1866,7 +2079,7 @@ def process_model():
                 model_name=model_name, model_kwargs=model_kwargs, encode_kwargs=encode_kwargs
             )
     except Exception as e:
-        handle_api_error("Could not load BGE embeddings in process_model, encountered error: ", e)
+        return handle_api_error("Could not load BGE embeddings in process_model, encountered error: ", e)
     
     try:
         write_config(config_update_dict)
@@ -1885,88 +2098,7 @@ def convert_to_pdf_with_unoconv(input_file_path, output_file_path):
         subprocess.run(['unoconv', '-f', 'pdf', '-o', output_file_path, input_file_path], check=True)
 
 
-# Route to handle the submission of the second form (file loading)
-@app.route('/process_new_file', methods=['POST'])
-def process_new_file():
-
-    use_ocr = False
-    try:
-        read_return = read_config(['use_ocr', 'ocr_service_choice'])
-        use_ocr = read_return['use_ocr']
-        ocr_service_choice = read_return['ocr_service_choice']
-    except Exception as e:
-        handle_api_error("Could not determine use_ocr in config.json for process_new_file. Disabling OCR and proceeding. Error: ", e)
-
-    try:
-        input_file = request.files['file']
-    except Exception as e:
-        handle_api_error("Server-side error recieving file: ", e)
-
-    # Ensure the filename is secure
-    filename = secure_filename(input_file.filename)
-    if "PDF" in filename:
-        filename = filename.replace("PDF", "pdf")
-
-    try:
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-
-        print("Loading new file - filename: ", filename)
-        print("Loading new file - filepath: ", filepath)
-
-        # Save the uploaded file to the specified path
-        input_file.save(filepath)
-    except Exception as e:
-        handle_api_error("Failed to save document to app folder, encountered error: ", e)
-
-    if not filename.lower().endswith('.pdf'):
-        try:
-            conv_filename = os.path.splitext(filename)[0] + '.pdf'
-            conv_filepath = os.path.join(app.config['UPLOAD_FOLDER'], conv_filename)
-
-            convert_to_pdf_with_unoconv(filepath, conv_filepath)
-
-            filepath = conv_filepath
-        except subprocess.CalledProcessError as e:
-            handle_api_error("Could not convert file to PDF, encountered error: ", e)
-        except Exception as e:
-            handle_api_error("Unexpected error when converting file to PDF, encountered error: ", e)
-
-    print("Processing PDF file")
-    
-    if use_ocr:
-        try:
-            if ocr_service_choice == 'AzureVision':
-                input_file = PDFtoAzureOCRTXT(filepath)
-            elif ocr_service_choice == 'AzureDocAi':
-                input_file = PDFtoAzureDocAiTXT(filepath)
-        except Exception as e:
-            handle_error_no_return("Failed to OCR text from PDF. Will now attempt to extract text via PyPDF2. Encountered error: ", e)
-            try:
-                input_file = PDFtoTXT(filepath)
-            except Exception as e:
-                handle_api_error("Failed to extract text from the PDF document, even via fallback PyPDF2, encountered error: ", e)
-    else:
-        try:
-            input_file = PDFtoTXT(filepath)
-        except Exception as e:
-            handle_api_error("Failed to extract text from the PDF document, even via fallback PyPDF2, encountered error: ", e)
-    
-    try:
-        images = extract_images_from_pdf(filepath)
-    except Exception as e:
-        handle_error_no_return("Failed to extract images from the PDF document, encountered error: ", e)
-
-    try:
-        store_images_to_db(images)
-    except Exception as e:
-        handle_error_no_return("Failed to save images to database, encountered error: ", e)
-    
-    try:
-        chunk_size, chunk_overlap = LoadNewDocument(input_file)
-    except Exception as e:
-        handle_api_error("Failed to extract text from PDF: ", e)
-    
-
+def reload_vector_store():
     global VECTOR_STORE
     print("\nRe-Loading VectorDB: ChromaDB")
 
@@ -1984,7 +2116,7 @@ def process_new_file():
         vectordb_bge_large_folder = read_return['vectordb_bge_large_folder']
         embedding_model_choice = read_return['embedding_model_choice']
     except Exception as e:
-        handle_api_error("Missing values in config.json when reloading VectorDB, could not fully complete process_new_file. Please try restarting the application. Error: ", e)
+        handle_local_error("Missing values in config.json when reloading VectorDB, could not fully complete process_new_file. Please try restarting the application. Error: ", e)
 
     try:
         if use_sbert_embeddings:
@@ -2000,12 +2132,118 @@ def process_new_file():
             VECTOR_STORE = Chroma(persist_directory=vectordb_bge_large_folder, embedding_function=HF_BGE_EMBEDDINGS)
             vectordb_used = vectordb_bge_large_folder
     except Exception as e:
-        handle_api_error("Could not reload VectorDB when trying to process_new_file. Please try restarting the application. Error: ", e)
+        handle_local_error("Could not reload VectorDB when trying to process_new_file. Please try restarting the application. Error: ", e)
+    
+    return embedding_model_choice, vectordb_used
+
+
+def convert_non_pdf_to_pdf_with_unoconv(filename, filepath):
+    print("Converting to PDF file")
+
+    try:
+        conv_filename = os.path.splitext(filename)[0] + '.pdf'
+        conv_filepath = os.path.join(app.config['UPLOAD_FOLDER'], conv_filename)
+
+        convert_to_pdf_with_unoconv(filepath, conv_filepath)
+
+        return conv_filename, conv_filepath
+    except subprocess.CalledProcessError as e:
+        return handle_api_error("Could not convert file to PDF, encountered error: ", e)
+    except Exception as e:
+        return handle_api_error("Unexpected error when converting file to PDF, encountered error: ", e)
+
+
+def vector_embed_filepath(filename, filepath):
+    print("Vector Embedding Document")
+
+    if not filename.lower().endswith('.pdf'):
+        _, filepath = convert_non_pdf_to_pdf_with_unoconv(filename, filepath)
+
+    use_ocr = False
+    try:
+        read_return = read_config(['use_ocr', 'ocr_service_choice'])
+        use_ocr = read_return['use_ocr']
+        ocr_service_choice = read_return['ocr_service_choice']
+    except Exception as e:
+        handle_local_error("Could not determine use_ocr in config.json for process_new_file. Disabling OCR and proceeding. Error: ", e)
+    
+    print("Processing PDF file")
+    
+    if use_ocr:
+        try:
+            if ocr_service_choice == 'AzureVision':
+                input_file = PDFtoAzureOCRTXT(filepath)
+            elif ocr_service_choice == 'AzureDocAi':
+                input_file = PDFtoAzureDocAiTXT(filepath)
+        except Exception as e:
+            handle_error_no_return("Failed to OCR text from PDF. Will now attempt to extract text via PyPDF2. Encountered error: ", e)
+            try:
+                input_file = PDFtoTXT(filepath)
+            except Exception as e:
+                handle_local_error("Failed to extract text from the PDF document, even via fallback PyPDF2, encountered error: ", e)
+    else:
+        try:
+            input_file = PDFtoTXT(filepath)
+        except Exception as e:
+            handle_local_error("Failed to extract text from the PDF document, even via fallback PyPDF2, encountered error: ", e)
+    
+    try:
+        images = extract_images_from_pdf(filepath)
+    except Exception as e:
+        handle_error_no_return("Failed to extract images from the PDF document, encountered error: ", e)
+
+    try:
+        store_images_to_db(images)
+    except Exception as e:
+        handle_error_no_return("Failed to save images to database, encountered error: ", e)
+    
+    try:
+        chunk_size, chunk_overlap = LoadNewDocument(input_file)
+    except Exception as e:
+        handle_local_error("Failed to extract text from PDF: ", e)
+    
+    try:
+        embedding_model_choice, vectordb_used = reload_vector_store()
+    except Exception as e:
+        handle_local_error("Could not reload vector store when attempting to vector_embed_filepath(), encountered error: ", e)
 
     try:
         record_doc_loaded_to_db(filename, embedding_model_choice, vectordb_used, chunk_size, chunk_overlap)
     except Exception as e:
         handle_error_no_return("Unable to record document loading to records DB, encountered error: ", e)
+
+    return True
+
+
+# Route to handle the submission of the second form (file loading)
+@app.route('/process_new_file', methods=['POST'])
+def process_new_file():
+
+    try:
+        input_file = request.files['file']
+    except Exception as e:
+        return handle_api_error("Server-side error recieving file: ", e)
+
+    # Ensure the filename is secure
+    filename = secure_filename(input_file.filename)
+    if "PDF" in filename:
+        filename = filename.replace("PDF", "pdf")
+
+    try:
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+
+        print("Loading new file - filename: ", filename)
+        print("Loading new file - filepath: ", filepath)
+
+        # Save the uploaded file to the specified path
+        input_file.save(filepath)
+    except Exception as e:
+        return handle_api_error("Failed to save document to app folder, encountered error: ", e)
+
+    try:
+        vector_embed_filepath(filename, filepath)
+    except Exception as e:
+        return handle_api_error("Could not vector_embed_filepath() in the process_new_file() method, encountered error: ", e)
 
     return jsonify(success=True)
 
@@ -2028,7 +2266,7 @@ def store_user_rating():
         chat_id_for_rating = request.form['chat_id']
         sequence_id_for_rating = request.form['sequence_id']
     except Exception as e:
-        handle_api_error("Server-side error, could not read user rating or failed to obtain chat/sequence ID, encountered error: ", e)
+        return handle_api_error("Server-side error, could not read user rating or failed to obtain chat/sequence ID, encountered error: ", e)
 
     # print("user_rating: ", user_rating)
     # print("chat_id_for_rating: ", chat_id_for_rating)
@@ -2038,7 +2276,7 @@ def store_user_rating():
         conn = sqlite3.connect(sqlite_history_db)
         cursor = conn.cursor()
     except Exception as e:
-        handle_api_error("Could not connect to chat history DB for storage of user-rating, encountered error: ", e)
+        return handle_api_error("Could not connect to chat history DB for storage of user-rating, encountered error: ", e)
 
     try:
         cursor.execute(
@@ -2051,7 +2289,7 @@ def store_user_rating():
         )
         conn.commit()
     except Exception as e:
-        handle_api_error("Could not store user-rating to chat history db, encountered error: ", e)
+        return handle_api_error("Could not store user-rating to chat history db, encountered error: ", e)
 
     conn.close()
 
@@ -2165,13 +2403,13 @@ def llama_cpp_server_starter():
                 LLAMA_CPP_PROCESS = None
             except Exception as e:
                 LLM_LOADED_UP = True
-                handle_api_error("Failed to terminate running llama.cpp process, server was likely launched by a previous session. Retruning with the currently loaded LLM. To change, shutdown the previously launched server manually and reload this page. Technical error-details follow: ", e)
+                handle_error_no_return("Failed to terminate running llama.cpp process, server was likely launched by a previous session. Retruning with the currently loaded LLM. To change, shutdown the previously launched server manually and reload this page. Technical error-details follow: ", e)
                 try:
                     read_return = read_config(['model_choice'])
                     model_choice = read_return['model_choice']
                     return jsonify({'success': True, 'llm_model': model_choice})
                 except Exception as e:
-                    handle_api_error("Missing values in config.json when preparing to launch llama.cpp server, encountered error: ", e)
+                    handle_error_no_return("Missing values in config.json when preparing to launch llama.cpp server, encountered error: ", e)
                 return jsonify({'success': True, 'llm_model': 'undefined'})
                 
                 
@@ -2190,13 +2428,13 @@ def llama_cpp_server_starter():
         server_retry_attempts = read_return['server_retry_attempts']
         use_gpu = read_return['use_gpu']
     except Exception as e:
-        handle_api_error("Missing values in config.json when preparing to launch llama.cpp server, encountered error: ", e)
+        return handle_api_error("Missing values in config.json when preparing to launch llama.cpp server, encountered error: ", e)
 
 
     try:
         cpp_model = os.path.join(model_dir, model_choice)
     except Exception as e:
-        handle_api_error("Could not os.join path to model file to launch llama.cpp server, encountered error: ", e)
+        return handle_api_error("Could not os.join path to model file to launch llama.cpp server, encountered error: ", e)
 
     if not use_gpu:
         local_llm_gpu_layers = 0
@@ -2212,7 +2450,7 @@ def llama_cpp_server_starter():
                 LLAMA_CPP_PROCESS = subprocess.Popen(cpp_app, stdout=f, stderr=subprocess.STDOUT, text=True)    #stdout has already been redirected to the file, so simply direct stderr to stdout!
 
     except Exception as e:
-        handle_api_error("Could not launch llama.cpp process, encountered error: ", e)
+        return handle_api_error("Could not launch llama.cpp process, encountered error: ", e)
 
 
     timeout = server_timeout_seconds   
@@ -2260,7 +2498,7 @@ def load_vectordb():
         vectordb_bge_base_folder = read_return['vectordb_bge_base_folder']
         vectordb_bge_large_folder = read_return['vectordb_bge_large_folder']
     except Exception as e:
-        handle_api_error("Missing values in config.json when attempting to load_vectordb. Error: ", e)
+        return handle_api_error("Missing values in config.json when attempting to load_vectordb. Error: ", e)
     
     
     ### 1 - Load VectorDB from disk
@@ -2286,7 +2524,7 @@ def load_vectordb():
                 azure_openai_api_version = read_return['azure_openai_api_version']
                 azure_openai_text_ada_deployment_name = read_return['azure_openai_text_ada_deployment_name']
             except Exception as e:
-                handle_api_error("Missing values for Azure OpenAI Embeddings in method load_model_and_vectordb in config.json. Error: ", e)
+                return handle_api_error("Missing values for Azure OpenAI Embeddings in method load_model_and_vectordb in config.json. Error: ", e)
             
             try:
                 os.environ["OPENAI_API_BASE"] = azure_openai_text_ada_api_url
@@ -2294,7 +2532,7 @@ def load_vectordb():
                 os.environ["OPENAI_API_TYPE"] = azure_openai_api_type
                 os.environ["OPENAI_API_VERSION"] = azure_openai_api_version
             except Exception as e:
-                handle_api_error("Could not set OS environment variables for Azure OpenAI Embeddings in load_model_and_vectordb, encountered error: ", e)
+                return handle_api_error("Could not set OS environment variables for Azure OpenAI Embeddings in load_model_and_vectordb, encountered error: ", e)
 
             
             AZURE_OPENAI_EMBEDDINGS = OpenAIEmbeddings(deployment=azure_openai_text_ada_deployment_name)
@@ -2329,7 +2567,7 @@ def load_vectordb():
         
         #VECTOR_STORE = Chroma(persist_directory=VECTORDB_SBERT_FOLDER, embedding_function=HuggingFaceEmbeddings())
     except Exception as e:
-        handle_api_error("Could not load VectorDB, encountered error: ", e)
+        return handle_api_error("Could not load VectorDB, encountered error: ", e)
     
     VECTORDB_LOADED_UP = True
     return jsonify(success=True)
@@ -2343,12 +2581,12 @@ def set_prompt_template():
     try:
         base_template = request.form['prompt_template']
     except Exception as e:
-        handle_api_error("Server-side error, could not read prompt_template from the POST request in method set_prompt_template, encountered error: ", e)
+        return handle_api_error("Server-side error, could not read prompt_template from the POST request in method set_prompt_template, encountered error: ", e)
     
     try:
         write_config({'base_template':base_template})
     except Exception as e:
-        handle_api_error("Could not update base_template in method set_prompt_template, encountered error: ", e)
+        return handle_api_error("Could not update base_template in method set_prompt_template, encountered error: ", e)
 
     return jsonify({'success':True})
 
@@ -2361,7 +2599,7 @@ def fetch_file_list_for_vector_db():
     try:
         selected_embedding_model_choice = request.form['embedding_model_choice']
     except Exception as e:
-        handle_api_error("Server-side error, could not read embedding_model_choice from the POST request in method fetch_file_list_for_vector_db, encountered error: ", e)
+        return handle_api_error("Server-side error, could not read embedding_model_choice from the POST request in method fetch_file_list_for_vector_db, encountered error: ", e)
 
     # For the VectorDB presently picked by the user in the dropdown, obtain the associated VectorDB folder for the select query:
     vdb_for_select = ""
@@ -2383,13 +2621,13 @@ def fetch_file_list_for_vector_db():
             vdb_for_select = read_return['vectordb_openai_folder']
 
     except Exception as e:
-        handle_api_error("Could not create new VectorDB in reset_vector_db_on_disk, encountered error: ", e)
+        return handle_api_error("Could not create new VectorDB in reset_vector_db_on_disk, encountered error: ", e)
 
     try:
         read_return = read_config(['sqlite_docs_loaded_db'])
         sqlite_docs_loaded_db = read_return['sqlite_docs_loaded_db']
     except Exception as e:
-        handle_api_error("Missing sqlite_docs_loaded_db in config.json in method fetch_file_list_for_vector_db. Error: ", e)
+        return handle_api_error("Missing sqlite_docs_loaded_db in config.json in method fetch_file_list_for_vector_db. Error: ", e)
 
     file_row_list = []
     
@@ -2397,12 +2635,12 @@ def fetch_file_list_for_vector_db():
         conn = sqlite3.connect(sqlite_docs_loaded_db)
         c = conn.cursor()
     except Exception as e:
-        handle_api_error("Could not connect to sqlite_docs_loaded_db database to load file list, encountered error: ", e)
+        return handle_api_error("Could not connect to sqlite_docs_loaded_db database to load file list, encountered error: ", e)
 
     try:
         c.execute("SELECT document_name, vectordb_used, chunk_size, chunk_overlap FROM document_records where vectordb_used = ?", (vdb_for_select,))
     except Exception as e:
-        handle_api_error("Could not get document list from document_records db, encountered error: ", e)
+        return handle_api_error("Could not get document list from document_records db, encountered error: ", e)
     
     try:
         result = c.fetchall()
@@ -2410,7 +2648,7 @@ def fetch_file_list_for_vector_db():
         for list_item in result:
             file_row_list.append(list(list_item))
     except Exception as e:
-        handle_api_error("Could not parse document list from document_records db, encountered error: ", e)
+        return handle_api_error("Could not parse document list from document_records db, encountered error: ", e)
 
     #print(f'returning docs loaded list: {file_row_list}')
 
@@ -2425,7 +2663,7 @@ def reset_vector_db_on_disk():
     try:
         selected_embedding_model_choice = request.form['embedding_model_choice']
     except Exception as e:
-        handle_api_error("Server-side error, could not read embedding_model_choice from the POST request in method reset_vector_db_on_disk, encountered error: ", e)
+        return handle_api_error("Server-side error, could not read embedding_model_choice from the POST request in method reset_vector_db_on_disk, encountered error: ", e)
 
     try:
         read_return = read_config(['base_directory'])
@@ -2437,7 +2675,7 @@ def reset_vector_db_on_disk():
         current_datetime = datetime.datetime.now()
         formatted_datetime = current_datetime.strftime('%Y-%m-%d-%Hhr-%Mmin-%Ssec')
     except Exception as e:
-        handle_api_error("Could not obtain timestamp in reset_vector_db_on_disk, encountered error: ", e)
+        return handle_api_error("Could not obtain timestamp in reset_vector_db_on_disk, encountered error: ", e)
 
     # Now that we have all pre-requisite data to create a new VectorDB, proceed to do so by checking the model the user had currently picked from the dropdown: 
     try:
@@ -2450,7 +2688,7 @@ def reset_vector_db_on_disk():
             write_config({'vectordb_bge_base_folder':vectordb_bge_base_folder})
 
         elif selected_embedding_model_choice == 'sbert_mpnet_base_v2':
-            vectordb_sbert_folder = base_directory + '/chroma_db_250_sbert_embeddings' + '-' + formatted_datetime
+            vectordb_sbert_folder = base_directory + '/chroma_db_sbert_embeddings' + '-' + formatted_datetime
             write_config({'vectordb_sbert_folder':vectordb_sbert_folder})
 
         elif selected_embedding_model_choice == 'openai_text_ada':
@@ -2458,7 +2696,7 @@ def reset_vector_db_on_disk():
             write_config({'vectordb_openai_folder':vectordb_openai_folder})
 
     except Exception as e:
-        handle_api_error("Could not create new VectorDB in reset_vector_db_on_disk, encountered error: ", e)
+        return handle_api_error("Could not create new VectorDB in reset_vector_db_on_disk, encountered error: ", e)
 
     restart_required = True
     global VECTORDB_CHANGE_RELOAD_TRIGGER_SET
@@ -2486,7 +2724,7 @@ def load_chat_history_list():
         read_return = read_config(['sqlite_history_db'])
         sqlite_history_db = read_return['sqlite_history_db']
     except Exception as e:
-        handle_api_error("Missing sqlite_history_db in config.json in method load_chat_history_list. Error: ", e)
+        return handle_api_error("Missing sqlite_history_db in config.json in method load_chat_history_list. Error: ", e)
 
     history_id_list = []
     
@@ -2494,12 +2732,12 @@ def load_chat_history_list():
         conn = sqlite3.connect(sqlite_history_db)
         c = conn.cursor()
     except Exception as e:
-        handle_api_error("Could not connect to sqlite_history_db database to load chat history list, encountered error: ", e)
+        return handle_api_error("Could not connect to sqlite_history_db database to load chat history list, encountered error: ", e)
 
     try:
         c.execute("SELECT DISTINCT chat_id FROM chat_history")
     except Exception as e:
-        handle_api_error("Could not get list from chat history db, encountered error: ", e)
+        return handle_api_error("Could not get list from chat history db, encountered error: ", e)
     
     try:
         result = c.fetchall()
@@ -2507,7 +2745,7 @@ def load_chat_history_list():
         for list_item in result:
             history_id_list.append(list_item)
     except Exception as e:
-        handle_api_error("Could not parse chat history list from db, encountered error: ", e)
+        return handle_api_error("Could not parse chat history list from db, encountered error: ", e)
 
     #print(f'returning chat hsitory list: {history_id_list}')
 
@@ -2542,13 +2780,13 @@ def load_chat_history():
         chat_id_for_history_search = request.form['chat_id']
         CHAT_ID = request.form['chat_id']
     except Exception as e:
-        handle_api_error("Could not retrieve Chat ID from request form, encountered error: ", e)
+        return handle_api_error("Could not retrieve Chat ID from request form, encountered error: ", e)
 
     try:
         conn = sqlite3.connect(sqlite_history_db)
         c = conn.cursor()
     except Exception as e:
-        handle_api_error("Could not connect to chat history database, encountered error: ", e)
+        return handle_api_error("Could not connect to chat history database, encountered error: ", e)
 
     sequence_id_for_history_search = 1
     retrieve_history = True
@@ -2580,7 +2818,7 @@ def load_chat_history():
             llm_response = '<div class="response-and-viewer-container"><div class="llm-wrapper"> <div class="llm-response">' + result_parts[0]
 
         except Exception as e:
-            handle_api_error("Could not retrieve chat history, encountered error: ", e)
+            return handle_api_error("Could not retrieve chat history, encountered error: ", e)
         
         llm_response = llm_response.strip('\n')
         llm_response = llm_response.replace('\n\n', '<br><br>')
@@ -2641,7 +2879,7 @@ def load_chat_history():
             c.execute("SELECT EXISTS(SELECT 1 FROM chat_history WHERE chat_id = ? AND sequence_id = ?)", (int(chat_id_for_history_search), int(sequence_id_for_history_search)))
             exists = c.fetchone()[0]
         except Exception as e:
-            handle_api_error("Could not determine if next sequence exists in chat history DB, encountered error: ", e)
+            return handle_api_error("Could not determine if next sequence exists in chat history DB, encountered error: ", e)
             
         if not exists:
             SEQUENCE_ID = sequence_id_for_history_search - 1
@@ -2688,14 +2926,14 @@ def init_chat_history_db():
         read_return = read_config(['sqlite_history_db'])
         sqlite_history_db = read_return['sqlite_history_db']
     except Exception as e:
-        handle_api_error("Missing sqlite_history_db in config.json in method init_chat_history_db. Error: ", e)
+        return handle_api_error("Missing sqlite_history_db in config.json in method init_chat_history_db. Error: ", e)
 
     # Connect to chat_history.db to determine appropriate chat_id
     try:
         conn = sqlite3.connect(sqlite_history_db)
         c = conn.cursor()
     except Exception as e:
-        handle_api_error("Could not connect to chat history database, encountered error: ", e)
+        return handle_api_error("Could not connect to chat history database, encountered error: ", e)
 
     # If the database does not currently exist...
     try:
@@ -2714,7 +2952,7 @@ def init_chat_history_db():
         ''')
         conn.commit()
     except Exception as e:
-        handle_api_error("Could not create new chat history db, encountered error: ", e)
+        return handle_api_error("Could not create new chat history db, encountered error: ", e)
 
     try:
         c.execute("SELECT COALESCE(MAX(chat_id), 0) FROM chat_history")
@@ -2731,7 +2969,7 @@ def init_chat_history_db():
 
         print(f"Chat history DB initialised with CHAT_ID: {CHAT_ID}")
     except Exception as e:
-        handle_api_error("Could not set CHAT_ID, encountered error: ", e)
+        return handle_api_error("Could not set CHAT_ID, encountered error: ", e)
 
     conn.close()
 
@@ -2800,6 +3038,7 @@ def extract_significant_phrases(query):
     except Exception as e:
         handle_local_error("Could not extract significant tokens, encountered error: ", e)
 
+    print(f"\nReturning tokens: {tokens}\n")
     return tokens
 
 
@@ -2869,6 +3108,7 @@ def setup_for_llama_cpp_response():
     global QUERIES
 
     do_rag = True
+    similarity_threshold = 0.8
 
     stream_session_id = ""
     key_for_vector_results = ""
@@ -2878,7 +3118,7 @@ def setup_for_llama_cpp_response():
         stream_session_id = str(uuid.uuid4())
         key_for_vector_results = "VectorDocsforQueryID_" + stream_session_id
     except Exception as e:
-        handle_api_error("Error creating unique stream_session_id when attempting to setup_for_streaming_response. Error: ", e)
+        return handle_api_error("Error creating unique stream_session_id when attempting to setup_for_streaming_response. Error: ", e)
     
 
     # Determine do_rag
@@ -2894,7 +3134,7 @@ def setup_for_llama_cpp_response():
         base_template = read_return['base_template']
 
     except Exception as e:
-        handle_api_error("Missing values in config.json when attempting to setup_for_streaming_response. Error: ", e)
+        return handle_api_error("Missing values in config.json when attempting to setup_for_streaming_response. Error: ", e)
 
     try:
         # Attempt to get query data
@@ -2904,7 +3144,7 @@ def setup_for_llama_cpp_response():
         # Store the query associated with the ID
         QUERIES[stream_session_id] = user_query
     except KeyError:
-        handle_api_error("Could not obtain and/or store user_query in setup_for_streaming_response, encountered error: ", e)
+        return handle_api_error("Could not obtain and/or store user_query in setup_for_streaming_response, encountered error: ", e)
 
     print("chat_id: ", chat_id)
 
@@ -2924,21 +3164,25 @@ def setup_for_llama_cpp_response():
         handle_error_no_return("Could not set embedding_function for similarity_search when attempting to setup_for_streaming_response, encountered error: ", e)
     
     try:
-        docs = VECTOR_STORE.similarity_search(user_query, embedding_fn=embedding_function)
+        # docs = VECTOR_STORE.similarity_search(user_query, embedding_fn=embedding_function)
         # docs_with_relevance_score = VECTOR_STORE.similarity_search_with_relevance_scores(user_query, 10, embedding_fn=embedding_function)
-        # docs_list_with_cosine_distance = VECTOR_STORE.similarity_search_with_score(user_query, 10, embedding_fn=embedding_function)
+        docs_list_with_cosine_distance = VECTOR_STORE.similarity_search_with_score(user_query, 5, embedding_fn=embedding_function)
         # print(f'\n\nsimple similarity search results: \n {docs}\n\n')
         # print(f'\n\nRelevance Score similarity search results (range 0 to 1): \n {docs_with_relevance_score}\n\n')
         # print(f'\n\nDocs list most similar to query based on cosine distance: \n {docs_list_with_cosine_distance}\n\n')
     except Exception as e:
         handle_error_no_return("Could not perform similarity_search to determine do_rag when attempting to setup_for_streaming_response, encountered error: ", e)
 
+    docs = [
+        doc for doc, score in docs_list_with_cosine_distance
+        if score >= similarity_threshold
+    ]
+
     print("\n\nDetermining do_rag \n\n")
     # We do not modify the force_enable_rag or force_disable_rag flags in this method, we simply respond to them here. UI updates should handle those flags.
     if force_enable_rag:
         print("\n\nFORCE_ENABLE_RAG True, force enabling RAG and returning\n\n")
         try:
-            page_contents, do_rag = filter_relevant_documents(user_query, docs)
             do_rag = True
         except Exception as e:
             do_rag = False
@@ -2948,7 +3192,7 @@ def setup_for_llama_cpp_response():
         do_rag = False
     else:
         try:
-            page_contents, do_rag = filter_relevant_documents(user_query, docs)
+            _, do_rag = filter_relevant_documents(user_query, docs)
         except Exception as e:
             do_rag = False
             handle_error_no_return("RAG Error, disabling RAG and continuing: could not filter_relevant_documents during setup_for_streaming_response, encountered error: ", e)
@@ -2966,8 +3210,8 @@ def setup_for_llama_cpp_response():
     if do_rag:  # add similarity search results for RAG!
         try:
             QUERIES[key_for_vector_results] = docs
-            user_query += f"\n\nThe following context might be helpful in answering the user query above:\n{page_contents}"
-            print(f"RAG formatted user_query: {user_query}")
+            user_query += f"\n\nThe following context might be helpful in answering the user query above:\n{docs}"
+            print(f"RAG formatted user_query: \n{user_query}\n")
         except Exception as e:
             try:
                 write_config({'do_rag':False})
@@ -3097,7 +3341,7 @@ def get_references():
         upload_folder = read_return['upload_folder']
         local_llm_chat_template_format = read_return['local_llm_chat_template_format']
     except Exception as e:
-        handle_api_error("Missing values in config.json when attempting to get_references. Error: ", e)
+        return handle_api_error("Missing values in config.json when attempting to get_references. Error: ", e)
 
     try:
         stream_session_id = request.json['stream_session_id']
@@ -3107,7 +3351,7 @@ def get_references():
         chat_id = request.json['chat_id']
         sequence_id = request.json['sequence_id']
     except Exception as e:
-        handle_api_error("Could not read request content in method get_references, encountered error: ", e)
+        return handle_api_error("Could not read request content in method get_references, encountered error: ", e)
 
     if local_llm_chat_template_format == 'llama3':
         formatted_user_prompt += f"{llm_response}<|eot_id|>"
@@ -3141,9 +3385,8 @@ def get_references():
     try:
         key_for_vector_results = "VectorDocsforQueryID_" + stream_session_id
         docs = QUERIES[key_for_vector_results]
-        print(f"\n\ntype(docs): {type(docs)}\n\n")
     except Exception as e:
-        handle_api_error("Could not obtain relevant data from QUERIES dict, encountered error: ", e)
+        return handle_api_error("Could not obtain relevant data from QUERIES dict, encountered error: ", e)
 
     # Having obtained the relevant info, clear the QUERIES{} dict so as to not bloat it!
     try:
@@ -3160,24 +3403,20 @@ def get_references():
         
         try:
             relevant_page_text = str(doc.page_content)
-            # relevant_page_text = relevant_page_text.replace('\n', ' ')
             source_filepath = str(doc.metadata.get('source'))
-            #print(relevant_page_text)
-            #print(source_filepath)
         except Exception as e:
             handle_error_no_return("Could not access doc.page_content and/or doc.metadata, encountered error: ", e)
             continue
         
-        relevant_page_text = relevant_page_text.split('\n', 1)[0]
-        relevant_page_text = relevant_page_text.strip()
-        relevant_page_text = re.sub(r'[\W_]+Page \d+[\W_]+', '', relevant_page_text)
-        source_filepath = source_filepath.replace('\\', '/')
+        relevant_page_text = relevant_page_text.replace('\n', ' ')
+
+        # relevant_page_text = relevant_page_text.split('\n', 1)[0]
+        # relevant_page_text = relevant_page_text.strip()
+        # relevant_page_text = re.sub(r'[\W_]+Page \d+[\W_]+', '', relevant_page_text)
         
         try:
             source_filename = os.path.basename(source_filepath)
             _, file_extension = os.path.splitext(source_filepath)
-            #print(source_filename)
-            #print(file_extension)
         except Exception as e:
             handle_error_no_return("Could not parse path with OS lib, encountered error: ", e)
             continue
@@ -3210,6 +3449,7 @@ def get_references():
 
             # Else PDF does not exist, TXT is the source
             else:
+                print("\n\nNo PDF source doc found in the 'uploaded_pdfs' dir, RAG ACTIVE BUT REFERENCING WILL NOT DISPLAY!\n\n")
                 # Check if the TXT is already in the sources dict
                 if source_filename not in all_sources:
                     try:
@@ -3229,11 +3469,9 @@ def get_references():
                 except Exception as e:
                     handle_error_no_return("Could not construct filepath for non-TXT file, encountered error: ", e)
 
-    # print(f"\n\nreference_pages: {reference_pages}\n\n")
 
     try:
         docs_have_relevant_info, user_should_refer_pages_in_doc = whoosh_text_in_pdf_and_highlight(reference_pages, stream_session_id)
-        # docs_have_relevant_info, user_should_refer_pages_in_doc = whoosh_text_in_pdf(reference_pages)
     except Exception as e:
         handle_error_no_return("Could not search Whoosh Index, encountered error: ", e)
 
@@ -3248,7 +3486,7 @@ def get_references():
 
     if docs_have_relevant_info:
 
-        refer_pages_string = "<br><br><h6>Refer to the following pages in the mentioned docs:</h6><br>"
+        refer_pages_string = "<br><br><h6>Refer to the following pages in the mentioned docs:</h6>"
         
         # for doc in user_should_refer_pages_in_doc:
         for index, doc in enumerate(user_should_refer_pages_in_doc, start=1):
@@ -3257,12 +3495,14 @@ def get_references():
             frame_doc_path = f"/pdf/{doc}"
             # frame_doc_path = upload_folder + f"/{doc}" 
             try:
-                refer_pages_string += f"<br><h6>{doc}: "
+                stream_id_string_to_remove = "_" + stream_session_id
+                doc_name_without_stream_id = str(doc).replace(stream_id_string_to_remove, "")
+                refer_pages_string += f"<br><h6>{doc_name_without_stream_id}: "
                 for page in user_should_refer_pages_in_doc[doc]:
                     frame_doc_path += "#page=" + str(page) 
                     refer_pages_string += f'<a href="javascript:void(0)" onclick="goToPage(\'{pdf_iframe_id}\', \'{frame_doc_path}\')">Page {page}</a>, '
                     frame_doc_path = f"/pdf/{doc}"
-                refer_pages_string = refer_pages_string.strip(', ') + "</h6><br>"
+                refer_pages_string = refer_pages_string.strip(', ') + "</h6>"
             except Exception as e:
                 handle_error_no_return("Could not construct refer_pages_string, encountered error: ", e)
 
