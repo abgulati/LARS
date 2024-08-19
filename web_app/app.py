@@ -3486,8 +3486,6 @@ def get_references():
 
     if docs_have_relevant_info:
 
-        # pdf-tabs branch
-
         refer_pages_string = "<br><br><h6>Refer to the following pages in the mentioned docs:</h6>"
         
         for index, doc in enumerate(user_should_refer_pages_in_doc, start=1):
