@@ -1347,7 +1347,6 @@ def find_images_in_db(reference_pages):
 def highlight_text_on_page(highlight_list, stream_session_id):
 
     print("\nHighlighting Document\n")
-    # print(f"\nhighlight_list: {highlight_list}\n")
     threshold = 80
 
     try:
@@ -1364,10 +1363,6 @@ def highlight_text_on_page(highlight_list, stream_session_id):
             output_file_extension = "_" + stream_session_id + '.pdf'
             output_file_name = doc.replace(".pdf",output_file_extension) 
             output_pdf_path = os.path.join(highlighted_pdfs_path, output_file_name).replace("\\","/")
-
-            # print(f"stream_session_id:{stream_session_id}")
-            # print(f"\npdf_path:{pdf_path}")
-
             highlight_doc = fitz.open(pdf_path)
         except Exception as e:
             handle_error_no_return("Could not open doc for highlighting, encountered error: ", e)
@@ -1378,10 +1373,6 @@ def highlight_text_on_page(highlight_list, stream_session_id):
                 text_to_highlight = str(target[1])
                 text_to_highlight = re.sub(r'Row \d+, Column \d+: ', '', text_to_highlight)
                 page_number = int(target[0])
-                
-                # print(f"text_to_highlight: {text_to_highlight}")
-                # print(f"page_number: {page_number}")
-
                 page = highlight_doc.load_page(page_number-1)
                 page_text = page.get_text("text")
 
@@ -1395,8 +1386,6 @@ def highlight_text_on_page(highlight_list, stream_session_id):
                     score = fuzz.partial_ratio(text_to_highlight.lower(), phrase.lower())
                     if score >= threshold:
                         good_matches.append(phrase)
-
-                # print(f"\ngood_matches: {good_matches}\n")
 
                 for match in good_matches:
                     if len(str(match)) > 3:
@@ -3485,6 +3474,8 @@ def get_references():
     images_iframe_html = ""
 
     if docs_have_relevant_info:
+
+        #main branch
 
         refer_pages_string = "<br><br><h6>Refer to the following pages in the mentioned docs:</h6>"
         
