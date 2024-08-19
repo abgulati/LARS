@@ -737,8 +737,39 @@
             }
 
             .pdf-viewer-container {
-                width: 100%;
+                width: 50%;
                 height: 600px;
+            }
+
+            .tab-buttons {
+                overflow: hidden;
+                border: 1px solid #ccc;
+                background-color: #f1f1f1;
+            }
+
+            .tab-button {
+                background-color: inherit;
+                float: left;
+                border: none;
+                outline: none;
+                cursor: pointer;
+                padding: 14px 16px;
+                transition: 0.3s;
+            }
+
+            .tab-button:hover {
+                background-color: #ddd;
+            }
+
+            .tab-button.active {
+                background-color: darkgray;
+            }
+
+            .tab-content {
+                display: none;
+                padding: 6px 12px;
+                border: 1px solid #ccc;
+                border-top: none;
             }
 
         </style>
@@ -1431,6 +1462,26 @@
                 // When calling appendChild on an element that's already part of the DOM, a duplicate will not be created, it'll simply be moved to a new position
                 // This allows us to reverse and reinsert without clearing all nav-items first!
                 
+            }
+
+
+            function openTab(evt, tabName) {
+                var i, tabcontent, tabbuttons;
+                tabcontent = document.getElementsByClassName("tab-content");
+                for (i = 0; i < tabcontent.length; i++) {
+                    tabcontent[i].style.display = "none";
+                }
+                tabbuttons = document.getElementsByClassName("tab-button");
+                for (i = 0; i < tabbuttons.length; i++) {
+                    tabbuttons[i].className = tabbuttons[i].className.replace(" active", "")
+                }
+                document.getElementById(tabName).style.display = "block";
+                
+                // Find the button that opens this tab and add the active class
+                var activeButton = document.querySelector(`button[onclick="openTab(event, '${tabName}')"]`);
+                if (activeButton) {
+                    activeButton.className += " active";
+                }
             }
 
 
@@ -3061,6 +3112,11 @@
                                     `
                                     if (do_rag) {
                                         document.getElementById(masterWrapperID).innerHTML += data.pdf_frame;
+                                        // Open the first tab by default
+                                        var defaultTab = document.getElementById("defaultOpen");
+                                        if (defaultTab) {
+                                            defaultTab.click();
+                                        }
                                     }
                                 } else {
                                     throw new Error('Internal Server Error: Check server-log and server command-line for more details.');
