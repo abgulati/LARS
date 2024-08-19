@@ -736,6 +736,44 @@
                 cursor: grabbing;
             }
 
+            .pdf-viewer-container {
+                width: 50%;
+                height: 600px;
+            }
+
+            .tab-buttons {
+                overflow: hidden;
+                border: 1px solid #3A3E41; /*darkslategray;*/
+                background-color: transparent;
+            }
+
+            .tab-button {
+                background-color: #282828;
+                color: white;
+                float: left;
+                border: 2px solid black;
+                border-radius: 3px;
+                outline: none;
+                cursor: pointer;
+                padding: 14px 16px;
+                transition: 0.3s;
+            }
+
+            .tab-button:hover {
+                background-color: #ddd;
+            }
+
+            .tab-button.active {
+                background-color: white;
+                color: black;
+            }
+
+            .tab-content {
+                display: none;
+                padding: 6px 12px;
+                border: 1px solid #3A3E41; /*darkslategray;*/
+                border-top: none;
+            }
 
         </style>
 
@@ -1427,6 +1465,27 @@
                 // When calling appendChild on an element that's already part of the DOM, a duplicate will not be created, it'll simply be moved to a new position
                 // This allows us to reverse and reinsert without clearing all nav-items first!
                 
+            }
+
+
+            function openTab(evt, tabName) {
+                console.log("Openning clicked tab");
+                var i, tabcontent, tabbuttons;
+                tabcontent = document.getElementsByClassName("tab-content");
+                for (i = 0; i < tabcontent.length; i++) {
+                    tabcontent[i].style.display = "none";
+                }
+                tabbuttons = document.getElementsByClassName("tab-button");
+                for (i = 0; i < tabbuttons.length; i++) {
+                    tabbuttons[i].className = tabbuttons[i].className.replace(" active", "")
+                }
+                document.getElementById(tabName).style.display = "block";
+                
+                // Find the button that opens this tab and add the active class
+                var activeButton = document.querySelector(`button[onclick="openTab(event, '${tabName}')"]`);
+                if (activeButton) {
+                    activeButton.className += " active";
+                }
             }
 
 
@@ -2817,6 +2876,11 @@
                             document.getElementById('chat-area').innerHTML += chat_history_data[i]
                         }
 
+                        var defaultTab = document.getElementById("defaultOpen");
+                        if (defaultTab) {
+                            defaultTab.click();
+                        }
+
                     } else {
                         throw new Error('Internal Server Error: Check server-log and server command-line for more details.');
                     }
@@ -3057,6 +3121,11 @@
                                     `
                                     if (do_rag) {
                                         document.getElementById(masterWrapperID).innerHTML += data.pdf_frame;
+                                        // Open the first tab by default
+                                        var defaultTab = document.getElementById("defaultOpen");
+                                        if (defaultTab) {
+                                            defaultTab.click();
+                                        }
                                     }
                                 } else {
                                     throw new Error('Internal Server Error: Check server-log and server command-line for more details.');
@@ -3247,15 +3316,20 @@
             }
 
 
-            function goToPage(viewerId, src) {
-                // console.log("Viewer ID: ", viewerId);
-                // console.log("src: ", src);
-                // document.getElementById(viewerId).src = src;
-
-                let iframe = document.getElementById(viewerId)
+            function goToPage(iframeId, url) {
+                var iframe = document.getElementById(iframeId)
+                
                 // Set src to blank and then to desired src to prevent the browser from ignoring clicks!
                 iframe.src = 'about:blank';
-                setTimeout(() => iframe.src = src, 100); // Set a slight delay to ensure the reload
+                setTimeout(() => iframe.src = url, 100); // Set a slight delay to ensure the reload
+            }
+
+            function goToPageAndSwitchTab(iframeId, url, tabName) {
+                // First, switch to the correct tab
+                openTab(null, tabName);
+
+                // Then, navigate to the correct page
+                goToPage(iframeId, url);
             }
 
 

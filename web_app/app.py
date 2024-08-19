@@ -3475,38 +3475,43 @@ def get_references():
 
     if docs_have_relevant_info:
 
-        #main branch
-
         refer_pages_string = "<br><br><h6>Refer to the following pages in the mentioned docs:</h6>"
         
-        # for doc in user_should_refer_pages_in_doc:
         for index, doc in enumerate(user_should_refer_pages_in_doc, start=1):
-            # pdf_iframe_id = str(doc) + "PdfViewer"
-            pdf_iframe_id = "stream" + stream_session_id + "PdfViewer" + str(index)
+            pdf_iframe_id = f"stream{stream_session_id}PdfViewer{str(index)}"
             frame_doc_path = f"/pdf/{doc}"
-            # frame_doc_path = upload_folder + f"/{doc}" 
             try:
-                stream_id_string_to_remove = "_" + stream_session_id
+                stream_id_string_to_remove = f"_{stream_session_id}"
                 doc_name_without_stream_id = str(doc).replace(stream_id_string_to_remove, "")
                 refer_pages_string += f"<br><h6>{doc_name_without_stream_id}: "
                 for page in user_should_refer_pages_in_doc[doc]:
-                    frame_doc_path += "#page=" + str(page) 
-                    refer_pages_string += f'<a href="javascript:void(0)" onclick="goToPage(\'{pdf_iframe_id}\', \'{frame_doc_path}\')">Page {page}</a>, '
+                    frame_doc_path += f"#page={str(page)}" 
+                    refer_pages_string += f'<a href="javascript:void(0)" onclick="goToPageAndSwitchTab(\'{pdf_iframe_id}\', \'{frame_doc_path}\', \'tab{index}\')">Page {page}</a>, '
                     frame_doc_path = f"/pdf/{doc}"
                 refer_pages_string = refer_pages_string.strip(', ') + "</h6>"
             except Exception as e:
                 handle_error_no_return("Could not construct refer_pages_string, encountered error: ", e)
 
-        # download_link_html = "<br><h6>Refer to the source documents below:</h6>"
-        pdf_right_pane_id = "stream" + stream_session_id + "PdfPane"
-        download_link_html = f'<div class="pdf-viewer" id={pdf_right_pane_id}>'
+        pdf_right_pane_id = f"stream{stream_session_id}PdfPane"
+        download_link_html = f'<div class="pdf-viewer-container" id="{pdf_right_pane_id}">'
 
+        # Add tab buttons
+        download_link_html += '<div class="tab-buttons">'
+        for index, source in enumerate(user_should_refer_pages_in_doc, start=1):
+            stream_id_string_to_remove = f"_{stream_session_id}"
+            doc_name_without_stream_id = str(source).replace(stream_id_string_to_remove, "")
+            default_open = ' id="defaultOpen"' if index == 1 else ''
+            download_link_html += f'<button class="tab-button" onclick="openTab(event, \'tab{index}\')" {default_open}>{doc_name_without_stream_id}</button>'
+        download_link_html += '</div>'
+
+        # Add tab content
         for index, source in enumerate(user_should_refer_pages_in_doc, start=1):
             try:
-                # print("\n\nlooping sources\n\n")
                 download_link_url = url_for('download_file', filename=source)
-                pdf_iframe_id = "stream" + stream_session_id + "PdfViewer" + str(index)
-                download_link_html += f'<br><h6><a href="{download_link_url}" target="_blank"><iframe id="{pdf_iframe_id}" src="{download_link_url}" width="100%" height="600"></iframe></a></h6><br>'
+                pdf_iframe_id = f"stream{stream_session_id}PdfViewer{str(index)}"
+                download_link_html += f'<div id="tab{index}" class="tab-content">'
+                download_link_html += f'<iframe id="{pdf_iframe_id}" src="{download_link_url}" width="100%" height="600"></iframe>'
+                download_link_html += "</div>"
             except Exception as e:
                 handle_error_no_return("Could not construct download_link_html, encountered error: ", e)
 
