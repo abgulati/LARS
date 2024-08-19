@@ -3499,7 +3499,7 @@ def get_references():
                 refer_pages_string += f"<br><h6>{doc_name_without_stream_id}: "
                 for page in user_should_refer_pages_in_doc[doc]:
                     frame_doc_path += f"#page={str(page)}" 
-                    refer_pages_string += f'<a href="javascript:void(0)" onclick="goToPage(\'{pdf_iframe_id}\', \'{frame_doc_path}\')">Page {page}</a>, '
+                    refer_pages_string += f'<a href="javascript:void(0)" onclick="goToPageAndSwitchTab(\'{pdf_iframe_id}\', \'{frame_doc_path}\', \'tab{index}\')">Page {page}</a>, '
                     frame_doc_path = f"/pdf/{doc}"
                 refer_pages_string = refer_pages_string.strip(', ') + "</h6>"
             except Exception as e:
