@@ -3479,6 +3479,7 @@ def get_references():
         
         for index, doc in enumerate(user_should_refer_pages_in_doc, start=1):
             pdf_iframe_id = f"stream{stream_session_id}PdfViewer{str(index)}"
+            tab_name_string = f"stream{stream_session_id}tabName{str(index)}"
             frame_doc_path = f"/pdf/{doc}"
             try:
                 stream_id_string_to_remove = f"_{stream_session_id}"
@@ -3486,7 +3487,7 @@ def get_references():
                 refer_pages_string += f"<br><h6>{doc_name_without_stream_id}: "
                 for page in user_should_refer_pages_in_doc[doc]:
                     frame_doc_path += f"#page={str(page)}" 
-                    refer_pages_string += f'<a href="javascript:void(0)" onclick="goToPageAndSwitchTab(\'{pdf_iframe_id}\', \'{frame_doc_path}\', \'tab{index}\')">Page {page}</a>, '
+                    refer_pages_string += f'<a href="javascript:void(0)" onclick="goToPageAndSwitchTab(\'{pdf_iframe_id}\', \'{frame_doc_path}\', \'tab{tab_name_string}\', \'{stream_session_id}\')">Page {page}</a>, '
                     frame_doc_path = f"/pdf/{doc}"
                 refer_pages_string = refer_pages_string.strip(', ') + "</h6>"
             except Exception as e:
@@ -3498,10 +3499,11 @@ def get_references():
         # Add tab buttons
         download_link_html += '<div class="tab-buttons">'
         for index, source in enumerate(user_should_refer_pages_in_doc, start=1):
+            tab_name_string = f"stream{stream_session_id}tabName{str(index)}"
             stream_id_string_to_remove = f"_{stream_session_id}"
             doc_name_without_stream_id = str(source).replace(stream_id_string_to_remove, "")
-            default_open = ' id="defaultOpen"' if index == 1 else ''
-            download_link_html += f'<button class="tab-button" onclick="openTab(event, \'tab{index}\')" {default_open}>{doc_name_without_stream_id}</button>'
+            default_open = ' defaultTabs' if index == 1 else ''
+            download_link_html += f'<button class="tab-button{default_open}" stream-session-id="{stream_session_id}" onclick="openTab(event, \'tab{tab_name_string}\', \'{stream_session_id}\')">{doc_name_without_stream_id}</button>'
         download_link_html += '</div>'
 
         # Add tab content
@@ -3509,7 +3511,8 @@ def get_references():
             try:
                 download_link_url = url_for('download_file', filename=source)
                 pdf_iframe_id = f"stream{stream_session_id}PdfViewer{str(index)}"
-                download_link_html += f'<div id="tab{index}" class="tab-content">'
+                tab_name_string = f"stream{stream_session_id}tabName{str(index)}"
+                download_link_html += f'<div id="tab{tab_name_string}" class="tab-content" stream-session-id="{stream_session_id}">'
                 download_link_html += f'<iframe id="{pdf_iframe_id}" src="{download_link_url}" width="100%" height="600"></iframe>'
                 download_link_html += "</div>"
             except Exception as e:

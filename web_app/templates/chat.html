@@ -283,6 +283,7 @@
 
             .response-and-viewer-container {
                 display: flex;
+                margin-bottom: 100px;
             }
 
             .pdf-viewer {
@@ -1468,21 +1469,25 @@
             }
 
 
-            function openTab(evt, tabName) {
+            function openTab(evt, tabName, streamSessionId) {
                 console.log("Openning clicked tab");
                 var i, tabcontent, tabbuttons;
                 tabcontent = document.getElementsByClassName("tab-content");
                 for (i = 0; i < tabcontent.length; i++) {
-                    tabcontent[i].style.display = "none";
+                    if (tabcontent[i].getAttribute('stream-session-id') === streamSessionId) {
+                        tabcontent[i].style.display = "none";
+                    }
                 }
                 tabbuttons = document.getElementsByClassName("tab-button");
                 for (i = 0; i < tabbuttons.length; i++) {
-                    tabbuttons[i].className = tabbuttons[i].className.replace(" active", "")
+                    if (tabbuttons[i].getAttribute('stream-session-id') === streamSessionId) {
+                        tabbuttons[i].className = tabbuttons[i].className.replace(" active", "")
+                    }
                 }
                 document.getElementById(tabName).style.display = "block";
                 
                 // Find the button that opens this tab and add the active class
-                var activeButton = document.querySelector(`button[onclick="openTab(event, '${tabName}')"]`);
+                var activeButton = document.querySelector(`button[onclick="openTab(event, '${tabName}', '${streamSessionId}')"]`);
                 if (activeButton) {
                     activeButton.className += " active";
                 }
@@ -2876,11 +2881,16 @@
                             document.getElementById('chat-area').innerHTML += chat_history_data[i]
                         }
 
-                        var defaultTab = document.getElementById("defaultOpen");
-                        if (defaultTab) {
-                            defaultTab.click();
-                        }
+                        // var defaultTab = document.getElementById("defaultOpen");
+                        // if (defaultTab) {
+                        //     defaultTab.click();
+                        // }
 
+                        var defaultTabs = document.getElementsByClassName("defaultTabs");
+                        for (let i = 0; i < defaultTabs.length; i++) {
+                            defaultTabs[i].click();
+                        }
+                        
                     } else {
                         throw new Error('Internal Server Error: Check server-log and server command-line for more details.');
                     }
@@ -3122,9 +3132,17 @@
                                     if (do_rag) {
                                         document.getElementById(masterWrapperID).innerHTML += data.pdf_frame;
                                         // Open the first tab by default
-                                        var defaultTab = document.getElementById("defaultOpen");
-                                        if (defaultTab) {
-                                            defaultTab.click();
+                                        // var defaultTabForStream = "defaultOpen-".concat(stream_session_id)
+                                        // var defaultTab = document.getElementById("defaultOpen");
+                                        // if (defaultTab) {
+                                        //     defaultTab.click();
+                                        // }
+
+                                        var defaultTabs = document.getElementsByClassName("defaultTabs");
+                                        for (let i = 0; i < defaultTabs.length; i++) {
+                                            if (defaultTabs[i].getAttribute('stream-session-id') === stream_session_id) {
+                                                defaultTabs[i].click();
+                                            }
                                         }
                                     }
                                 } else {
@@ -3324,9 +3342,9 @@
                 setTimeout(() => iframe.src = url, 100); // Set a slight delay to ensure the reload
             }
 
-            function goToPageAndSwitchTab(iframeId, url, tabName) {
+            function goToPageAndSwitchTab(iframeId, url, tabName, streamSessionId) {
                 // First, switch to the correct tab
-                openTab(null, tabName);
+                openTab(null, tabName, streamSessionId);
 
                 // Then, navigate to the correct page
                 goToPage(iframeId, url);
