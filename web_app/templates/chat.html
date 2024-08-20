@@ -2881,11 +2881,6 @@
                             document.getElementById('chat-area').innerHTML += chat_history_data[i]
                         }
 
-                        // var defaultTab = document.getElementById("defaultOpen");
-                        // if (defaultTab) {
-                        //     defaultTab.click();
-                        // }
-
                         var defaultTabs = document.getElementsByClassName("defaultTabs");
                         for (let i = 0; i < defaultTabs.length; i++) {
                             defaultTabs[i].click();
@@ -3132,12 +3127,6 @@
                                     if (do_rag) {
                                         document.getElementById(masterWrapperID).innerHTML += data.pdf_frame;
                                         // Open the first tab by default
-                                        // var defaultTabForStream = "defaultOpen-".concat(stream_session_id)
-                                        // var defaultTab = document.getElementById("defaultOpen");
-                                        // if (defaultTab) {
-                                        //     defaultTab.click();
-                                        // }
-
                                         var defaultTabs = document.getElementsByClassName("defaultTabs");
                                         for (let i = 0; i < defaultTabs.length; i++) {
                                             if (defaultTabs[i].getAttribute('stream-session-id') === stream_session_id) {
