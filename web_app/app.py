@@ -585,7 +585,7 @@ def whoosh_indexer(pdf_data):
             # print("\nAlready indexed page content, skipping\n")
 
             #if not results:
-            writer.add_document(title=doc["title"], content=doc["content"], pagenumber=doc["pagenumber"])
+            writer.update_document(title=doc["title"], content=doc["content"], pagenumber=doc["pagenumber"])
 
         writer.commit()
         #searcher.close()
@@ -1222,7 +1222,7 @@ def LoadNewDocument(input_file):
     #finally:
         #loader.stop()
 
-    chunk_sz = 500
+    chunk_sz = 250
     chunk_olp = 0
 
     ### L2 - Chunk Source Data ###
@@ -2176,15 +2176,15 @@ def vector_embed_filepath(filename, filepath):
         except Exception as e:
             handle_local_error("Failed to extract text from the PDF document, even via fallback PyPDF2, encountered error: ", e)
     
-    try:
-        images = extract_images_from_pdf(filepath)
-    except Exception as e:
-        handle_error_no_return("Failed to extract images from the PDF document, encountered error: ", e)
+    # try:
+    #     images = extract_images_from_pdf(filepath)
+    # except Exception as e:
+    #     handle_error_no_return("Failed to extract images from the PDF document, encountered error: ", e)
 
-    try:
-        store_images_to_db(images)
-    except Exception as e:
-        handle_error_no_return("Failed to save images to database, encountered error: ", e)
+    # try:
+    #     store_images_to_db(images)
+    # except Exception as e:
+    #     handle_error_no_return("Failed to save images to database, encountered error: ", e)
     
     try:
         chunk_size, chunk_overlap = LoadNewDocument(input_file)
