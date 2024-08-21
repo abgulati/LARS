@@ -3033,7 +3033,9 @@ def setup_for_llama_cpp_response():
 
     filtered_docs = [doc for doc, score in docs_list_with_cosine_distance]
 
-    docs = rerank_results_ml(user_query, filtered_docs, top_n=5)
+    docs = []
+    if filtered_docs:
+        docs = rerank_results_ml(user_query, filtered_docs, top_n=5)
 
 
     print("\n\nDetermining do_rag \n\n")
