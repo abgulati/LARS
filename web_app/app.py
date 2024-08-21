@@ -5,12 +5,6 @@ from flask import jsonify
 from pdfminer.high_level import extract_text
 from werkzeug.utils import secure_filename
 
-from whoosh.fields import Schema, TEXT, ID, NUMERIC
-from whoosh.qparser import MultifieldParser
-from whoosh.qparser import QueryParser, OrGroup, AndGroup
-from whoosh.index import create_in
-from whoosh.index import open_dir
-
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -20,7 +14,6 @@ from googleapiclient.http import MediaIoBaseDownload, MediaDownloadProgress
 
 from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
 from langchain_community.embeddings import HuggingFaceBgeEmbeddings
-from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.memory import ConversationSummaryBufferMemory
 from langchain.embeddings import HuggingFaceEmbeddings
 from langchain.embeddings import OpenAIEmbeddings
@@ -268,7 +261,6 @@ def read_config(keys, default_value=None, filename='config.json'):
                 'vectordb_openai_folder':base_directory + '/chroma_db_openai_embeddings',
                 'vectordb_bge_large_folder':base_directory + '/chroma_db_bge_large_embeddings',
                 'vectordb_bge_base_folder':base_directory + '/chroma_db_bge_base_embeddings',
-                'index_dir':base_directory + '/indexdir_main',
                 'sqlite_images_db':base_directory + '/images_database_main.db',
                 'sqlite_history_db':base_directory + '/chat_history.db',
                 'sqlite_docs_loaded_db':base_directory + '/docs_loaded.db',
@@ -309,7 +301,7 @@ def read_config(keys, default_value=None, filename='config.json'):
                 'local_llm_n_keep':0,
                 'server_timeout_seconds':10,
                 'server_retry_attempts':3,
-                'base_template':"Answer the user's question in as much detail as possible.",
+                'base_template':"Answer the user's question in as much detail as possible. Be as accurate as possible. Do not make up answers or fabricate false information! Whenever additional context is provided, mention the document names and page numbers the user should reference as per your best judgement.",
             }.get(key, 'undefined')
 
             if default_value == 'undefined':
@@ -501,25 +493,6 @@ if not os.path.exists(pdfs_to_txts):
         handle_local_error("Failed to create txt-docs Directory (pdfs_to_txts), encountered error: ", e)
 
 
-# If the index does not currently exist...
-if not os.path.exists(index_dir):
-
-    # Define the Index schema: what fields it contains
-    schema = Schema(title=ID(unique=True, stored=True), content=TEXT(stored=True), pagenumber=NUMERIC(stored=True))
-    
-    # Create a directory for persistent storage of the index to disk
-    try:
-        os.mkdir(index_dir)
-    except Exception as e:
-        handle_local_error("Failed to create directory for the Whoosh Index, encountered error: ", e)
-
-    # Create the index based on the schema definted above
-    try:
-        create_in(index_dir, schema)
-    except Exception as e:
-        handle_local_error("Failed to create Whoosh Index, encountered error: ", e)
-
-
 app.config['UPLOAD_FOLDER'] = upload_folder
 app.config['DOWNLOAD_FOLDER'] = highlighted_docs
 
@@ -539,59 +512,6 @@ def clean_text_string(text_to_be_cleaned):
     clean_text = re.sub(r'\s+', ' ', clean_text).strip()
 
     return clean_text
-
-def whoosh_indexer(pdf_data):
-
-    print("\n\nIndexing File\n\n")
-
-    try:
-        read_return = read_config(['index_dir'])
-        index_dir = read_return['index_dir']
-    except Exception as e:
-        handle_local_error("Missing index_dir in config.json for whoosh_indexer. Error: ", e)
-
-    # Define the Index schema: what fields it contains
-    schema = Schema(title=ID(unique=True, stored=True), content=TEXT(stored=True), pagenumber=NUMERIC(stored=True))
-
-    # If the index does not currently exist...
-    if not os.path.exists(index_dir):
-        
-        # Create a directory for persistent storage of the index to disk
-        try:
-            os.mkdir(index_dir)
-        except Exception as e:
-            handle_local_error("Failed to create directory for the Whoosh Index, encountered error: ", e)
-
-        # Create the index based on the schema definted above
-        try:
-            ix = create_in(index_dir, schema)
-        except Exception as e:
-            handle_local_error("Failed to create Whoosh Index, encountered error: ", e)
-            
-    else:
-        try:
-            ix = open_dir(index_dir)
-        except Exception as e:
-            handle_local_error("Failed to open Whoosh Index, encountered error: ", e)
-        
-    # init writer and write to the index:
-    try:
-        writer = ix.writer()
-        #searcher = ix.searcher()
-
-        for doc in pdf_data:
-            # query = QueryParser("title", ix.schema).parse(doc["title"])
-            # results = searcher.search(query)
-            # print("\nAlready indexed page content, skipping\n")
-
-            #if not results:
-            writer.update_document(title=doc["title"], content=doc["content"], pagenumber=doc["pagenumber"])
-
-        writer.commit()
-        #searcher.close()
-        
-    except Exception as e:
-        handle_local_error("Failed to write to Whoosh Index, encountered error: ", e)
 
 
 def PDFtoAzureDocAiTXT(input_filepath):
@@ -618,9 +538,6 @@ def PDFtoAzureDocAiTXT(input_filepath):
     if os.path.exists(output_text_file_path):
         print("Azure-OCR'ed doc already exists! Returning existing file.")
         return output_text_file_path
-
-    # Init list for Whoosh indexing
-    pdf_data = []
 
     # Initialize text output
     try:
@@ -665,11 +582,6 @@ def PDFtoAzureDocAiTXT(input_filepath):
                     for cell in table.cells:
                         #print(f"Row {cell.row_index}, Column {cell.column_index}, Text: {cell.content}")
                         cell_text = f'Row {cell.row_index}, Column {cell.column_index}: {cell.content}'
-                        
-                        try:
-                            output_text_file.write(cell_text + '\n')
-                        except Exception as e:
-                            handle_local_error("could not write to output text file, encountered error: ", e)
 
                         # Get page number
                         page_number = ""
@@ -680,9 +592,10 @@ def PDFtoAzureDocAiTXT(input_filepath):
                                 cell_polygon_tuple = tuple((point.x, point.y) for point in cell_polygon)    # lists aren't hashable to cast to a tuple
                                 used_regions.add(cell_polygon_tuple)
 
-                        # Whoosh prep
-                        whoosh_page_dict_entry = {"title": source_filename, "content": cell_text, "pagenumber":page_number}
-                        pdf_data.append(whoosh_page_dict_entry)
+                        try:
+                            output_text_file.write(f"[PAGE:{page_number}]\n{cell_text}\n")
+                        except Exception as e:
+                            handle_local_error("could not write to output text file, encountered error: ", e)
 
         # Get paragraphs
         if hasattr(result, 'paragraphs'):
@@ -700,26 +613,16 @@ def PDFtoAzureDocAiTXT(input_filepath):
 
                 # write the extracted text to the file:
                 try:
-                    output_text_file.write(para_content + '\n')
+                    output_text_file.write(f"[PAGE:{para_page_number}]\n{para_content}\n")
                     used_regions.add(para_polygon_tuple)
                 except Exception as e:
                     handle_local_error("could not write to output text file, encountered error: ", e)
-
-                # whoosh prep
-                whoosh_page_dict_entry = {"title": source_filename, "content": para_content, "pagenumber":para_page_number}
-                pdf_data.append(whoosh_page_dict_entry)
 
     except Exception as e:
         handle_local_error("Error processing document with azure DocAI: ", e)
 
     # Close all files
     output_text_file.close()
-
-    # Create Whoosh Index; if error, log exception and proceed to returning output_text_file_path
-    try:
-        whoosh_indexer(pdf_data)
-    except Exception as e:
-        handle_error_no_return("Could not index file, encountered error: ", e)
 
     return output_text_file_path
 
@@ -756,9 +659,6 @@ def PDFtoAzureOCRTXT(input_filepath):
         pages = convert_from_path(input_filepath, 300) # 300dpi - good balance between quality and performance
     except Exception as e:
         handle_local_error("Could not image PDF file, encountered error: ", e)
-
-    # Init list for Whoosh indexing
-    pdf_data = []
 
     # Initialize text output
     try:
@@ -836,23 +736,12 @@ def PDFtoAzureOCRTXT(input_filepath):
 
                 # Write the extracted text to the file:
                 try:
-                    output_text_file.write(clean_text + '\n')
+                    output_text_file.write(f"[PAGE:{page_number}]\n{clean_text}\n")
                 except Exception as e:
                     handle_local_error("Could not write to output text file, encountered error: ", e)
 
-                # Whoosh prep
-                #whoosh_clean_text = preprocess_string(clean_text)
-                whoosh_page_dict_entry = {"title": source_filename, "content": clean_text, "pagenumber":page_number}
-                pdf_data.append(whoosh_page_dict_entry)
-
     # Close all files
     output_text_file.close()
-
-    # Create Whoosh Index; if error, log exception and proceed to returning output_text_file_path
-    try:
-        whoosh_indexer(pdf_data)
-    except Exception as e:
-        handle_error_no_return("Could not index file, encountered error: ", e)
 
     return output_text_file_path
 
@@ -892,9 +781,6 @@ def PDFtoTXT(input_file):
         print("PyPDF2-extracted .txt already exists! Returning existing file.")
         return output_text_file_path
 
-    # Init list for Whoosh indexing
-    pdf_data = []
-
     # Initialize text output
     try:
         output_text_file = open(output_text_file_path, 'w', encoding='utf-8')
@@ -913,61 +799,22 @@ def PDFtoTXT(input_file):
         #clean_text = text
         # Clean text
         clean_text = clean_text_string(text)
+        page_number = int(page_num) + 1
         
         # Optionally, you can include page numbers in the text file
         # output_text_file.write(f'\n\n--- Page {page_num + 1} ---\n\n')
         
         # Write the extracted text to the file
         try:
-            output_text_file.write(clean_text + '\n')
+            output_text_file.write(f"[PAGE:{page_number}]\n{clean_text}\n")
         except Exception as e:
             handle_local_error("Could not write to output text file, encountered error: ", e)
-
-        # Whoosh prep
-        #whoosh_clean_text = preprocess_string(clean_text)
-        whoosh_page_dict_entry = {"title": source_filename, "content": clean_text, "pagenumber":page_num+1}
-        pdf_data.append(whoosh_page_dict_entry)
 
     # Close all files
     pdf_file.close()
     output_text_file.close()
 
-    # Create Whoosh Index; if error, log exception and proceed to returning output_text_file_path
-    try:
-        whoosh_indexer(pdf_data)
-    except Exception as e:
-        handle_error_no_return("Could not index file, encountered error: ", e)
-
     return output_text_file_path
-
-
-def get_page_content_from_whoosh_index(title, pagenumber):
-
-    print("\n\nSearching Index for Page Content\n\n")
-
-    try:
-        read_return = read_config(['index_dir'])
-        index_dir = read_return['index_dir']
-    except Exception as e:
-        handle_local_error("Missing index_dir in config.json for get_page_content_from_whoosh_index. Error: ", e)
-
-    try:
-        ix = open_dir(index_dir)
-        searcher = ix.searcher()
-
-        parser = MultifieldParser(["title", "pagenumber"], schema=ix.schema)
-        query = parser.parse(f'title:"{title}" AND pagenumber:{pagenumber}')
-
-        results = searcher.search(query)
-
-        if results:
-            return results[0]["content"]
-        else:
-            return None
-    except Exception as e:
-        handle_local_error("Failed to open & search Whoosh Index for page content, encountered error: ", e)
-    finally:
-        searcher.close()
 
 
 def extract_images_from_pdf(pdf_path):
@@ -1036,8 +883,6 @@ def extract_images_from_pdf(pdf_path):
 
                             # Clean text
                             clean_text = clean_text_string(text)
-
-                            # clean_text = get_page_content_from_whoosh_index(source_filename, page_num)
 
                             try:
                                 if obj_details['Filter'] == '/FlateDecode':
@@ -1189,15 +1034,65 @@ def split_embeddings_list(all_splits, max_emmbeddings_list_size):
         yield all_splits[i:i + max_emmbeddings_list_size]   # Yield a slice of all_splits from index i upto but NOT including i+max_size 
 
 
+class Document:
+    def __init__(self, page_content, metadata):
+        self.page_content = page_content
+        self.metadata = metadata
+
+    def __repr__(self): #to provide string-representation of an object
+        return f"Document(page_content='{self.page_content[:50]}...', metadata={self.metadata})"
+
+
+
+def chunk_docs_with_page_numbers(input_file, chunk_size=250):
+    documents = []
+    current_chunk = ""
+    current_page = 1
+
+    def add_chunk(chunk, page):
+        if chunk:
+            documents.append(Document(
+                page_content=chunk.strip(),
+                metadata={'source': input_file, 'page_number': page}
+            ))
+
+    try:
+        with open(input_file, 'r', encoding='utf-8') as file:
+            for line in file:
+                if line.startswith('[PAGE:'):
+                    new_page = int(line.strip()[6:-1])
+                    if new_page != current_page:
+                        add_chunk(current_chunk, current_page)
+                        current_chunk = ""
+                        current_page = new_page
+                    continue
+
+                if len(current_chunk) + len(line) > chunk_size:
+                    add_chunk(current_chunk, current_page)
+                    current_chunk = line
+                else:
+                    current_chunk += line
+
+                if len(current_chunk) >= chunk_size:
+                    add_chunk(current_chunk, current_page)
+                    current_chunk = ""
+        
+        # Add any remaining content
+        add_chunk(current_chunk, current_page)
+
+    except Exception as e:
+        handle_local_error("Could not chunk document, encountered error: ", e)
+
+    return documents
+
+
 # Document vectorization and chunking
 def LoadNewDocument(input_file):
 
     global VECTOR_STORE
     
     ### L1 - Load Data from Source ###
-    #loader = UnstructuredPDFLoader("737.pdf", mode="elements", strategy="fast")
     print("\nLoading Document")
-    #loader.start()
 
     try:
         read_return = read_config(['use_sbert_embeddings', 'use_openai_embeddings', 'use_bge_base_embeddings', 'use_bge_large_embeddings', 'vectordb_sbert_folder', 'vectordb_openai_folder', 'vectordb_bge_base_folder', 'vectordb_bge_large_folder'])
@@ -1212,54 +1107,34 @@ def LoadNewDocument(input_file):
     except Exception as e:
         handle_local_error("Missing values in config.json, could not LoadNewDocument. Error: ", e)
 
-    try:
-        txt_loader = TextLoader(input_file, encoding="UTF-8", autodetect_encoding="true")
-        docs = txt_loader.load()
-        #loader.stop()
-    except Exception as e:
-        #loader.stop()
-        handle_local_error("Failed to load document for storage to VectorDB, encountered error: ", e)
-    #finally:
-        #loader.stop()
-
     chunk_sz = 250
     chunk_olp = 0
 
     ### L2 - Chunk Source Data ###
     print("Chunking Doc")
-    #loader.start()
     try:
-        text_splitter = RecursiveCharacterTextSplitter(chunk_size = chunk_sz, chunk_overlap = chunk_olp) # chunk_size refers to max size; nice to have some small sliding-window overlap between chunks such as 20-50 chars
-        all_splits = text_splitter.split_documents(docs)
-        
-        #For JINA2 Embeddings:
-        # Initialize an empty list to hold the page_content values
-        page_contents = []
-        # Iterate through each Document in the list
-        for doc in all_splits:
-            # Access the 'page_content' attribute and append it to the 'page_contents' list
-            page_contents.append(doc.page_content)
-        #loader.stop()
-    except Exception as e:
-        #loader.stop()
-        handle_local_error("Failed to chunk document for storage to VectorDB, encountered error: ", e)
-    #finally:
-        #oader.stop()
+        numbered_splits = chunk_docs_with_page_numbers(input_file, chunk_sz)
 
+        print(f"\n\nnumbered_splits sample: {numbered_splits[:3]}\n\n")
+        print(f"\n\nnumbered_splits type: {type(numbered_splits[3])}\n\n")
+        # print(f"\n\nall_splits sample: {all_splits[:3]}\n\n")
+        # print(f"\n\nall_splits type: {type(all_splits[3])}\n\n")
+        
+    except Exception as e:
+        handle_local_error("Failed to chunk document for storage to VectorDB, encountered error: ", e)
 
     ### L3 - Store Chunks in VectorDB ###
     print("Storing to VectorDB: ChromaDB")
-    #loader.start()
     try:
         # Return VectorStore initialized from documents and embeddings.
         if use_sbert_embeddings:
             # Ideally should use MAX_BATCH_SIZE obtained elsewhere 
-            if len(all_splits) > 5000:
-                split_docs = split_embeddings_list(all_splits, 5000)
+            if len(numbered_splits) > 5000:
+                split_docs = split_embeddings_list(numbered_splits, 5000)
                 for split_docs_list in split_docs:
                     VECTOR_STORE = Chroma.from_documents(documents=split_docs_list, embedding=HuggingFaceEmbeddings(), persist_directory=vectordb_sbert_folder)
             else:
-                VECTOR_STORE = Chroma.from_documents(documents=all_splits, embedding=HuggingFaceEmbeddings(), persist_directory=vectordb_sbert_folder)
+                VECTOR_STORE = Chroma.from_documents(documents=numbered_splits, embedding=HuggingFaceEmbeddings(), persist_directory=vectordb_sbert_folder)
         
         elif use_openai_embeddings:
             print("Using OpenAI Text Ada Model via Azure OpenAI")
@@ -1267,11 +1142,11 @@ def LoadNewDocument(input_file):
             list_position = 0
             token_count = 0
 
-            for i in range(list_position, len(all_splits)):
+            for i in range(list_position, len(numbered_splits)):
 
-                token_count += len(str(all_splits[i]))
+                token_count += len(str(numbered_splits[i]))
                 if token_count >= 108000:
-                    VECTOR_STORE = Chroma.from_documents(documents=all_splits[list_position:i+1], embedding=AZURE_OPENAI_EMBEDDINGS, persist_directory=vectordb_openai_folder)  #AZURE_OPENAI_EMBEDDINGS defined on line 407
+                    VECTOR_STORE = Chroma.from_documents(documents=numbered_splits[list_position:i+1], embedding=AZURE_OPENAI_EMBEDDINGS, persist_directory=vectordb_openai_folder)  #AZURE_OPENAI_EMBEDDINGS defined on line 407
                     list_position = i+1
                     token_count = 0
                     print("Loaded batch, sleeping for one minute to stay within rate-limit")
@@ -1279,8 +1154,8 @@ def LoadNewDocument(input_file):
                     continue
 
             # post-loop, if any splits are left to be processed but were missed due to token_count not reaching the limit:
-            if list_position < len(all_splits):
-                VECTOR_STORE = Chroma.from_documents(documents=all_splits[list_position:], embedding=AZURE_OPENAI_EMBEDDINGS, persist_directory=vectordb_openai_folder) #AZURE_OPENAI_EMBEDDINGS defined on line 407
+            if list_position < len(numbered_splits):
+                VECTOR_STORE = Chroma.from_documents(documents=numbered_splits[list_position:], embedding=AZURE_OPENAI_EMBEDDINGS, persist_directory=vectordb_openai_folder) #AZURE_OPENAI_EMBEDDINGS defined on line 407
 
         elif use_bge_base_embeddings or use_bge_large_embeddings:
             persist_directory = ""
@@ -1288,14 +1163,10 @@ def LoadNewDocument(input_file):
                 persist_directory = vectordb_bge_base_folder
             elif use_bge_large_embeddings:
                 persist_directory = vectordb_bge_large_folder
-            VECTOR_STORE = Chroma.from_documents(documents=all_splits, embedding=HF_BGE_EMBEDDINGS, persist_directory=persist_directory)    #HF_BGE_EMBEDDINGS defined in process_model() line 2133
+            VECTOR_STORE = Chroma.from_documents(documents=numbered_splits, embedding=HF_BGE_EMBEDDINGS, persist_directory=persist_directory)    #HF_BGE_EMBEDDINGS defined in process_model() line 2133
 
-        #loader.stop()
     except Exception as e:
-        #loader.stop()
         handle_local_error("Could not store to VectorDB, encountered error: ", e)
-    #finally:
-        #loader.stop()
 
     return chunk_sz, chunk_olp
 
@@ -1392,7 +1263,7 @@ def highlight_text_on_page(highlight_list, stream_session_id):
                         text_instances = page.search_for(match)
                         for inst in text_instances:
                             try:
-                                print(f"HIGHLIGHTING inst {inst} in document {doc}")
+                                #print(f"HIGHLIGHTING inst {inst} in document {doc}")
                                 page.add_highlight_annot(inst)
                             except Exception as e:
                                 handle_error_no_return("Could not highlight text instance, encountered error: ", e)
@@ -1411,68 +1282,35 @@ def highlight_text_on_page(highlight_list, stream_session_id):
     return True
 
 
-def whoosh_text_in_pdf_and_highlight(reference_pages, stream_session_id):
-
-    print("Searching Whoosh Index")
-
-    try:
-        read_return = read_config(['index_dir'])
-        index_dir = read_return['index_dir']
-    except Exception as e:
-        handle_local_error("Missing index_dir in config.json for method whoosh_text_in_pdf_and_highlight. Error: ", e)
+def highlighter_interface(reference_pages, stream_session_id):
 
     user_should_refer_pages_in_doc = {}
-    docs_have_relevant_info = False
-    min_search_string_word_count = 5
-
     highlight_list = {}
+    docs_have_relevant_info = False
 
-    try:
-        # Open the index
-        ix = open_dir(index_dir)
+    print(f"\n\nreference_pages: {reference_pages}\n\n")
 
-        # Create a 'searcher' object
-        with ix.searcher() as searcher:
-            query_parser = QueryParser("content", ix.schema, group=OrGroup)
+    for file_path, content in reference_pages.items():
+        source_filename = os.path.basename(file_path)
+        print(f"\nsource_filename basename: {source_filename}\n")
+        output_file_extension = "_" + stream_session_id + '.pdf'
+        output_file_name = source_filename.replace(".pdf",output_file_extension) 
+        page_numbers = set()
+        highlight_strings = set()
 
-            for doc in reference_pages:
-                
-                source_filename = os.path.basename(doc)
-                print(f"\nsource_filename basename: {source_filename}\n")
-                output_file_extension = "_" + stream_session_id + '.pdf'
-                output_file_name = source_filename.replace(".pdf",output_file_extension) 
-                page_numbers = []
-                highlight_strings = []
-                
-                for search_string in reference_pages[doc]:
+        for item in content:
+            # Each item in the list has two elements
+            page_text, page_number = item
+            page_numbers.add(int(page_number))
+            highlight_strings.add((int(page_number), str(page_text[:50])))
 
-                    # Only search for non-empty search strings
-                    if search_string and len(str(search_string).split()) >= min_search_string_word_count:
-                        query = query_parser.parse(str(search_string).lower())
-                        results = searcher.search(query)
+        if page_numbers:
+            user_should_refer_pages_in_doc[output_file_name] = page_numbers
+            docs_have_relevant_info = True
 
-                        for hit in results:
-                            if source_filename in str(hit['title']):    # Whoosh hits can occur on all titles in the index, ensure it's actually present in the current similarity_search result
-                                print(f"Whoosh search positive hit in title {hit['title']} on page {hit['pagenumber']}")
-                                page_numbers.append(int(hit['pagenumber']))
-                                docs_have_relevant_info = True
-                                
-                                highlight_target = [hit['pagenumber'], search_string]
-                                highlight_strings.append(highlight_target)
+        if highlight_strings:
+            highlight_list[source_filename] = list(highlight_strings)
 
-                if len(page_numbers) > 0:
-                    page_numbers = set(page_numbers)
-                    user_should_refer_pages_in_doc[output_file_name] = page_numbers
-
-                if len(highlight_strings) > 0:
-                    highlight_strings_set = set(tuple(inner_list) for inner_list in highlight_strings)  # Because using a set directly on a list of lists won't work because lists are mutable and cannot be hashed, which is a requirement for the elements of a set. 
-                    highlight_strings = [list(inner_tuple) for inner_tuple in highlight_strings_set]
-                    highlight_list[source_filename] = highlight_strings
-
-    except Exception as e:
-        handle_error_no_return("Could not search Whoosh Index, encountered error: ", e)
-    
-    # Highlight line in PDF
     if docs_have_relevant_info:
         try:
             highlight_text_on_page(highlight_list, str(stream_session_id))
@@ -3155,17 +2993,19 @@ def setup_for_llama_cpp_response():
     try:
         # docs = VECTOR_STORE.similarity_search(user_query, embedding_fn=embedding_function)
         # docs_with_relevance_score = VECTOR_STORE.similarity_search_with_relevance_scores(user_query, 10, embedding_fn=embedding_function)
-        docs_list_with_cosine_distance = VECTOR_STORE.similarity_search_with_score(user_query, 5, embedding_fn=embedding_function)
+        docs_list_with_cosine_distance = VECTOR_STORE.similarity_search_with_score(user_query, 7, embedding_fn=embedding_function)
         # print(f'\n\nsimple similarity search results: \n {docs}\n\n')
         # print(f'\n\nRelevance Score similarity search results (range 0 to 1): \n {docs_with_relevance_score}\n\n')
         # print(f'\n\nDocs list most similar to query based on cosine distance: \n {docs_list_with_cosine_distance}\n\n')
     except Exception as e:
         handle_error_no_return("Could not perform similarity_search to determine do_rag when attempting to setup_for_streaming_response, encountered error: ", e)
 
-    docs = [
-        doc for doc, score in docs_list_with_cosine_distance
-        if score >= similarity_threshold
-    ]
+    # docs = [
+    #     doc for doc, score in docs_list_with_cosine_distance
+    #     if score >= similarity_threshold
+    # ]
+
+    docs = [doc for doc, score in docs_list_with_cosine_distance]
 
     print("\n\nDetermining do_rag \n\n")
     # We do not modify the force_enable_rag or force_disable_rag flags in this method, we simply respond to them here. UI updates should handle those flags.
@@ -3392,6 +3232,7 @@ def get_references():
         
         try:
             relevant_page_text = str(doc.page_content)
+            relevant_page_number = str(doc.metadata.get('page_number'))
             source_filepath = str(doc.metadata.get('source'))
         except Exception as e:
             handle_error_no_return("Could not access doc.page_content and/or doc.metadata, encountered error: ", e)
@@ -3427,9 +3268,11 @@ def get_references():
                 source_filename = source_filename.replace('.txt', '.pdf')
                 
                 if pdf_version_path in reference_pages:
-                    reference_pages[pdf_version_path].extend([relevant_page_text])
+                    reference_pages[pdf_version_path].extend([[relevant_page_text,relevant_page_number]])
+                    #reference_pages[pdf_version_path].extend({'page_content': relevant_page_text, 'page_number': relevant_page_number})
                 else:
-                    reference_pages[pdf_version_path] = [relevant_page_text]
+                    reference_pages[pdf_version_path] = [[relevant_page_text,relevant_page_number]]
+                    #reference_pages[pdf_version_path] = {'page_content': relevant_page_text, 'page_number': relevant_page_number}
 
                 # Add this file to our sources dictionary if it's not already present
                 if source_filename not in all_sources:
@@ -3460,18 +3303,19 @@ def get_references():
 
 
     try:
-        docs_have_relevant_info, user_should_refer_pages_in_doc = whoosh_text_in_pdf_and_highlight(reference_pages, stream_session_id)
+        docs_have_relevant_info, user_should_refer_pages_in_doc = highlighter_interface(reference_pages, stream_session_id)
     except Exception as e:
-        handle_error_no_return("Could not search Whoosh Index, encountered error: ", e)
+        handle_error_no_return("Could not complete highlighter_interface, encountered error: ", e)
 
-    try:
-        matched_images_found, matched_images_in_bytes = find_images_in_db(reference_pages)
-    except Exception as e:
-        handle_error_no_return("Could not search for images, encountered error: ", e)
+    # try:
+    #     matched_images_found, matched_images_in_bytes = find_images_in_db(reference_pages)
+    # except Exception as e:
+    #     handle_error_no_return("Could not search for images, encountered error: ", e)
 
     refer_pages_string = ""
     download_link_html = ""
     images_iframe_html = ""
+    matched_images_found = False
 
     if docs_have_relevant_info:
 
