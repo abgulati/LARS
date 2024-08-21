@@ -1191,16 +1191,16 @@ def find_images_in_db(reference_pages):
     except Exception as e:
         handle_local_error("Could not connect to images DB for image search, encountered error: ", e)
 
-    for doc in reference_pages:
-                
-        #source_filename = os.path.basename(doc)
+    for file_path, content in reference_pages.items():
 
-        for search_string in reference_pages[doc]:
+        for item in content:
+            # Each item in the list has two elements
+            page_text, page_number = item
 
             # Only search for non-empty search strings
-            if search_string:
+            if page_text:
                 try:
-                    images = conn.execute('SELECT DISTINCT id, image_data FROM images WHERE surrounding_text LIKE ?', ('%' + search_string + '%',)).fetchall()
+                    images = conn.execute('SELECT DISTINCT id, image_data FROM images WHERE surrounding_text LIKE ?', ('%' + page_text[:50] + '%',)).fetchall()
                 except Exception as e:
                     handle_error_no_return("Could not select images from Images DB, encountered error: ", e)
                 for row in images:
@@ -1209,7 +1209,7 @@ def find_images_in_db(reference_pages):
                     image_id = row['id']
                     image_data = row['image_data']
                     matched_images.append((image_id, image_data))
-
+        
     conn.close()
     matched_images = set(matched_images)
     return matched_images_found, matched_images
@@ -3307,6 +3307,7 @@ def get_references():
     except Exception as e:
         handle_error_no_return("Could not complete highlighter_interface, encountered error: ", e)
 
+    matched_images_found = False
     # try:
     #     matched_images_found, matched_images_in_bytes = find_images_in_db(reference_pages)
     # except Exception as e:
@@ -3315,7 +3316,7 @@ def get_references():
     refer_pages_string = ""
     download_link_html = ""
     images_iframe_html = ""
-    matched_images_found = False
+    matched_images_found = False    #temp over-ride
 
     if docs_have_relevant_info:
 
