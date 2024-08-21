@@ -2,6 +2,8 @@ from flask import Flask, render_template, request, redirect, url_for, Response, 
 from flask import send_from_directory
 from flask import jsonify
 
+from sentence_transformers import SentenceTransformer, util
+
 from pdfminer.high_level import extract_text
 from werkzeug.utils import secure_filename
 
@@ -2928,6 +2930,30 @@ def filter_relevant_documents(query, search_results, threshold=1):
     return page_contents, do_rag
 
 
+def rerank_results_ml(query, documents, top_n=5):
+    # Load pre-trained SBERT model
+    model = SentenceTransformer('all-MiniLM-L6-v2')
+    
+    # Encode the query
+    query_embedding = model.encode(query, convert_to_tensor=True)
+    
+    # Encode the documents
+    doc_embeddings = model.encode([doc.page_content for doc in documents], convert_to_tensor=True)
+    
+    # Compute cosine similarities
+    cosine_scores = util.pytorch_cos_sim(query_embedding, doc_embeddings)[0]
+    
+    # Create a list of (index, score) tuples
+    indexed_scores = list(enumerate(cosine_scores))
+    
+    # Sort by score in descending order
+    sorted_indexes = sorted(indexed_scores, key=lambda x: x[1], reverse=True)
+    
+    # Reorder the original documents based on the sorted indexes
+    ranked_documents = [documents[idx] for idx, _ in sorted_indexes[:top_n]]
+    
+    return ranked_documents
+
 
 @app.route('/setup_for_llama_cpp_response', methods=['POST'])
 def setup_for_llama_cpp_response():
@@ -2993,7 +3019,7 @@ def setup_for_llama_cpp_response():
     try:
         # docs = VECTOR_STORE.similarity_search(user_query, embedding_fn=embedding_function)
         # docs_with_relevance_score = VECTOR_STORE.similarity_search_with_relevance_scores(user_query, 10, embedding_fn=embedding_function)
-        docs_list_with_cosine_distance = VECTOR_STORE.similarity_search_with_score(user_query, 7, embedding_fn=embedding_function)
+        docs_list_with_cosine_distance = VECTOR_STORE.similarity_search_with_score(user_query, 11, embedding_fn=embedding_function)
         # print(f'\n\nsimple similarity search results: \n {docs}\n\n')
         # print(f'\n\nRelevance Score similarity search results (range 0 to 1): \n {docs_with_relevance_score}\n\n')
         # print(f'\n\nDocs list most similar to query based on cosine distance: \n {docs_list_with_cosine_distance}\n\n')
@@ -3005,7 +3031,10 @@ def setup_for_llama_cpp_response():
     #     if score >= similarity_threshold
     # ]
 
-    docs = [doc for doc, score in docs_list_with_cosine_distance]
+    filtered_docs = [doc for doc, score in docs_list_with_cosine_distance]
+
+    docs = rerank_results_ml(user_query, filtered_docs, top_n=5)
+
 
     print("\n\nDetermining do_rag \n\n")
     # We do not modify the force_enable_rag or force_disable_rag flags in this method, we simply respond to them here. UI updates should handle those flags.
@@ -3320,7 +3349,7 @@ def get_references():
 
     if docs_have_relevant_info:
 
-        refer_pages_string = "<br><br><h6>Refer to the following pages in the mentioned docs:</h6>"
+        refer_pages_string = "<br><br><h6>Additional data may be found in the following documents & pages:</h6>"
         
         for index, doc in enumerate(user_should_refer_pages_in_doc, start=1):
             pdf_iframe_id = f"stream{stream_session_id}PdfViewer{str(index)}"
