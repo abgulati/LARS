@@ -538,6 +538,15 @@
                 padding-bottom: 10px;
             }
 
+            .hf-select-settings-divs-group {
+                display: flex;
+                align-items: center;
+            }
+
+            .hf-select-settings-labels-group {
+                margin-right: 10px;
+            }
+
             .restart-warning {
                 position: absolute;
                 right: 10px;
@@ -864,7 +873,7 @@
                                             <select class="modal-selects" name="local_llm_server_selector" id="local_llm_server_select_dropdown">
                                                 <option value="hf-waitress">HF-Waitress</option>
                                                 <option value="llama-cpp">llama.cpp</option>
-                                                <!-- Add more embedding models here!-->
+                                                <!-- Add future servers here!-->
                                             </select>
                                         </div>
 
@@ -872,7 +881,7 @@
 
                                         <div id="hf_waitress_div" style="display: none;">
                                         
-                                            <div  id="localHfLlmSelection">
+                                            <div id="localHfLlmSelection">
                                                 <label style="margin-bottom: 3px;">Select a local LLM:</label>
                                                 <br>
                                                 <select class="modal-selects" name="hf_model_choice" id="hfModelDropdown">
@@ -886,6 +895,208 @@
                                             <a href="#" class="btn btn-link btn-primary llm-adv-set-toggle" id="advancedHfLlmSettingsToggle" data-bs-toggle="collapse" data-bs-target="#advancedHfLlmSettings" aria-expanded="false" aria-controls="advancedHfLlmSettings" style="display: inline-block;">
                                                 Advanced Settings >>>
                                             </a>
+
+                                            <div class="collapse" id="advancedHfLlmSettings">
+                                                <div class="card card-body" style="background-color: #181A1B; border: none;">
+                                                    
+                                                    <!-- Add options here | TODO: style "Advanced Settings" button! -->
+        
+                                                    <button class="btn btn-primary" type="button" id="resetHfLlmAdvancedDefaults">Reset to Defaults</button>
+        
+                                                    <br>
+        
+                                                    <div class="settings-requiring-restart-container">
+
+                                                        <div id="hf_waitress_torch_device_map" class="restart-settings-group hf-select-settings-divs-group">
+                                                            <label class="hf-select-settings-labels-group">Select Inference Device basis appropriate PyTorch Installation (--torch_device_map):</label>
+                                                            <br>
+                                                            <select class="modal-selects" id="hf_waitress_torch_device_map_choice">
+                                                                <option value="auto">auto (default)</option>
+                                                                <option value="cuda">CUDA</option>
+                                                                <option value="rocm">ROCm</option>
+                                                                <option value="cpu">CPU</option>
+                                                            </select>
+                                                        </div>
+            
+                                                        <br>
+
+                                                        <div id="hf_waitress_torch_dtype" class="restart-settings-group hf-select-settings-divs-group">
+                                                            <label class="hf-select-settings-labels-group">Select Torch data type basis model Tensor type (--torch_dtype):</label>
+                                                            <br>
+                                                            <select class="modal-selects" id="hf_waitress_torch_dtype_choice">
+                                                                <option value="auto">auto (default)</option>
+                                                                <option value="torch.bfloat16">torch.bfloat16</option>
+                                                                <option value="torch.float16">torch.float16</option>
+                                                                <option value="torch.float32">torch.float32</option>
+                                                                <option value="torch.float64">torch.float64</option>
+                                                                <option value="torch.int8">torch.int8</option>
+                                                                <option value="torch.int16">torch.int16</option>
+                                                                <option value="torch.int32">torch.int32</option>
+                                                                <option value="torch.int64">torch.int64</option>
+                                                                <option value="torch.uint8">torch.uint8</option>
+                                                                <option value="torch.bool">torch.bool</option>
+                                                            </select>
+                                                        </div>
+
+                                                        <br>
+
+                                                        <div id="hf_waitress_use_flash_attention_2" class="restart-settings-group">
+                                                            <label class="hf-select-settings-labels-group">Use Flash Attention 2? Ensure hardware and software requirements met (--use_flash_attention_2):</label>
+                                                            <input type="radio" id="hf_waitress_use_flash_attention_2_yes" value="y" style="margin-left: 7px;"> Yes
+                                                            <input type="radio" id="hf_waitress_use_flash_attention_2_no" value="n" style="margin-left: 7px;"> No (Default)
+                                                        </div>
+
+                                                        <br>
+
+                                                        <div id="hf_waitress_pipeline_task" class="restart-settings-group hf-select-settings-divs-group">
+                                                            <label class="hf-select-settings-labels-group">Select Pipeline Task (--pipeline_task):</label>
+                                                            <br>
+                                                            <select class="modal-selects" id="hf_waitress_pipeline_task_choice">
+                                                                <option value="text-generation">text-generation (default)</option>
+                                                                <option value="audio-classification">audio-classification (in-development)</option>
+                                                                <option value="automatic-speech-recognition">automatic-speech-recognition (in-development)</option>
+                                                                <option value="depth-estimation">depth-estimation (in-development)</option>
+                                                                <option value="document-question-answering">document-question-answering (in-development)</option>
+                                                                <option value="feature-extraction">feature-extraction (in-development)</option>
+                                                                <option value="fill-mask">fill-mask (in-development)</option>
+                                                                <option value="image-classification">image-classification (in-development)</option>
+                                                                <option value="image-feature-extraction">image-feature-extraction (in-development)</option>
+                                                                <option value="image-segmentation">image-segmentation (in-development)</option>
+                                                                <option value="image-to-image">image-to-image (in-development)</option>
+                                                                <option value="image-to-text">image-to-text (in-development)</option>
+                                                                <option value="mask-generation">mask-generation (in-development)</option>
+                                                                <option value="object-detection">object-detection (in-development)</option>
+                                                                <option value="question-answering">question-answering (in-development)</option>
+                                                                <option value="summarization">summarization (in-development)</option>
+                                                                <option value="table-question-answering">table-question-answering (in-development)</option>
+                                                                <option value="text2text-generation">text2text-generation (in-development)</option>
+                                                                <option value="text-classification">text-classification (in-development)</option>
+                                                                <option value="text-generation">text-generation (in-development)</option>
+                                                                <option value="text-to-audio">text-to-audio (in-development)</option>
+                                                                <option value="token-classification">token-classification (in-development)</option>
+                                                                <option value="translation">translation (in-development)</option>
+                                                                <option value="translation_xx_to_yy">translation_xx_to_yy (in-development)</option>
+                                                                <option value="video-classification">video-classification (in-development)</option>
+                                                                <option value="visual-question-answering">visual-question-answering (in-development)</option>
+                                                                <option value="zero-shot-classification">zero-shot-classification (in-development)</option>
+                                                                <option value="zero-shot-image-classification">zero-shot-image-classification (in-development)</option>
+                                                                <option value="zero-shot-audio-classification">zero-shot-audio-classification (in-development)</option>
+                                                                <option value="zero-shot-object-detection">zero-shot-object-detection (in-development)</option>
+                                                            </select>
+                                                        </div>
+
+                                                        <br>
+
+                                                        <div id="hf_waitress_quantization" class="restart-settings-group hf-select-settings-divs-group">
+                                                            <label class="hf-select-settings-labels-group">Quantization Method (--quantize):</label>
+                                                            <br>
+                                                            <select class="modal-selects" id="hf_waitress_quantization_choice">
+                                                                <option value="quanto">Quanto (Default)</option>
+                                                                <option value="bitsandbytes">BitsAndBytes</option>
+                                                                <option value="hqq">HQQ</option>
+                                                                <option value="no_quantization">No Quantization</option>
+                                                            </select>
+                                                        </div>
+
+                                                        <br>
+
+                                                        <div id="hf_waitress_quantization_level" class="restart-settings-group hf-select-settings-divs-group">
+                                                            <label class="hf-select-settings-labels-group">Quantization Level (--quant_level):</label>
+                                                            <br>
+                                                            <select class="modal-selects" id="hf_waitress_quantization_level_choice">
+                                                                <option value="int8">Int8 (Recommended)</option>
+                                                                <option value="int4">Int4 (Default)</option>
+                                                                <option value="int3">Int3 (HQQ Only)</option>
+                                                                <option value="int2">Int2 (Quanto & HQQ only)</option>
+                                                                <option value="int1">Int1 (HQQ Only - Not Recommended!)</option>
+                                                            </select>
+                                                        </div>
+
+                                                        <br>
+            
+                                                        <div id="hf_waitress_hqq_group_size" class="restart-settings-group">
+                                                            <label for="HfwHqqGroupSize" class="hf-select-settings-labels-group">HQQ Group Size (must be divisible by group_size) (--hqq_group_size): </label>
+                                                            <input type="number" id="HfwHqqGroupSize" min="0" style="width: 15%;" value="64">
+                                                        </div>
+            
+                                                        <br>
+
+                                                        <div id="hf_waitress_trust_remote_code" class="restart-settings-group hf-select-settings-divs-group">
+                                                            <label class="hf-select-settings-labels-group">Trust Remote Code (--trust_remote_code):</label>
+                                                            <br>
+                                                            <select class="modal-selects" id="hf_waitress_trust_remote_code_choice">
+                                                                <option value="y">Yes</option>
+                                                                <option value="n">No (default)</option>
+                                                            </select>
+                                                        </div>
+
+                                                        <br>
+        
+                                                        <div id="hf_waitress_port" class="restart-settings-group">
+                                                            <label for="HfwPort" class="hf-select-settings-labels-group">HF-Waitress Server Port (default: 9069) (--port): </label>
+                                                            <input type="number" id="HfwPort" min="0"  max="65535" step="1" style="width: 15%;" value="9069">
+                                                        </div>
+        
+                                                        <br>
+        
+                                                        <div class="restart-warning">
+                                                            <i class="fa-solid fa-exclamation-triangle"></i> Changes trigger restart!
+                                                        </div>
+        
+                                                    </div>
+        
+                                                    <br>
+
+                                                    <div id="hf_waitress_return_full_text" class="hf-select-settings-divs-group">
+                                                        <label class="hf-select-settings-labels-group">Return Full Text (X-Return-Full-Text):</label>
+                                                        <br>
+                                                        <select class="modal-selects" id="hf_waitress_return_full_text_choice">
+                                                            <option value="y">Yes</option>
+                                                            <option value="n">No (default)</option>
+                                                        </select>
+                                                    </div>
+
+                                                    <br>
+            
+                                                    <div id="hf_waitress_max_new_tokens">
+                                                        <label for="HfwMaxNewToks" class="hf-select-settings-labels-group">Maximum New Tokens (X-Max-New-Tokens): </label>
+                                                        <input type="number" id="HfwMaxNewToks" min="100" style="width: 15%;" value="500">
+                                                    </div>
+
+                                                    <br>
+        
+                                                    <div id="hf_waitress_temperature_value">
+                                                        <label for="HfwTempSlider" class="hf-select-settings-labels-group">Temperature (Randomness of generated text) (X-Temperature): </label>
+                                                        <input type="range" id="HfwTempSlider" min="0" max="2" step="0.1" value="0.3">
+                                                        <span id="HfwTempSliderValue">0.3</span>
+                                                    </div>
+        
+                                                    <br>
+        
+                                                    <div id="hf_waitress_topk_value">
+                                                        <label for="HfwTopkSlider" class="hf-select-settings-labels-group">Limit to K most probable tokens (X-Top-K): </label>
+                                                        <input type="range" id="HfwTopkSlider" min="-1" max="100" step="1" value="40">
+                                                        <span id="HfwTopkSliderValue">40</span>
+                                                    </div>
+        
+                                                    <br>
+        
+                                                    <div id="hf_waitress_topp_value">
+                                                        <label for="HfwToppSlider" class="hf-select-settings-labels-group">Limit to a subset of tokens with a cumulative probability above (X-Top-P): </label>
+                                                        <input type="range" id="HfwToppSlider" min="0" max="1" step="0.01" value="0.95">
+                                                        <span id="HfwToppSliderValue">0.95</span>
+                                                    </div>
+        
+                                                    <br>
+        
+                                                    <div id="hf_waitress_minp_value">
+                                                        <label for="HfwMinpSlider" class="hf-select-settings-labels-group">Minimum probability for considering a token, relative to most likely (X-Min-P): </label>
+                                                        <input type="range" id="HfwMinpSlider" min="0" max="1" step="0.01" value="0.05">
+                                                        <span id="HfwMinpSliderValue">0.05</span>
+                                                    </div>
+                                                    
+                                                </div>
+                                            </div>
 
                                         </div>
 
