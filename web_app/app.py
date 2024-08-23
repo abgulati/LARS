@@ -204,7 +204,7 @@ def write_config(config_updates, filename='config.json'):
         
     restart_required = False
     if LLM_LOADED_UP:
-        llm_trigger_keys_for_app_restart = ['use_local_llm', 'use_azure_open_ai', 'use_gpu', 'model_choice', 'local_llm_chat_template_format', 'local_llm_context_length', 'local_llm_max_new_tokens', 'local_llm_gpu_layers', 'base_template']
+        llm_trigger_keys_for_app_restart = ['use_local_llm', 'local_llm_server', 'use_azure_open_ai', 'use_gpu', 'model_choice', 'local_llm_chat_template_format', 'local_llm_context_length', 'local_llm_max_new_tokens', 'local_llm_gpu_layers', 'base_template']
                 
         for key in llm_trigger_keys_for_app_restart:
             if key in config_updates and config_updates[key] != config.get(key):

@@ -17,10 +17,6 @@
         <!--CSS Goes Here-->
         <style>
 
-            /* body {
-                background-color: azure;
-            } */
-
             @font-face {
                 font-family: Boeing Meso;
                 font-weight: 400;
@@ -98,28 +94,12 @@
                 left: 0;
                 right: 0;
                 bottom: 0;
-                /* padding-top: 60px;
-                height: 100%; */
             }
-
-            /* .closebtn {
-                position: absolute;
-                top: 10px;
-                right: 25px;
-                z-index: 10;
-                font-size: 36px;
-            } */
-
-            /* @media screen and (max-height: 450px) {
-                .sidenav {padding-top: 15px;}
-                .sidenav a {font-size: 18px;}
-            } */
 
             .chat-container {
                 display: flex;
                 flex-direction: column; /* Stack children vertically */
                 justify-content: space-between; /* Space between chat area and input area */
-                /* height: calc(100vh - header-container); */
                 flex-grow: 1;
                 z-index: 0;
                 height: 95vh;
@@ -131,9 +111,7 @@
                 overflow-y: auto; /* Add a scrollbar if content overflows */
                 padding: 1rem;
                 border-bottom: 1px solid #383d3f;
-                /* flex-grow: 1; /* Allow chat area to grow and consume available space */
                 font-family: 'Roboto', sans-serif; /* Use Roboto font */
-                /* font-family: Boeing Meso, Arial, sans-serif; */
                 font-size: 16px; /* Adjust as needed */
                 color: #333; /* Dark gray color for better readability */
                 margin-top: 30px;
@@ -164,8 +142,6 @@
             .user-message {
                 font-weight: 500; /* Medium thickness */
                 margin-bottom: 0.5rem; /* Spacing between messages */
-                /* background-color: #e9ecef; /* A light gray background for user's messages */
-                /* background-color: #343a40; */
                 background-color: darkslategray;
                 padding: 0.5rem;
                 border-radius: 1rem;
@@ -176,20 +152,10 @@
             .llm-response {
                 font-weight: 400; /* Was 500 */
                 margin-bottom: 0.5rem; /* Spacing between messages */
-                /* background-color: #007bff;  Bootstrap primary color for LLM's responses */
-                /* background-color: #00ffaa;  Bootstrap primary color for LLM's responses */
-                /* background-color: 0098ff63; */
-                /* background-color: #00c3ff; */
-                /* background-color: #6c757d; */
-                /* background-color: #0033A1; /*BOEING BLUE! Use 300-weight White font */
-                /* background-color: #0069ff54; */
-                /* background-color: aliceblue; */
                 background-color: #1e2022;
                 color: #e8e6e3; 
                 padding: 0.5rem;
                 border-radius: 1rem;
-                /* box-shadow: 5px 5px #9ccd9d47; */
-                /* box-shadow: 5px 5px #BADCE6; */
                 box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
                 border: 1px solid #3A3E41;
             }
@@ -304,7 +270,6 @@
 
             .star-rating {
                 position: absolute;
-                /* bottom: -20px; */
                 right: 0;
                 display: flex;
                 justify-content: flex-end;
@@ -314,7 +279,6 @@
                 border-radius: 15px; /* Rounded border */
                 background-color: #181A1B; /* White background */
                 box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1); /* Optional: adds a subtle shadow */
-                /* margin-top: 8px; /* Adds a bit of space between the LLM's response and the stars */
             }
 
             .fa-star {
@@ -325,13 +289,8 @@
             }
 
             .fas.fa-star {
-                /* color: #007bff; /* Color of rater stars: Matching the Bootstrap primary colors. */
                 color: #ffa500; /* Color of rated stars: Yellow */
             }
-
-            /* .llm-response {
-                position: relative;
-            } */
 
             .header-container {
                 display: flex;
@@ -350,21 +309,8 @@
                 display: none;
             }
 
-            /* #model_header,
-            #old_model_header {
-                display: none;
-                position: absolute;
-                z-index: 1;
-            }
-
-            .info-icon:hover + #model_header,
-            .info-icon:hover + #old_model_header {
-                display: block !important;
-            } */
-
             .info-container .info-box {
                 position: absolute;
-                /* left: -100%; /* Adjust as needed to move the box to the left of the icon */
                 right: 100%;
                 margin-right: 10px;
                 top: 0;
@@ -384,9 +330,6 @@
                 position: absolute;
                 top: 18px;
                 right: 1px;
-                /* left: 100%; /* Adjust to move the arrow to the left edge of the tooltip */
-                /* transform: translateY(-50%) translateX(-100%); /* Adjust the arrow to point to the icon */
-                /* margin-top: -5px; */
                 margin-left: -5px;
                 border-width: 5px;
                 border-style: solid;
@@ -440,15 +383,10 @@
             }
 
             .modal-selection-radios {
-                /* display: inline; */
                 display: flex; /* Uses flexbox to lay out child elements*/
                 justify-content: space-between; /* space out children evenly */
                 width: 100%;
             }
-
-            /* .modal-selection-radios input[type="radio"] {
-                /* Optional additional styling for modal radio buttons *
-            } */
 
             .modal-selection-radios label {
                 flex: 1;    /* Allow each label to grow and take up equal space*/
@@ -528,10 +466,6 @@
                 background-color: darkslateblue;
             }
 
-            /* #resetLlmAdvancedDefaults {
-                width: 30%;
-            } */
-
             .llm-adv-set-toggle {
                 text-decoration: none;
                 color: white;
@@ -541,14 +475,6 @@
             .llm-adv-set-toggle:hover {
                 color: black;
             }
-
-            /* .llm-adv-set-toggle:focus {
-                box-shadow: 0 0 5px rgba(0, 123, 255, 0.5);
-            } */
-
-            /* .llm-adv-set-toggle:active {
-                color: #003d82;
-            } */
 
             #docs_loaded_details_table {
                 width: 100%;
@@ -622,9 +548,6 @@
                 align-items: center;
                 font-size: 16px;    /*Adjusts the size of icon & text*/
                 font-weight: 500;
-                /* color: black;
-                background-color: #ffcc00;
-                border: 1px solid #b3a100; */
             }
 
             .restart-warning i {
@@ -730,8 +653,6 @@
 
             .gallery-thumbnail {
                 margin: 10px;
-                /* max-width: 375px;
-                max-height: 150px; */
                 width: 100%;
                 height: 350px;
                 cursor: grabbing;
@@ -881,6 +802,12 @@
             </div>
         </div>
 
+        <div id="SavingHfWaitressSettings" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgb(250,250,250,0.5); z-index: 1000;">
+            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: black; font-size: 24px; font-family: 'Roboto', sans-serif; font-weight: 500;">
+                Saving HF-Waitress Server Settings...
+            </div>
+        </div>
+
 
         <!-- Settings Popup - Bootstrap Modal -->
         <div class="modal fade" id="settingsModal" tabindex="-1" aria-labelledby="settingsModalLabel" aria-hidden="true">
@@ -929,54 +856,171 @@
 
                                     <br>
 
-                                    <div id="local_llm_server_select_div" style="display: none;">
-                                        <label style="margin-bottom: 3px;">Select an LLM Server:</label>
+                                    <div id="localLlmDiv" style="display: none;">
+
+                                        <div id="local_llm_server_select_div">
+                                            <label style="margin-bottom: 3px;">Select an LLM Server:</label>
+                                            <br>
+                                            <select class="modal-selects" name="local_llm_server_selector" id="local_llm_server_select_dropdown">
+                                                <option value="hf-waitress">HF-Waitress</option>
+                                                <option value="llama-cpp">llama.cpp</option>
+                                                <!-- Add more embedding models here!-->
+                                            </select>
+                                        </div>
+
                                         <br>
-                                        <select class="modal-selects" name="local_llm_server_selector" id="local_llm_server_select_dropdown">
-                                            <option value="hf-waitress">HF-Waitress</option>
-                                            <option value="llama-cpp">llama.cpp</option>
-                                            <!-- Add more embedding models here!-->
-                                        </select>
+
+                                        <div id="hf_waitress_div" style="display: none;">
+                                        
+                                            <div  id="localHfLlmSelection">
+                                                <label style="margin-bottom: 3px;">Select a local LLM:</label>
+                                                <br>
+                                                <select class="modal-selects" name="hf_model_choice" id="hfModelDropdown">
+                                                    
+                                                </select>
+                                            </div>
+
+                                            <br>
+
+                                            <!--Advanced Settings Section Begins-->
+                                            <a href="#" class="btn btn-link btn-primary llm-adv-set-toggle" id="advancedHfLlmSettingsToggle" data-bs-toggle="collapse" data-bs-target="#advancedHfLlmSettings" aria-expanded="false" aria-controls="advancedHfLlmSettings" style="display: inline-block;">
+                                                Advanced Settings >>>
+                                            </a>
+
+                                        </div>
+
+                                        <div id="llama_cpp_div" style="display: none;">
+
+                                            <input type="file" name="llmFile" id="uploadLlm" style="display: none;">
+                                            <button type="button" id="uploadLlmButton" class="btn btn-primary upload-file-btn" onclick="document.getElementById('uploadLlm').click();" style="display: none;"><i class="fas fa-upload"></i> Upload an LLM</button>
+                                            
+                                            <br>
+
+                                            <div  id="localLlmSelection">
+                                                <label style="margin-bottom: 3px;">Select a local LLM:</label>
+                                                <br>
+                                                <select class="modal-selects" name="model_choice" id="modelDropdown">
+                                                    
+                                                </select>
+                                            </div>
+
+                                            <br>
+
+                                            <div  id="localLlmTemplateSelection">
+                                                <label style="margin-bottom: 3px;">Select a Prompt-Template Format</label>
+                                                <br>
+                                                <select class="modal-selects" name="llm_template_choice" id="llmTemplateDropdown">
+                                                    <option value="">Please select</option>
+                                                    <option value="llama3">Llama-3 & 3.1 Prompt Template Format</option>
+                                                    <option value="llama2">Llama-2 Prompt Template Format (Mistral Nemo-12B Instruct, Instruct-7B & MoE - v0.1 & v0.2, etc.)</option>
+                                                    <option value="chatml">ChatML Prompt Template Format (Open & Nous Hermes-Mistral & MoE, etc.) </option>
+                                                    <option value="phi3">Microsoft Phi-3 Prompt Template Format</option>
+                                                    <option value="command-r">Cohere Command-R & Command-R+ Prompt Template Format</option>
+                                                    <option value="deepseek">Deepseek-Coder Prompt Template Format</option>
+                                                    <option value="deepseek-coder-v2">Deepseek-Coder-V2 Prompt Template Format</option>
+                                                    <option value="gemma2">Google Gemma2 Prompt Template Format</option>
+                                                    <option value="vicuna">Nous-Capybara Vicuna Prompt Template Format</option>
+                                                    <option value="openchat">OpenChat-3.5-0106 Prompt Template Format</option>
+                                                </select>
+                                            </div>
+
+                                            <br>
+
+                                            <!--Advanced Settings Section Begins-->
+                                            <a href="#" class="btn btn-link btn-primary llm-adv-set-toggle" id="advancedLlmSettingsToggle" data-bs-toggle="collapse" data-bs-target="#advancedLlmSettings" aria-expanded="false" aria-controls="advancedLlmSettings" style="display: inline-block;">
+                                                Advanced Settings >>>
+                                            </a>
+
+                                            <div class="collapse" id="advancedLlmSettings">
+                                                <div class="card card-body" style="background-color: #181A1B; border: none;">
+                                                    
+                                                    <!-- Add options here | TODO: style "Advanced Settings" button! -->
+        
+                                                    <button class="btn btn-primary" type="button" id="resetLlmAdvancedDefaults">Reset to Defaults</button>
+        
+                                                    <br>
+        
+                                                    <div class="settings-requiring-restart-container">
+        
+                                                        <div id="gpu_choice" class="restart-settings-group">
+                                                            <label>Use GPU?</label>
+                                                            <input type="radio" id="gpu_radio_yes" name="use_gpu" value="y" style="margin-left: 7px;"> Yes (NvCUDA)
+                                                            <input type="radio" id="gpu_radio_no" name="use_gpu" value="n" style="margin-left: 7px;"> No
+                                                            <br><label for="NumbGpuLayers">Number of Model-layers to offload to the GPU (-ngl): </label>
+                                                            <input type="number" id="NumbGpuLayers" name="NumbGpuLayers" min="-1" style="width: 15%;" value="47">
+                                                        </div>
+            
+                                                        <br>
+            
+                                                        <div id="ctx_length" class="restart-settings-group">
+                                                            <label for="LlmCtxLgt">Context-Length (-c): </label>
+                                                            <input type="number" id="LlmCtxLgt" name="LlmCtxLgt" min="128" style="width: 15%;" value="8192">
+                                                        </div>
+            
+                                                        <br>
+            
+                                                        <div id="llm_max_new_tokens" class="restart-settings-group">
+                                                            <label for="MaxNewToks">Maximum tokens to predict (-n): </label>
+                                                            <input type="number" id="MaxNewToks" name="MaxNewToks" min="-1" style="width: 15%;" value="2048">
+                                                        </div>
+        
+                                                        <br>
+        
+                                                        <div class="restart-warning">
+                                                            <i class="fa-solid fa-exclamation-triangle"></i> Changes trigger restart!
+                                                        </div>
+        
+                                                    </div>
+        
+                                                    <br>
+        
+                                                    <div id="temperature_value">
+                                                        <label for="tempSlider">Temperature (Randomness of generated text): </label>
+                                                        <input type="range" id="tempSlider" name="tempSlider" min="0" max="2" step="0.1" value="0.8">
+                                                        <span id="tempSliderValue">0.8</span>
+                                                    </div>
+        
+                                                    <br>
+        
+                                                    <div id="topk_value">
+                                                        <label for="topkSlider">Limit to K most probable tokens (top_k): </label>
+                                                        <input type="range" id="topkSlider" name="topkSlider" min="-1" max="100" step="1" value="40">
+                                                        <span id="topkSliderValue">40</span>
+                                                    </div>
+        
+                                                    <br>
+        
+                                                    <div id="topp_value">
+                                                        <label for="toppSlider">Limit to a subset of tokens with a cumulative probability above (top_p): </label>
+                                                        <input type="range" id="toppSlider" name="toppSlider" min="0" max="1" step="0.01" value="0.95">
+                                                        <span id="toppSliderValue">0.95</span>
+                                                    </div>
+        
+                                                    <br>
+        
+                                                    <div id="minp_value">
+                                                        <label for="minpSlider">Minimum probability for considering a token, relative to most likely (min_p): </label>
+                                                        <input type="range" id="minpSlider" name="minpSlider" min="0" max="1" step="0.01" value="0.05">
+                                                        <span id="minpSliderValue">0.05</span>
+                                                    </div>
+        
+                                                    <br>
+        
+                                                    <div id="nkeep_value">
+                                                        <label for="nkeepSlider">Prompt-tokens retained when context-size exceeded (n_keep, -1 to retain all): </label>
+                                                        <input type="number" id="nkeepSlider" name="nkeepSlider" min="-1" style="width: 15%;" value="0">
+                                                    </div>
+                                                    
+                                                </div>
+                                            </div>
+
+                                        </div>
+
                                     </div>
 
-                                    <br>
-
-                                    <div id="llama_cpp_div" style="display: none;">
-
-                                        <input type="file" name="llmFile" id="uploadLlm" style="display: none;">
-                                        <button type="button" id="uploadLlmButton" class="btn btn-primary upload-file-btn" onclick="document.getElementById('uploadLlm').click();" style="display: none;"><i class="fas fa-upload"></i> Upload an LLM</button>
+                                    <div id="apiLlmDiv" style="display: none;">
                                         
-                                        <br>
-
-                                        <div  id="localLlmSelection" style="display: none;">
-                                            <label style="margin-bottom: 3px;">Select a local LLM:</label>
-                                            <br>
-                                            <select class="modal-selects" name="model_choice" id="modelDropdown">
-                                                
-                                            </select>
-                                        </div>
-
-                                        <br>
-
-                                        <div  id="localLlmTemplateSelection" style="display: none;">
-                                            <label style="margin-bottom: 3px;">Select a Prompt-Template Format</label>
-                                            <br>
-                                            <select class="modal-selects" name="llm_template_choice" id="llmTemplateDropdown">
-                                                <option value="">Please select</option>
-                                                <option value="llama3">Llama-3 & 3.1 Prompt Template Format</option>
-                                                <option value="llama2">Llama-2 Prompt Template Format (Mistral Nemo-12B Instruct, Instruct-7B & MoE - v0.1 & v0.2, etc.)</option>
-                                                <option value="chatml">ChatML Prompt Template Format (Open & Nous Hermes-Mistral & MoE, etc.) </option>
-                                                <option value="phi3">Microsoft Phi-3 Prompt Template Format</option>
-                                                <option value="command-r">Cohere Command-R & Command-R+ Prompt Template Format</option>
-                                                <option value="deepseek">Deepseek-Coder Prompt Template Format</option>
-                                                <option value="deepseek-coder-v2">Deepseek-Coder-V2 Prompt Template Format</option>
-                                                <option value="gemma2">Google Gemma2 Prompt Template Format</option>
-                                                <option value="vicuna">Nous-Capybara Vicuna Prompt Template Format</option>
-                                                <option value="openchat">OpenChat-3.5-0106 Prompt Template Format</option>
-                                            </select>
-                                        </div>
-                                                            
-                                        <div id="apiLlmSelection" style="display: none;">
+                                        <div id="apiLlmSelection">
                                             <label style="margin-bottom: 3px;">Select an LLM-API Inferencing Service:</label>
                                             <br>
                                             <select class="modal-selects" name="llm_api_choice" id="llmApiDropdown">
@@ -987,7 +1031,7 @@
                                         </div>
                                         
                                         <br>
-
+    
                                         <form action="" class="api_form" id="azure_openai_api_form" style="display: none;">
                                             <div class="form-group">
                                                 <input type="checkbox" id="update_azure_gpt" name="update_azure_gpt">
@@ -1007,94 +1051,6 @@
                                             </div>
                                             <br>
                                         </form>
-
-                                        <!--Advanced Settings Section Begins-->
-                                        <a href="#" class="btn btn-link btn-primary llm-adv-set-toggle" id="advancedLlmSettingsToggle" data-bs-toggle="collapse" data-bs-target="#advancedLlmSettings" aria-expanded="false" aria-controls="advancedLlmSettings" style="display: none;">
-                                            Advanced Settings >>>
-                                        </a>
-
-                                        <div class="collapse" id="advancedLlmSettings">
-                                            <div class="card card-body" style="background-color: #181A1B; border: none;">
-                                                
-                                                <!-- Add options here | TODO: style "Advanced Settings" button! -->
-    
-                                                <button class="btn btn-primary" type="button" id="resetLlmAdvancedDefaults">Reset to Defaults</button>
-    
-                                                <br>
-    
-                                                <div class="settings-requiring-restart-container">
-    
-                                                    <div id="gpu_choice" class="restart-settings-group">
-                                                        <label>Use GPU?</label>
-                                                        <input type="radio" id="gpu_radio_yes" name="use_gpu" value="y" style="margin-left: 7px;"> Yes (NvCUDA)
-                                                        <input type="radio" id="gpu_radio_no" name="use_gpu" value="n" style="margin-left: 7px;"> No
-                                                        <br><label for="NumbGpuLayers">Number of Model-layers to offload to the GPU (-ngl): </label>
-                                                        <input type="number" id="NumbGpuLayers" name="NumbGpuLayers" min="-1" style="width: 15%;" value="47">
-                                                    </div>
-        
-                                                    <br>
-        
-                                                    <div id="ctx_length" class="restart-settings-group">
-                                                        <label for="LlmCtxLgt">Context-Length (-c): </label>
-                                                        <input type="number" id="LlmCtxLgt" name="LlmCtxLgt" min="128" style="width: 15%;" value="8192">
-                                                    </div>
-        
-                                                    <br>
-        
-                                                    <div id="llm_max_new_tokens" class="restart-settings-group">
-                                                        <label for="MaxNewToks">Maximum tokens to predict (-n): </label>
-                                                        <input type="number" id="MaxNewToks" name="MaxNewToks" min="-1" style="width: 15%;" value="2048">
-                                                    </div>
-    
-                                                    <br>
-    
-                                                    <div class="restart-warning">
-                                                        <i class="fa-solid fa-exclamation-triangle"></i> Changes trigger restart!
-                                                    </div>
-    
-                                                </div>
-    
-                                                <br>
-    
-                                                <div id="temperature_value">
-                                                    <label for="tempSlider">Temperature (Randomness of generated text): </label>
-                                                    <input type="range" id="tempSlider" name="tempSlider" min="0" max="2" step="0.1" value="0.8">
-                                                    <span id="tempSliderValue">0.8</span>
-                                                </div>
-    
-                                                <br>
-    
-                                                <div id="topk_value">
-                                                    <label for="topkSlider">Limit to K most probable tokens (top_k): </label>
-                                                    <input type="range" id="topkSlider" name="topkSlider" min="-1" max="100" step="1" value="40">
-                                                    <span id="topkSliderValue">40</span>
-                                                </div>
-    
-                                                <br>
-    
-                                                <div id="topp_value">
-                                                    <label for="toppSlider">Limit to a subset of tokens with a cumulative probability above (top_p): </label>
-                                                    <input type="range" id="toppSlider" name="toppSlider" min="0" max="1" step="0.01" value="0.95">
-                                                    <span id="toppSliderValue">0.95</span>
-                                                </div>
-    
-                                                <br>
-    
-                                                <div id="minp_value">
-                                                    <label for="minpSlider">Minimum probability for considering a token, relative to most likely (min_p): </label>
-                                                    <input type="range" id="minpSlider" name="minpSlider" min="0" max="1" step="0.01" value="0.05">
-                                                    <span id="minpSliderValue">0.05</span>
-                                                </div>
-    
-                                                <br>
-    
-                                                <div id="nkeep_value">
-                                                    <label for="nkeepSlider">Prompt-tokens retained when context-size exceeded (n_keep, -1 to retain all): </label>
-                                                    <input type="number" id="nkeepSlider" name="nkeepSlider" min="-1" style="width: 15%;" value="0">
-                                                </div>
-                                                
-                                            </div>
-                                        </div>
 
                                     </div>
 
@@ -1403,6 +1359,7 @@
                 console.error(full_error_message);
                 alert(error_alert_message);
                 document.getElementById('ModelAndDBLoading').style.display = 'none';
+                document.getElementById('SavingHfWaitressSettings').style.display = 'none';  
             }
 
             const forceEnableRagCheckbox = document.getElementById('force_enable_rag_checkbox');
@@ -1498,40 +1455,39 @@
                 
                 //Make a GET request to the server
                 fetch('/load_chat_history_list')
-                    .then(response => {
-                        if (!response.ok) {
-                            return response.json().then(err => { throw new Error(err.error)});
+                .then(response => {
+                    if (!response.ok) {
+                        return response.json().then(err => { throw new Error(err.error)});
+                    }
+                    return response.json()
+                })
+                .then(data => {
+                    if (data.success) {
+
+                        history_list = data.history_list
+                        //console.log(data)
+
+                        let sidenav = document.getElementById('sidenav-content');
+
+                        for(let i = 0; i < history_list.length; i++) {
+                            let newDiv = document.createElement('div');
+                            newDiv.className = 'nav-item';
+                            newDiv.textContent = `Chat ${history_list[i]}`
+                            newDiv.setAttribute('data-chat-id', history_list[i])
+                            newDiv.addEventListener('click', function() {
+                                console.log("clicked")
+                                let chatID = this.getAttribute('data-chat-id');
+                                loadChatHistory(chatID);
+                            });
+                            sidenav.appendChild(newDiv);
                         }
-                        return response
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.success) {
-
-                            history_list = data.history_list
-                            //console.log(data)
-
-                            let sidenav = document.getElementById('sidenav-content');
-
-                            for(let i = 0; i < history_list.length; i++) {
-                                let newDiv = document.createElement('div');
-                                newDiv.className = 'nav-item';
-                                newDiv.textContent = `Chat ${history_list[i]}`
-                                newDiv.setAttribute('data-chat-id', history_list[i])
-                                newDiv.addEventListener('click', function() {
-                                    console.log("clicked")
-                                    let chatID = this.getAttribute('data-chat-id');
-                                    loadChatHistory(chatID);
-                                });
-                                sidenav.appendChild(newDiv);
-                            }
-                        } else {
-                            throw new Error('Internal Server Error: Check server-log and server command-line for more details.');
-                        }
-                    })
-                    .catch(error => {
-                        errorHandler("fetching the history-menu list", "/load_chat_history_list", String(error.message))
-                    });
+                    } else {
+                        throw new Error('Internal Server Error: Check server-log and server command-line for more details.');
+                    }
+                })
+                .catch(error => {
+                    errorHandler("fetching the history-menu list", "/load_chat_history_list", String(error.message))
+                });
             }
             
 
@@ -2066,7 +2022,71 @@
                 }
 
                 document.getElementById('llama_cpp_div').style.display = local_llm_server === 'llama-cpp' ? 'block' : 'none';
+                document.getElementById('hf_waitress_div').style.display = local_llm_server === 'hf-waitress' ? 'block' : 'none';
             }
+
+
+            function loadAndSetCoreHfValues() {
+                const initKeysToRead = [
+                    'model_id',
+                    'model_list',
+                    'access_gated',
+                    'trust_remote_code',
+                    'torch_device_map',
+                    'torch_dtype',
+                    'use_flash_attention_2',
+                    'pipeline_task',
+                    'max_new_tokens',
+                    'return_full_text',
+                    'temperature',
+                    'do_sample',
+                    'top_k',
+                    'top_p',
+                    'min_p',
+                    'n_keep',
+                    'quantize',
+                    'quant_level',
+                    'awq',
+                    'hqq_group_size'
+                ]
+                
+                return fetch('http://localhost:9069/hf_config_reader_api', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({keys: initKeysToRead})
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        return response.json().then(err => { throw new Error(err.error)});
+                    }
+                    return response.json()
+                })
+                .then(data => {
+                    //setUIValues(data.values);
+                    return data.values;
+                })
+                .catch(error => {
+                    errorHandler("reading hf_config.json", "loadAndSetCoreHfValues()", String(error.message))
+                });
+            }
+
+
+            function initializeHfModelDropdown(model_list, model_id) {
+                const hfDropdown = document.getElementById('hfModelDropdown');
+                for (let i = 0; i < model_list.length; i++) {
+                    const option = document.createElement('option');
+                    option.value = model_list[i];
+                    option.textContent = model_list[i];
+
+                    if (model_list[i].toLowerCase() == model_id.toLowerCase()) {
+                        option.selected = true;
+                    }
+                    hfDropdown.appendChild(option);
+                }
+            }
+
             
             function initializeModelDropdown(model_choice) {
                 fetch('/load_local_models')
@@ -2155,36 +2175,51 @@
 
             
             function toggleLocalLlmSelection() {    // Show or hide local-LLM selection:
-                var selection = document.querySelector('input[name="use_local_or_api_llm"]:checked').value;
-                
-                document.getElementById('local_llm_server_select_div').style.display = selection === 'local' ? 'block' : 'none';
-                document.getElementById('localLlmSelection').style.display = selection === 'local' ? 'block' : 'none';
-                document.getElementById('localLlmTemplateSelection').style.display = selection === 'local' ? 'block' : 'none';
-                document.getElementById('uploadLlmButton').style.display = selection === 'local' ? 'block' : 'none';
-                document.getElementById('apiLlmSelection').style.display = selection === 'api' ? 'block' : 'none';
-                
-                var advancedLlmSettingsToggle = document.getElementById('advancedLlmSettingsToggle');
-                var advancedLlmSettings = document.getElementById('advancedLlmSettings');
+                const selection = document.querySelector('input[name="use_local_or_api_llm"]:checked').value;
+                document.getElementById('localLlmDiv').style.display = selection === 'local' ? 'block' : 'none';
+                document.getElementById('apiLlmDiv').style.display = selection === 'api' ? 'block' : 'none';
 
                 if (selection === 'local') {
                     document.getElementById('azure_openai_api_form').style.display = 'none'; //Hide API-Details-Form if local selected
-                    advancedLlmSettingsToggle.style.display = 'inline-block';
+
+                    const local_llm_server_selected = document.getElementById('local_llm_server_select_dropdown');
+
+                    if (local_llm_server_selected === 'hf-waitress') {
+                        document.getElementById('hf_waitress_div').style.display = 'block';
+                        document.getElementById('llama_cpp_div').style.display = 'none';
+                    } else if (local_llm_server_selected === 'llama-cpp') {
+                        document.getElementById('hf_waitress_div').style.display = 'none';
+                        document.getElementById('llama_cpp_div').style.display = 'block';
+                    }
                 } else {
-                    advancedLlmSettingsToggle.style.display = 'none';
                     // Collapse Advanced Settings if it's expanded
+                    var advancedLlmSettings = document.getElementById('advancedLlmSettings');
                     if (advancedLlmSettings.classList.contains('show')) {
                         var bsCollapse = new bootstrap.Collapse(advancedLlmSettings, {
                             toggle: false
                         });
                         bsCollapse.hide();
                     }
+
                 }
             }
 
 
             function toggleLocalLLMSettingsForms() {
-                var selection = document.getElementById('local_llm_server_select_dropdown').value;
+                const selection = document.getElementById('local_llm_server_select_dropdown').value;
+
+                if (selection === 'hf-waitress') {
+                    loadAndSetCoreHfValues()
+                        .then(hf_values => {
+                            initializeHfModelDropdown(hf_values.model_list, hf_values.model_id);
+                        })
+                        .catch(error => {
+                            errorHandler("initializing the application", "DOMContentLoaded", String(error.message));
+                        });
+                }
+
                 document.getElementById('llama_cpp_div').style.display = selection === 'llama-cpp' ? 'block' : 'none';
+                document.getElementById('hf_waitress_div').style.display = selection === 'hf-waitress' ? 'block' : 'none';
             }
 
             
@@ -2206,7 +2241,7 @@
             }
 
             
-            function initializeEventListenersForLLMTabRadioButtons() {
+            function initializeEventListenersForLLMTab() {
                 // Event listener for Local LLM Server selection:
                 document.getElementById('local_llm_server_select_dropdown').addEventListener('change', toggleLocalLLMSettingsForms);
 
@@ -2261,11 +2296,20 @@
             
             function initializeLLMTabComponents(values) {
                 initializeLocalLLMServerDropdown(values.local_llm_server);
+                if (values.local_llm_server === "hf-waitress") {
+                    loadAndSetCoreHfValues()
+                        .then(hf_values => {
+                            initializeHfModelDropdown(hf_values.model_list, hf_values.model_id);
+                        })
+                        .catch(error => {
+                            errorHandler("initializing the application", "DOMContentLoaded", String(error.message));
+                        });
+                }
                 initializeModelDropdown(values.model_choice);   
                 initializeLLMTemplateDropdown(values.local_llm_chat_template_format);
                 initializeGPURadioButtons(values.use_gpu);
                 initializeLLMRadioButtons(values.use_local_llm, values.model_choice);
-                initializeEventListenersForLLMTabRadioButtons();
+                initializeEventListenersForLLMTab();
                 initializeEventListenersForLLMTabSliders();
             }
 
@@ -2647,29 +2691,28 @@
             function getLlmConfig() {
                 const useLocalLlmRadioButton = document.getElementById('local_llm_radio_button');
                 const useApiRadioButton = document.getElementById('api_llm_radio_button');
-                const useGpuForLocalLlm = document.getElementById('gpu_radio_yes');
                 const update_azure_gpt_config = document.getElementById('update_azure_gpt').checked;
 
                 let config = {
                     'use_local_llm': useLocalLlmRadioButton.checked,
                     'use_azure_open_ai':false,
-                    'use_gpu': false,
-                    'model_choice':"",
-                    'local_llm_chat_template_format':"",
-                    'local_llm_gpu_layers': document.getElementById('NumbGpuLayers').value,
-                    'local_llm_context_length': document.getElementById('LlmCtxLgt').value,
-                    'local_llm_max_new_tokens': document.getElementById('MaxNewToks').value,
-                    'local_llm_temperature': parseFloat(document.getElementById('tempSlider').value),
-                    'local_llm_top_k': parseInt(document.getElementById('topkSlider').value),
-                    'local_llm_top_p': parseFloat(document.getElementById('toppSlider').value),
-                    'local_llm_min_p': parseFloat(document.getElementById('minpSlider').value),
-                    'local_llm_n_keep': parseInt(document.getElementById('nkeepSlider').value)
                 };
 
                 if (useLocalLlmRadioButton.checked) {
-                    config.model_choice = document.getElementById('modelDropdown').value;
-                    config.local_llm_chat_template_format = document.getElementById('llmTemplateDropdown').value;
-                    config.use_gpu = useGpuForLocalLlm.checked;
+                    config.local_llm_server = document.getElementById('local_llm_server_select_dropdown').value;
+                    if (config.local_llm_server === "llama-cpp") {
+                        config.model_choice = document.getElementById('modelDropdown').value;
+                        config.local_llm_chat_template_format = document.getElementById('llmTemplateDropdown').value;
+                        config.use_gpu = document.getElementById('gpu_radio_yes').checked;
+                        config.local_llm_gpu_layers = parseInt(document.getElementById('NumbGpuLayers').value);
+                        config.local_llm_context_length = parseInt(document.getElementById('LlmCtxLgt').value);
+                        config.local_llm_max_new_tokens = parseInt(document.getElementById('MaxNewToks').value);
+                        config.local_llm_temperature = parseFloat(document.getElementById('tempSlider').value);
+                        config.local_llm_top_k = parseInt(document.getElementById('topkSlider').value);
+                        config.local_llm_top_p = parseFloat(document.getElementById('toppSlider').value);
+                        config.local_llm_min_p = parseFloat(document.getElementById('minpSlider').value);
+                        config.local_llm_n_keep = parseInt(document.getElementById('nkeepSlider').value);
+                    } 
                 } else if (useApiRadioButton.checked) {
                     config.model_choice = document.getElementById('llmApiDropdown').value;
                     if (config.model_choice === "AzureOpenAI") {
@@ -2792,8 +2835,18 @@
                 return config;
             }
 
+
+            function getHfWaitressConfig() {
+                let hf_config = {
+                    'model_id': document.getElementById('hfModelDropdown').value,
+                };
+
+                return hf_config;
+            }
+
+
             function saveConfigToServer(config) {
-                fetch('/config_writer_api', {
+                return fetch('/config_writer_api', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -2820,7 +2873,60 @@
             }
 
 
+            function handleHfWaitressChanges(hf_config) {
+                return new Promise((resolve, reject) => {
+                    document.getElementById('SavingHfWaitressSettings').style.display = 'block';
+
+                    fetch('http://localhost:9069/hf_config_writer_api', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            'config_updates': hf_config
+                        })
+                    })
+                    .then(response => {
+                        if (!response.ok) {
+                            return response.json().then(err => { throw new Error(err.error) });
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        console.log(data);
+                        if (data.restart_required) {
+                            // Restart HF-Waitress Server
+                            return fetch('http://localhost:9069/restart_server');
+                        }
+                        return { ok: true, json: () => Promise.resolve({ success: true }) };
+                    })
+                    .then(response => {
+                        if (!response.ok) {
+                            return response.json().then(err => { throw new Error(err.error) });
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        if (data.success) {
+                            document.getElementById('SavingHfWaitressSettings').style.display = 'none';
+                            resolve();  // Resolve the promise when everything is done
+                        } else {
+                            throw new Error('Internal Server Error: Check hf_server_log and HF-Waitress command-line for more details.');
+                        }
+                    })
+                    .catch(error => {
+                        errorHandler("handling HF-Waitress Server changes", "handleHfWaitressChanges", String(error.message));
+                        reject(error);  // Reject the promise if there's an error
+                    })
+                    .finally(() => {
+                        document.getElementById('SavingHfWaitressSettings').style.display = 'none';
+                    });
+                });
+            }
+
+
             function handleSaveChanges() {
+                
                 const config = {
                     ...getLlmConfig(),
                     ...getVectorEmbeddingsConfig(),
@@ -2829,8 +2935,33 @@
                     ...getOcrConfig(),
                     ...getGoogleDriveConfig()
                 };
-                console.log("handleSaveChanges config: ", config);
-                saveConfigToServer(config);
+
+                if (config.local_llm_server === "hf-waitress") {
+                    const hf_config = {
+                        ...getHfWaitressConfig()
+                    };
+                    console.log("handleHfWaitressChanges hf_config: ", hf_config);
+                    handleHfWaitressChanges(hf_config)
+                        .then(() => {
+                            console.log("handleSaveChanges config: ", config);
+                            return saveConfigToServer(config);
+                        })
+                        .then(() => {
+                            console.log("All changes saved successfully, LARS restart unnecessary.");
+                        })
+                        .catch(error => {
+                            errorHandler("saving HF-Waitress and LARS settings", "handleSaveChanges()", String(error.message));
+                        });
+                } else {
+                    console.log("handleSaveChanges config: ", config);
+                    saveConfigToServer(config)
+                        .then(() => {
+                            console.log("LARS config saved successfully, restart unnecessary.");
+                        })
+                        .catch(error => {
+                            errorHandler("saving LARS settings", "handleSaveChanges()", String(error.message));
+                        });
+                }
             }
 
             document.getElementById('saveChangesButton').addEventListener('click', handleSaveChanges);
