@@ -891,6 +891,22 @@
 
                                             <br>
 
+                                            <div id="hf_waitress_is_awq">
+                                                <label class="hf-select-settings-labels-group">Activation-aware Weight Quantized (AWQ) Model? (--awq):</label>
+                                                <input type="radio" id="hf_waitress_is_awq_yes" name="hf_use_awq" value="y" style="margin-left: 7px;"> Yes
+                                                <input type="radio" id="hf_waitress_is_awq_no" name="hf_use_awq" value="n" style="margin-left: 7px;"> No (Default)
+                                            </div>
+
+                                            <br>
+
+                                            <div id="hf_waitress_trust_remote_code">
+                                                <label class="hf-select-settings-labels-group">Trust Remote Code (--trust_remote_code):</label>
+                                                <input type="radio" id="hf_waitress_trust_remote_code_yes" name="hf_trust_remote" value="y" style="margin-left: 7px;"> Yes (Default)
+                                                <input type="radio" id="hf_waitress_trust_remote_code_no" name="hf_trust_remote" value="n" style="margin-left: 7px;"> No
+                                            </div>
+
+                                            <br>
+
                                             <!--Advanced Settings Section Begins-->
                                             <a href="#" class="btn btn-link btn-primary llm-adv-set-toggle" id="advancedHfLlmSettingsToggle" data-bs-toggle="collapse" data-bs-target="#advancedHfLlmSettings" aria-expanded="false" aria-controls="advancedHfLlmSettings" style="display: inline-block;">
                                                 Advanced Settings >>>
@@ -904,8 +920,24 @@
                                                     <button class="btn btn-primary" type="button" id="resetHfLlmAdvancedDefaults">Reset to Defaults</button>
         
                                                     <br>
+
+                                                    <div class="form-group" style="display: flex; align-items: center;">
+                                                        <input type="checkbox" id="update_hf_access_token" name="update_hf_access_token" style="margin-right: 10px;">
+                                                        <label for="update_hf_access_token" style="margin-right: 20px;">Update HF Access Token for Gated Models</label>
+                                                        <input type="text" id="hf_access_token" name="hf_access_token" style="width: 100%;" disabled>
+                                                    </div>
+
+                                                    <br>
         
                                                     <div class="settings-requiring-restart-container">
+
+                                                        <div id="hf_waitress_use_flash_attention_2" class="restart-settings-group">
+                                                            <label class="hf-select-settings-labels-group">Use Flash Attention 2? Ensure hardware and software requirements met (--use_flash_attention_2):</label>
+                                                            <input type="radio" id="hf_waitress_use_flash_attention_2_yes" name="hf_use_fa2" value="y" style="margin-left: 7px;"> Yes
+                                                            <input type="radio" id="hf_waitress_use_flash_attention_2_no" name="hf_use_fa2" value="n" style="margin-left: 7px;"> No (Default)
+                                                        </div>
+    
+                                                        <br>
 
                                                         <div id="hf_waitress_torch_device_map" class="restart-settings-group hf-select-settings-divs-group">
                                                             <label class="hf-select-settings-labels-group">Select Inference Device basis appropriate PyTorch Installation (--torch_device_map):</label>
@@ -936,14 +968,6 @@
                                                                 <option value="torch.uint8">torch.uint8</option>
                                                                 <option value="torch.bool">torch.bool</option>
                                                             </select>
-                                                        </div>
-
-                                                        <br>
-
-                                                        <div id="hf_waitress_use_flash_attention_2" class="restart-settings-group">
-                                                            <label class="hf-select-settings-labels-group">Use Flash Attention 2? Ensure hardware and software requirements met (--use_flash_attention_2):</label>
-                                                            <input type="radio" id="hf_waitress_use_flash_attention_2_yes" value="y" style="margin-left: 7px;"> Yes
-                                                            <input type="radio" id="hf_waitress_use_flash_attention_2_no" value="n" style="margin-left: 7px;"> No (Default)
                                                         </div>
 
                                                         <br>
@@ -1018,23 +1042,12 @@
                                                             <label for="HfwHqqGroupSize" class="hf-select-settings-labels-group">HQQ Group Size (must be divisible by group_size) (--hqq_group_size): </label>
                                                             <input type="number" id="HfwHqqGroupSize" min="0" style="width: 15%;" value="64">
                                                         </div>
-            
-                                                        <br>
-
-                                                        <div id="hf_waitress_trust_remote_code" class="restart-settings-group hf-select-settings-divs-group">
-                                                            <label class="hf-select-settings-labels-group">Trust Remote Code (--trust_remote_code):</label>
-                                                            <br>
-                                                            <select class="modal-selects" id="hf_waitress_trust_remote_code_choice">
-                                                                <option value="y">Yes</option>
-                                                                <option value="n">No (default)</option>
-                                                            </select>
-                                                        </div>
 
                                                         <br>
         
                                                         <div id="hf_waitress_port" class="restart-settings-group">
                                                             <label for="HfwPort" class="hf-select-settings-labels-group">HF-Waitress Server Port (default: 9069) (--port): </label>
-                                                            <input type="number" id="HfwPort" min="0"  max="65535" step="1" style="width: 15%;" value="9069">
+                                                            <input type="number" id="HfwPort" min="0"  max="65535" style="width: 15%;" value="9069">
                                                         </div>
         
                                                         <br>
@@ -1046,21 +1059,18 @@
                                                     </div>
         
                                                     <br>
-
-                                                    <div id="hf_waitress_return_full_text" class="hf-select-settings-divs-group">
-                                                        <label class="hf-select-settings-labels-group">Return Full Text (X-Return-Full-Text):</label>
-                                                        <br>
-                                                        <select class="modal-selects" id="hf_waitress_return_full_text_choice">
-                                                            <option value="y">Yes</option>
-                                                            <option value="n">No (default)</option>
-                                                        </select>
-                                                    </div>
-
-                                                    <br>
             
                                                     <div id="hf_waitress_max_new_tokens">
                                                         <label for="HfwMaxNewToks" class="hf-select-settings-labels-group">Maximum New Tokens (X-Max-New-Tokens): </label>
                                                         <input type="number" id="HfwMaxNewToks" min="100" style="width: 15%;" value="500">
+                                                    </div>
+
+                                                    <br>
+
+                                                    <div id="hf_waitress_return_full_text" class="hf-select-settings-divs-group">
+                                                        <label class="hf-select-settings-labels-group">Return Full Text (X-Return-Full-Text):</label>
+                                                        <input type="radio" id="hf_waitress_return_full_text_yes" name="hf_return_full_text" value="y" style="margin-left: 7px;"> Yes (Default)
+                                                        <input type="radio" id="hf_waitress_return_full_text_no" name="hf_return_full_text" value="n" style="margin-left: 7px;"> No
                                                     </div>
 
                                                     <br>
@@ -1731,6 +1741,36 @@
             }
 
 
+            function resetHfLlmAdvancedDefaults() {
+                document.getElementById('hf_waitress_is_awq_yes').checked = false;
+                document.getElementById('hf_waitress_is_awq_no').checked = true;
+                document.getElementById('hf_waitress_trust_remote_code_yes').checked = true;
+                document.getElementById('hf_waitress_trust_remote_code_no').checked = false;
+                document.getElementById('hf_waitress_use_flash_attention_2_yes').checked = false;
+                document.getElementById('hf_waitress_use_flash_attention_2_no').checked = true;
+                document.getElementById('hf_waitress_return_full_text_yes').checked = false;
+                document.getElementById('hf_waitress_return_full_text_no').checked = true;
+                document.getElementById('update_hf_access_token').checked = false;
+                document.getElementById('hf_access_token').disabled = true;
+                document.getElementById('hf_waitress_torch_device_map_choice').value = 'auto';
+                document.getElementById('hf_waitress_torch_dtype_choice').value = 'auto';
+                document.getElementById('hf_waitress_pipeline_task_choice').value = 'text-generation';
+                document.getElementById('hf_waitress_quantization_choice').value = 'quanto';
+                document.getElementById('hf_waitress_quantization_level_choice').value = 'int4';
+                document.getElementById('HfwHqqGroupSize').value = "64";
+                document.getElementById('HfwPort').value = "9069";
+                document.getElementById('HfwMaxNewToks').value = "500";
+                document.getElementById('HfwTempSlider').value = "0";
+                document.getElementById('HfwTempSliderValue').textContent = "0.0"
+                document.getElementById('HfwTopkSlider').value = "40";
+                document.getElementById('HfwTopkSliderValue').textContent = "40";
+                document.getElementById('HfwToppSlider').value = "0.95";
+                document.getElementById('HfwToppSliderValue').textContent = "0.95";
+                document.getElementById('HfwMinpSlider').value = "0.05";
+                document.getElementById('HfwMinpSliderValue').textContent = "0.05";
+            }
+
+
             function clearDocsLoadedTable() {
                 var table = document.getElementById('docs_loaded_details_table');
 
@@ -2257,6 +2297,7 @@
                     'n_keep',
                     'quantize',
                     'quant_level',
+                    'port',
                     'awq',
                     'hqq_group_size'
                 ]
@@ -2275,7 +2316,6 @@
                     return response.json()
                 })
                 .then(data => {
-                    //setUIValues(data.values);
                     return data.values;
                 })
                 .catch(error => {
@@ -2296,6 +2336,99 @@
                     }
                     hfDropdown.appendChild(option);
                 }
+            }
+
+
+            function initializeHfSettingsDropdowns(all_values) {
+                const hfTorchDeviceMap = document.getElementById('hf_waitress_torch_device_map_choice');
+
+                for (let option of hfTorchDeviceMap.options) {
+                    if (option.value == all_values.torch_device_map) {
+                        option.selected = true;
+                        break;
+                    }
+                }
+
+                const hfTorchDataType = document.getElementById('hf_waitress_torch_dtype_choice');
+
+                for (let option of hfTorchDataType.options) {
+                    if (option.value == all_values.torch_dtype) {
+                        option.selected = true;
+                        break;
+                    }
+                }
+
+                const hfPipelineTask = document.getElementById('hf_waitress_pipeline_task_choice');
+
+                for (let option of hfPipelineTask.options) {
+                    if (option.value == all_values.pipeline_task) {
+                        option.selected = true;
+                        break;
+                    }
+                }
+
+                const hfQuantMethod = document.getElementById('hf_waitress_quantization_choice');
+
+                for (let option of hfQuantMethod.options) {
+                    if (option.value == all_values.quantize) {
+                        option.selected = true;
+                        break;
+                    }
+                }
+
+                const hfQuantLevel = document.getElementById('hf_waitress_quantization_level_choice');
+
+                for (let option of hfQuantLevel.options) {
+                    if (option.value == all_values.quant_level) {
+                        option.selected = true;
+                        break;
+                    }
+                }
+
+            }
+
+
+            function initializeHfRadioButtons(all_values) {
+                document.getElementById('hf_waitress_is_awq_yes').checked = all_values.awq;
+                document.getElementById('hf_waitress_is_awq_no').checked = !all_values.awq;
+
+                document.getElementById('hf_waitress_trust_remote_code_yes').checked = all_values.trust_remote_code;
+                document.getElementById('hf_waitress_trust_remote_code_no').checked = !all_values.trust_remote_code;
+
+                document.getElementById('hf_waitress_use_flash_attention_2_yes').checked = all_values.use_flash_attention_2;
+                document.getElementById('hf_waitress_use_flash_attention_2_no').checked = !all_values.use_flash_attention_2;
+
+                document.getElementById('hf_waitress_return_full_text_yes').checked = all_values.return_full_text;
+                document.getElementById('hf_waitress_return_full_text_no').checked = !all_values.return_full_text;
+            }
+
+
+            function setHfSlidersAndTextAreas(values) {
+                document.getElementById('HfwHqqGroupSize').value = values.hqq_group_size;
+                document.getElementById('HfwPort').value = values.port;
+                document.getElementById('HfwMaxNewToks').value = values.max_new_tokens;
+                document.getElementById('HfwTempSlider').value = values.temperature;
+                document.getElementById('HfwTempSliderValue').textContent = values.temperature;
+                document.getElementById('HfwTopkSlider').value = values.top_k;
+                document.getElementById('HfwTopkSliderValue').textContent = values.top_k;
+                document.getElementById('HfwToppSlider').value = values.top_p;
+                document.getElementById('HfwToppSliderValue').textContent = values.top_p;
+                document.getElementById('HfwMinpSlider').value = values.min_p;
+                document.getElementById('HfwMinpSliderValue').textContent = values.min_p;
+            }
+
+
+            function initializeHfwServerConfig() {
+                loadAndSetCoreHfValues()
+                    .then(hf_values => {
+                        initializeHfModelDropdown(hf_values.model_list, hf_values.model_id);
+                        initializeHfSettingsDropdowns(hf_values);
+                        initializeHfRadioButtons(hf_values);
+                        setHfSlidersAndTextAreas(hf_values);
+                    })
+                    .catch(error => {
+                        errorHandler("initializing HF-Waitress Server config", "initializeHfwServerConfig", String(error.message));
+                    });
             }
 
             
@@ -2348,16 +2481,8 @@
 
             
             function initializeGPURadioButtons(use_gpu) {
-                var gpuYes = document.getElementById('gpu_radio_yes');
-                var gpuNo = document.getElementById('gpu_radio_no');
-
-                if (use_gpu) {
-                    gpuYes.checked = true;
-                    gpuNo.checked = false;
-                } else {
-                    gpuYes.checked = false;
-                    gpuNo.checked = true;
-                }
+                document.getElementById('gpu_radio_yes').checked = use_gpu;
+                document.getElementById('gpu_radio_no').checked = !use_gpu;
             }
 
             
@@ -2420,13 +2545,7 @@
                 const selection = document.getElementById('local_llm_server_select_dropdown').value;
 
                 if (selection === 'hf-waitress') {
-                    loadAndSetCoreHfValues()
-                        .then(hf_values => {
-                            initializeHfModelDropdown(hf_values.model_list, hf_values.model_id);
-                        })
-                        .catch(error => {
-                            errorHandler("initializing the application", "DOMContentLoaded", String(error.message));
-                        });
+                    initializeHfwServerConfig();
                 }
 
                 document.getElementById('llama_cpp_div').style.display = selection === 'llama-cpp' ? 'block' : 'none';
@@ -2472,6 +2591,7 @@
 
                 // Event listener for Reset Defaults button:
                 document.getElementById('resetLlmAdvancedDefaults').addEventListener('click', resetLlmAdvancedDefaults);    //aparently, adding parenthesis () here will cause resetLlmAdvancedDefaults to run immediately when the script executes, not on button click. Removing them allows the function to be passed as a reference correctly on click.
+                document.getElementById('resetHfLlmAdvancedDefaults').addEventListener('click', resetHfLlmAdvancedDefaults);    
 
                 // Initial state check:
                 toggleLocalLlmSelection();
@@ -2482,6 +2602,10 @@
                     document.getElementById('azure_openai_api_url').disabled = !this.checked;   
                     document.getElementById('azure_openai_api_key').disabled = !this.checked;   
                     document.getElementById('azure_openai_deployment_name').disabled = !this.checked;
+                });
+
+                document.getElementById('update_hf_access_token').addEventListener('change', function() {
+                    document.getElementById('hf_access_token').disabled = !this.checked;   
                 });
             }
 
@@ -2502,19 +2626,29 @@
                 document.getElementById('minpSlider').addEventListener('input', function() {
                     document.getElementById('minpSliderValue').textContent = this.value;
                 });
+
+                document.getElementById('HfwTempSlider').addEventListener('input', function() {
+                    document.getElementById('HfwTempSliderValue').textContent = this.value;
+                });
+
+                document.getElementById('HfwTopkSlider').addEventListener('input', function() {
+                    document.getElementById('HfwTopkSliderValue').textContent = this.value;
+                });
+
+                document.getElementById('HfwToppSlider').addEventListener('input', function() {
+                    document.getElementById('HfwToppSliderValue').textContent = this.value;
+                });
+
+                document.getElementById('HfwMinpSlider').addEventListener('input', function() {
+                    document.getElementById('HfwMinpSliderValue').textContent = this.value;
+                });
             }
             
             
             function initializeLLMTabComponents(values) {
                 initializeLocalLLMServerDropdown(values.local_llm_server);
                 if (values.local_llm_server === "hf-waitress") {
-                    loadAndSetCoreHfValues()
-                        .then(hf_values => {
-                            initializeHfModelDropdown(hf_values.model_list, hf_values.model_id);
-                        })
-                        .catch(error => {
-                            errorHandler("initializing the application", "DOMContentLoaded", String(error.message));
-                        });
+                    initializeHfwServerConfig();
                 }
                 initializeModelDropdown(values.model_choice);   
                 initializeLLMTemplateDropdown(values.local_llm_chat_template_format);
