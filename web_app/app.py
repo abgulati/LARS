@@ -2126,14 +2126,27 @@ def store_user_rating():
 
 
 
-def is_llama_cpp_local_server_online():
+def is_local_server_online(server_to_check):
+    server_health_url = ''
+    if server_to_check == 'llama-cpp':
+        server_health_url = 'http://localhost:8080/health'
+    elif server_to_check == 'hf-waitress':
+        server_health_url = 'http://localhost:9069/health'
+    else:
+        return handle_api_error("Invalid server_to_check in method is_local_server_online, encountered error: ", e)
+
+    print(f"Checking {server_to_check} server status")
+
     try:
-        response = requests.get('http://localhost:8080/health')
+        response = requests.get(server_health_url)
         
         if response.status_code == 200:
             data = response.json()  # parse the JSON response to determine the server status
-            if data['status'] == 'ok':
-                print(f"Server ready: {data['slots_idle']} idle slots, {data['slots_processing']} processing slots.")
+            if data['status'] == 'ok' and server_to_check == 'llama-cpp':
+                print(f"llama.cpp Server ready: {data['slots_idle']} idle slots, {data['slots_processing']} processing slots.")
+                return {"server_available":True, "loading_model":False, "status_code":200}
+            elif data['status'] == 'ok' and server_to_check == 'hf-waitress':
+                print(f"hf-waitress Server ready and online")
                 return {"server_available":True, "loading_model":False, "status_code":200}
             elif data['status'] == 'no slot available':
                 print("No slots available. Server is running but cannot handle more requests.")
@@ -2150,7 +2163,7 @@ def is_llama_cpp_local_server_online():
         
         elif response.status_code == 500:
             print("Server error: Failed to load LLM.")
-            logger.error("llama.cpp - 500 event")
+            logger.error("Local LLM Server - 500 event")
             return {"server_available":False, "loading_model":False, "status_code":500}
         
         else:
@@ -2165,7 +2178,7 @@ def is_llama_cpp_local_server_online():
             print(error_message)
         return {"server_available":False, "loading_model":True, "status_code":500}
     except Exception as e:
-        error_message = f"\n\nCould not check llama.cpp local-server health, encountered error: {e}\n\n"
+        error_message = f"\n\nCould not check local LLM Server health, encountered error: {e}\n\n"
         if logger:
             logger.error(error_message)
             print(error_message)
@@ -2225,7 +2238,7 @@ def llama_cpp_server_starter():
         LLM_CHANGE_RELOAD_TRIGGER_SET = False
 
     try:
-        if is_llama_cpp_local_server_online()['server_available']:
+        if is_local_server_online('llama-cpp')['server_available']:
             print("Server online. Terminating and reloading from config.json")
             try:
                 terminate_llama_cpp_process(LLAMA_CPP_PROCESS)
@@ -2287,7 +2300,7 @@ def llama_cpp_server_starter():
 
     try:
         for _ in range(attempts):
-            if is_llama_cpp_local_server_online()['server_available']:
+            if is_local_server_online('llama-cpp')['server_available']:
                 print("llama.cpp server launched succesfully! Returning.")
                 LLM_LOADED_UP = True
                 return jsonify({'success': True, 'llm_model': model_choice})
@@ -2297,6 +2310,23 @@ def llama_cpp_server_starter():
 
     return handle_api_error("Failed to start llama.cpp local-server")
 
+
+@app.route('/check_local_llm_server_status', methods=['POST'])
+def check_local_llm_server_status():
+    
+    server_online = False
+    
+    try:
+        server_to_check = request.form['server_to_check']
+    except Exception as e:
+        return handle_api_error("Server-side error, could not read server_to_check from the POST request in method check_local_llm_server_status, encountered error: ", e)
+    
+    try:
+        server_online = is_local_server_online(server_to_check)['server_available']
+    except Exception as e:
+        return handle_api_error(f"Error checking {server_to_check} server status in method check_local_llm_server_status, encountered error: ", e)
+
+    return jsonify({'success': True, 'server_online': server_online})
 
 
 @app.route('/load_vectordb')

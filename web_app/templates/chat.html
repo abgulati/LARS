@@ -877,6 +877,10 @@
                                             </select>
                                         </div>
 
+                                        <div class="local-llm-server-status-indicator">
+                                            <span id="local_llm_server_status_indicator_text" style="color: red; font-weight: 500;"><i class="fa-solid fa-circle"></i> Server Offline</span>
+                                        </div>
+
                                         <br>
 
                                         <div id="hf_waitress_div" style="display: none;">
@@ -1113,8 +1117,9 @@
                                         <div id="llama_cpp_div" style="display: none;">
 
                                             <input type="file" name="llmFile" id="uploadLlm" style="display: none;">
-                                            <button type="button" id="uploadLlmButton" class="btn btn-primary upload-file-btn" onclick="document.getElementById('uploadLlm').click();" style="display: none;"><i class="fas fa-upload"></i> Upload an LLM</button>
+                                            <button type="button" id="uploadLlmButton" class="btn btn-primary upload-file-btn" onclick="document.getElementById('uploadLlm').click();"><i class="fas fa-upload"></i> Upload an LLM</button>
                                             
+                                            <br>
                                             <br>
 
                                             <div  id="localLlmSelection">
@@ -1617,6 +1622,11 @@
 
             function closeNav() {
                 document.getElementById("sidenav").style.width = "0";
+            }
+
+            function setServerStatusIndicator(status) {
+                document.getElementById('local_llm_server_status_indicator_text').innerHTML = `<i class="fa-solid fa-circle"></i> Server ${status}`;
+                document.getElementById('local_llm_server_status_indicator_text').style.color = status === "Online" ? "green" : "red";
             }
 
 
@@ -2241,6 +2251,39 @@
                 });
             }
 
+
+            function checkLocalLLMServerStatus() {
+                setServerStatusIndicator('Status Check In-Progress...');
+                const server_to_check = document.getElementById('local_llm_server_select_dropdown').value;
+                let formData = new FormData();
+                formData.append('server_to_check', server_to_check);
+                fetch('/check_local_llm_server_status', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        return response.json().then(err => { throw new Error(err.error)});
+                    }
+                    return response.json()
+                })
+                .then(data => {
+                    if (data.success) {
+                        console.log(data);
+                        if (data.server_online) {
+                            setServerStatusIndicator('Online');
+                        } else {
+                            setServerStatusIndicator('Offline');
+                        }
+                    } else {
+                        throw new Error('Internal Server Error: Check server-log and server command-line for more details.');
+                    }
+                })
+                .catch(error => {
+                    errorHandler("checking local LLM server status", "/check_local_llm_server_status", String(error.message))
+                });
+            }
+
             
             ////////////////////////---------DOMContentLoaded Block Begins---------////////////////////////////
             function initializeChatLink() {
@@ -2468,12 +2511,14 @@
             function initializeHfwServerConfig() {
                 loadAndSetCoreHfValues()
                     .then(hf_values => {
+                        setServerStatusIndicator("Online");
                         initializeHfModelDropdown(hf_values.model_list, hf_values.model_id);
                         initializeHfSettingsDropdowns(hf_values);
                         initializeHfRadioButtons(hf_values);
                         setHfSlidersAndTextAreas(hf_values);
                     })
                     .catch(error => {
+                        setServerStatusIndicator("Offline");
                         errorHandler("initializing HF-Waitress Server config", "initializeHfwServerConfig", String(error.message));
                     });
             }
@@ -2621,6 +2666,7 @@
             function initializeEventListenersForLLMTab() {
                 // Event listener for Local LLM Server selection:
                 document.getElementById('local_llm_server_select_dropdown').addEventListener('change', toggleLocalLLMSettingsForms);
+                document.getElementById('local_llm_server_select_dropdown').addEventListener('change', checkLocalLLMServerStatus);
 
                 // Event listener for LLM/API radio buttons:
                 document.getElementById('local_llm_radio_button').addEventListener('change', toggleLlmApiForm);
@@ -3042,14 +3088,17 @@
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
+                        setServerStatusIndicator("Online");
                         const llm_model = data.llm_model;
                         LLM_MODEL = String(data.llm_model);
                         return loadVectorDB(llm_model);
                     } else {
+                        setServerStatusIndicator("Error");
                         throw new Error('Internal Server Error: Check server-log and server command-line for more details.');
                     }
                 })
                 .catch(error => {
+                    setServerStatusIndicator("Offline");
                     errorHandler("loading the LLM", "/llama_cpp_server_starter", String(error.message))
                 })
             }
