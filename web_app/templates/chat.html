@@ -1018,7 +1018,7 @@
                                                                 <option value="quanto">Quanto (Default)</option>
                                                                 <option value="bitsandbytes">BitsAndBytes</option>
                                                                 <option value="hqq">HQQ</option>
-                                                                <option value="no_quantization">No Quantization</option>
+                                                                <option value="n">No Quantization</option>
                                                             </select>
                                                         </div>
 
@@ -1710,6 +1710,36 @@
                     errorHandler("fetching the history-menu list", "/load_chat_history_list", String(error.message))
                 });
             }
+
+
+            async function updateHfModelList() {
+                const hfDropdown = document.getElementById('hfModelDropdown');
+                const currentModelList = hfDropdown.value.split(',');
+
+                const response = await fetch('/hf_config_writer_api', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ config_updates: { model_list: currentModelList } })
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        return response.json().then(err => { throw new Error(err.error)});
+                    }
+                    return response.json()
+                })
+                .then(data => {
+                    if (data.success) {
+                        console.log("HF-Waitress model list updated successfully");
+                    } else {
+                        throw new Error('Internal Server Error: Check server-log and server command-line for more details.');
+                    }
+                })
+                .catch(error => {
+                    errorHandler("updating the HF-Waitress model list", "updateHfModelList()", String(error.message))
+                });
+            }
             
 
             function setDefaultTemplate() {
@@ -1771,6 +1801,22 @@
             }
 
 
+            function addNewHfwModel() {
+                console.log("Adding new model to HF-Waitress dropdown");
+
+                const newModelId = document.getElementById('addHfwModelInput').value.trim();
+                const hfDropdown = document.getElementById('hfModelDropdown');
+                
+                if (newModelId && !currentModelList.includes(newModelId)) {
+                    const option = document.createElement('option');
+                    option.value = newModelId;
+                    option.textContent = newModelId;
+                    hfDropdown.appendChild(option);
+                }
+                updateHfModelList();    // User should be able to see the new model in the dropdown immediately and select it even if the model list is not updated on the server side!
+            }
+
+                        
             function clearDocsLoadedTable() {
                 var table = document.getElementById('docs_loaded_details_table');
 
@@ -1779,6 +1825,7 @@
                 }
             }
 
+            
             function clearGoogleDriveTable() {
                 var table = document.getElementById('google_drive_files_tables');
                 var tbody = table.querySelector('tbody');
@@ -2591,7 +2638,10 @@
 
                 // Event listener for Reset Defaults button:
                 document.getElementById('resetLlmAdvancedDefaults').addEventListener('click', resetLlmAdvancedDefaults);    //aparently, adding parenthesis () here will cause resetLlmAdvancedDefaults to run immediately when the script executes, not on button click. Removing them allows the function to be passed as a reference correctly on click.
-                document.getElementById('resetHfLlmAdvancedDefaults').addEventListener('click', resetHfLlmAdvancedDefaults);    
+                document.getElementById('resetHfLlmAdvancedDefaults').addEventListener('click', resetHfLlmAdvancedDefaults);
+
+                // Event listener for adding a new model to the HF-Waitress dropdown:
+                //document.getElementById('addHfwModelButton').addEventListener('click', addNewHfwModel);
 
                 // Initial state check:
                 toggleLocalLlmSelection();
@@ -3184,7 +3234,31 @@
             function getHfWaitressConfig() {
                 let hf_config = {
                     'model_id': document.getElementById('hfModelDropdown').value,
+                    'torch_device_map': document.getElementById('hf_waitress_torch_device_map_choice').value,
+                    'torch_dtype': document.getElementById('hf_waitress_torch_dtype_choice').value,
+                    'use_flash_attention_2': document.getElementById('hf_waitress_use_flash_attention_2_yes').checked,
+                    'trust_remote_code': document.getElementById('hf_waitress_trust_remote_code_yes').checked,
+                    'awq': document.getElementById('hf_waitress_is_awq_yes').checked,
+                    'pipeline_task': document.getElementById('hf_waitress_pipeline_task_choice').value,
+                    'max_new_tokens': parseInt(document.getElementById('HfwMaxNewToks').value),
+                    'top_k': parseInt(document.getElementById('HfwTopkSlider').value),
+                    'top_p': parseFloat(document.getElementById('HfwToppSlider').value),
+                    'min_p': parseFloat(document.getElementById('HfwMinpSlider').value),
+                    'return_full_text': document.getElementById('hf_waitress_return_full_text_yes').checked,
+                    'quantize': document.getElementById('hf_waitress_quantization_choice').value,
+                    'quant_level': document.getElementById('hf_waitress_quantization_level_choice').value,
+                    'hqq_group_size': parseInt(document.getElementById('HfwHqqGroupSize').value),
+                    'port': parseInt(document.getElementById('HfwPort').value)
                 };
+
+                hfw_temperature = parseFloat(document.getElementById('HfwTempSlider').value);
+                hf_config.do_sample = hfw_temperature > 0.0;
+                hf_config.temperature = Math.max(0.0, hfw_temperature);
+
+                if(document.getElementById('update_hf_access_token').checked) {
+                    hf_config.access_gated = true;
+                    hf_config.hf_access_token = document.getElementById('hf_access_token').value;
+                }
 
                 return hf_config;
             }
