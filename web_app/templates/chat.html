@@ -929,7 +929,7 @@
                                                         <input type="checkbox" id="update_hf_access_token" name="update_hf_access_token" style="margin-right: 10px;">
                                                         <label for="update_hf_access_token" style="margin-right: 20px;">Update HF Access Token for Gated Models</label>
                                                         <input type="text" id="hf_access_token" name="hf_access_token" style="width: 100%;" disabled>
-                                                    </div>
+                                                    </div>  
 
                                                     <br>
         
@@ -2743,9 +2743,7 @@
             
             function initializeLLMTabComponents(values) {
                 initializeLocalLLMServerDropdown(values.local_llm_server);
-                if (values.local_llm_server === "hf-waitress") {
-                    initializeHfwServerConfig();
-                }
+                
                 initializeModelDropdown(values.model_choice);   
                 initializeLLMTemplateDropdown(values.local_llm_chat_template_format);
                 initializeGPURadioButtons(values.use_gpu);
@@ -3078,7 +3076,7 @@
             
             function startLLMAndVectorDB() {
                 // Finally, trigger the LLM & vectorDB starter!
-                return fetch('/llama_cpp_server_starter')
+                return fetch('/local_llm_server_starter')
                 .then(response => {
                     if (!response.ok) {
                         return response.json().then(err => { throw new Error(err.error)});
@@ -3107,6 +3105,7 @@
             document.addEventListener("DOMContentLoaded", function() {
                 initializeUI();
                 document.getElementById('ModelAndDBLoading').style.display = 'block';   //Start initializing the chat session
+                let local_llm_server;
 
                 loadAndSetCoreValues()
                     .then(values => {
@@ -3117,9 +3116,13 @@
                         initializeOCRTabComponents(values);
                         initializeGoogleDriveTabComponents(values);
                         initializeSettingsModalTabCycleListener();
+                        local_llm_server = values.local_llm_server;
                         return startLLMAndVectorDB();
                     })
                     .then(() => {
+                        if (local_llm_server === "hf-waitress") {
+                            initializeHfwServerConfig();
+                        }
                         loadChatHistoryMenu();  // should be done regardless of errors
                     })
                     .catch(error => {
@@ -3306,7 +3309,7 @@
 
                 if(document.getElementById('update_hf_access_token').checked) {
                     hf_config.access_gated = true;
-                    hf_config.hf_access_token = document.getElementById('hf_access_token').value;
+                    hf_config.access_token = document.getElementById('hf_access_token').value;
                 }
 
                 return hf_config;
@@ -3404,32 +3407,29 @@
                     ...getGoogleDriveConfig()
                 };
 
+                let hfSavePromise = Promise.resolve();  // HF-Waitress server changes are saved in a separate Promise to handle them first, then save the rest of the LARS config.
+
                 if (config.local_llm_server === "hf-waitress") {
                     const hf_config = {
                         ...getHfWaitressConfig()
                     };
                     console.log("handleHfWaitressChanges hf_config: ", hf_config);
-                    handleHfWaitressChanges(hf_config)
+                    hfSavePromise = handleHfWaitressChanges(hf_config)
                         .then(() => {
-                            console.log("handleSaveChanges config: ", config);
-                            return saveConfigToServer(config);
-                        })
-                        .then(() => {
-                            console.log("All changes saved successfully, LARS restart unnecessary.");
+                            console.log("HF-Waitress server changes saved successfully.");
                         })
                         .catch(error => {
-                            errorHandler("saving HF-Waitress and LARS settings", "handleSaveChanges()", String(error.message));
-                        });
-                } else {
-                    console.log("handleSaveChanges config: ", config);
-                    saveConfigToServer(config)
-                        .then(() => {
-                            console.log("LARS config saved successfully, restart unnecessary.");
-                        })
-                        .catch(error => {
-                            errorHandler("saving LARS settings", "handleSaveChanges()", String(error.message));
+                            errorHandler("saving HF-Waitress settings", "handleSaveChanges()", String(error.message));  // Catching the error will resolve the Promise and allow the rest of the code to continue!
                         });
                 }
+                console.log("Saving LARS config: ", config);
+                Promise.all([hfSavePromise, saveConfigToServer(config)])    // Use Promise.all() to handle both promises in parallel, but wait for both to resolve before proceeding.
+                    .then(() => {
+                        console.log("LARS config saved successfully, restart unnecessary.");
+                    })
+                    .catch(error => {
+                        errorHandler("saving LARS settings", "handleSaveChanges()", String(error.message));
+                    });
             }
 
             document.getElementById('saveChangesButton').addEventListener('click', handleSaveChanges);

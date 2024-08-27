@@ -95,6 +95,7 @@ def pdf_viewer(filename):
 
 #########################------------------GLOBALS!----------------------###############################
 LLAMA_CPP_PROCESS = None
+HF_WAITRESS_PROCESS = None
 LLM = None
 CHAT_ID = None
 SEQUENCE_ID = None
@@ -2206,7 +2207,7 @@ def send_ctrl_c_to_process(process):
                 print("Process still running after force kill attempt.")
 
 
-def terminate_llama_cpp_process(process):
+def terminate_local_llm_server_process(process):
     try:
         # process.terminate() sends 'SIGTERM' on Unix-like systems / 'TerminateProcess' on Windows, allows for graceful termination
         # process.wait()
@@ -2241,7 +2242,7 @@ def llama_cpp_server_starter():
         if is_local_server_online('llama-cpp')['server_available']:
             print("Server online. Terminating and reloading from config.json")
             try:
-                terminate_llama_cpp_process(LLAMA_CPP_PROCESS)
+                terminate_local_llm_server_process(LLAMA_CPP_PROCESS)
                 LLAMA_CPP_PROCESS = None
             except Exception as e:
                 LLM_LOADED_UP = True
@@ -2253,8 +2254,7 @@ def llama_cpp_server_starter():
                 except Exception as e:
                     handle_error_no_return("Missing values in config.json when preparing to launch llama.cpp server, encountered error: ", e)
                 return jsonify({'success': True, 'llm_model': 'undefined'})
-                
-                
+                 
     except Exception as e:
         handle_error_no_return("Could not pre-check if llama.cpp server is running, it may be offline. Printing error and proceeding: ", e)
 
@@ -2311,6 +2311,74 @@ def llama_cpp_server_starter():
     return handle_api_error("Failed to start llama.cpp local-server")
 
 
+@app.route('/hf_waitress_server_starter')
+def hf_waitress_server_starter():
+    print("Starting HF-Waitress Server")
+
+    global LLM_CHANGE_RELOAD_TRIGGER_SET
+    global LLM_LOADED_UP
+    global HF_WAITRESS_PROCESS
+
+    is_awq = False
+    model_choice = 'microsoft/Phi-3-mini-4k-instruct'   # match default in hf_waitress.py as this will only be used in the very first run, as the hf_config.json file is created in the first run!
+    try:
+        with open('hf_config.json', 'r') as file:
+            hf_config = json.load(file)
+            is_awq = hf_config['awq']
+            model_choice = hf_config['model_id']
+    except Exception as e:
+        handle_error_no_return("Could not read hf_config.json in method hf_waitress_server_starter, encountered error: ", e)
+
+    if LLM_LOADED_UP and not LLM_CHANGE_RELOAD_TRIGGER_SET:
+        print(f'\n\nAlready loaded! Simply returning.\n\n')
+        return jsonify({'success': True, 'llm_model': model_choice})
+    elif LLM_CHANGE_RELOAD_TRIGGER_SET:
+        print('\n\nProceeding to reload the LLM & resetting the LLM_CHANGE_RELOAD_TRIGGER_SET flag.\n\n')
+        LLM_CHANGE_RELOAD_TRIGGER_SET = False
+
+    try:
+        if is_local_server_online('hf-waitress')['server_available']:
+            print("HF-Waitress server already running. Returning.")
+            LLM_LOADED_UP = True
+            return jsonify({'success': True, 'llm_model': model_choice})
+    except Exception as e:
+        handle_error_no_return("Could not check if HF-Waitress server is running in method hf_waitress_server_starter, encountered error: ", e)
+    
+    print("Proceeding to launch HF-Waitress server")
+
+    try:
+        if platform.system() == 'Windows':
+            if not is_awq:
+                HF_WAITRESS_PROCESS = subprocess.Popen(['python', 'hf_waitress.py'], creationflags=subprocess.CREATE_NEW_CONSOLE)   #Popen is non-blocking, so the server will keep running in the background
+            else:
+                HF_WAITRESS_PROCESS = subprocess.Popen(['python', 'hf_waitress.py', '--awq'], creationflags=subprocess.CREATE_NEW_CONSOLE)
+        else:
+            # Platform & container agnostic:
+            with open('hf_waitress_output_log.txt', 'w') as f:
+                if not is_awq:
+                    HF_WAITRESS_PROCESS = subprocess.Popen(['python3', 'hf_waitress.py'], stdout=f, stderr=subprocess.STDOUT, text=True)
+                else:
+                    HF_WAITRESS_PROCESS = subprocess.Popen(['python3', 'hf_waitress.py', '--awq'], stdout=f, stderr=subprocess.STDOUT, text=True)
+
+    except Exception as e:
+        return handle_api_error("Could not launch HF-Waitress process, encountered error: ", e)
+
+    timeout = 10   # seconds
+    attempts = 10
+
+    try:
+        for _ in range(attempts):
+            if is_local_server_online('hf-waitress')['server_available']:
+                print("HF-Waitress server launched succesfully! Returning.")
+                LLM_LOADED_UP = True
+                return jsonify({'success': True, 'llm_model': model_choice})
+            time.sleep(timeout)
+    except Exception as e:
+        handle_error_no_return("Could not check server status after launch attempt, printing error and retrying: ", e)
+
+    return handle_api_error("Failed to start HF-Waitress Server. It may be taking a while to download the model, try refreshing LARS in a few minutes.")
+
+
 @app.route('/check_local_llm_server_status', methods=['POST'])
 def check_local_llm_server_status():
     
@@ -2327,6 +2395,29 @@ def check_local_llm_server_status():
         return handle_api_error(f"Error checking {server_to_check} server status in method check_local_llm_server_status, encountered error: ", e)
 
     return jsonify({'success': True, 'server_online': server_online})
+
+
+@app.route('/local_llm_server_starter')
+def local_llm_server_starter():
+    print("Starting Local LLM Server")
+
+    try:
+        read_return = read_config(['local_llm_server'])
+        server_to_start = read_return['local_llm_server']
+    except Exception as e:
+        return handle_api_error("Server-side error, could not read local_llm_server from config.json in method local_llm_server_starter, encountered error: ", e)
+
+    try:
+        if server_to_start == 'hf-waitress':
+            return hf_waitress_server_starter()
+        elif server_to_start == 'llama-cpp':
+            return llama_cpp_server_starter()
+        else:
+            return handle_api_error(f"Invalid local LLM server choice in method local_llm_server_starter: {server_to_start}")
+    except Exception as e:
+        return handle_api_error("Server-side error, could not start local LLM server in method local_llm_server_starter, encountered error: ", e)
+
+    return jsonify({'success': True})
 
 
 @app.route('/load_vectordb')
