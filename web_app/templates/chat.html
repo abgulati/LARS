@@ -2280,7 +2280,7 @@
                     }
                 })
                 .catch(error => {
-                    errorHandler("checking local LLM server status", "/check_local_llm_server_status", String(error.message))
+                    errorHandler("checking local LLM server status", "checkLocalLLMServerStatus()", String(error.message))
                 });
             }
 
@@ -2409,7 +2409,7 @@
                     return data.values;
                 })
                 .catch(error => {
-                    errorHandler("reading hf_config.json", "loadAndSetCoreHfValues()", String(error.message))
+                    errorHandler("reading hf_config.json (likely means the HF-Waitress server is offline)", "loadAndSetCoreHfValues()", String(error.message))
                 });
             }
 
@@ -2511,15 +2511,13 @@
             function initializeHfwServerConfig() {
                 loadAndSetCoreHfValues()
                     .then(hf_values => {
-                        setServerStatusIndicator("Online");
                         initializeHfModelDropdown(hf_values.model_list, hf_values.model_id);
                         initializeHfSettingsDropdowns(hf_values);
                         initializeHfRadioButtons(hf_values);
                         setHfSlidersAndTextAreas(hf_values);
                     })
                     .catch(error => {
-                        setServerStatusIndicator("Offline");
-                        errorHandler("initializing HF-Waitress Server config", "initializeHfwServerConfig", String(error.message));
+                        errorHandler("initializing HF-Waitress Server config (likely means the HF-Waitress server is offline)", "initializeHfwServerConfig()", String(error.message));
                     });
             }
 
@@ -2665,8 +2663,8 @@
             
             function initializeEventListenersForLLMTab() {
                 // Event listener for Local LLM Server selection:
-                document.getElementById('local_llm_server_select_dropdown').addEventListener('change', toggleLocalLLMSettingsForms);
                 document.getElementById('local_llm_server_select_dropdown').addEventListener('change', checkLocalLLMServerStatus);
+                document.getElementById('local_llm_server_select_dropdown').addEventListener('change', toggleLocalLLMSettingsForms);
 
                 // Event listener for LLM/API radio buttons:
                 document.getElementById('local_llm_radio_button').addEventListener('change', toggleLlmApiForm);
@@ -3086,6 +3084,9 @@
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
+                        if (data.other_server_running) {
+                            alert("Warning: Both HF-Waitress and llama.cpp servers appear to be running. Consider manually shutting one down to conserve memory!")
+                        }
                         setServerStatusIndicator("Online");
                         const llm_model = data.llm_model;
                         LLM_MODEL = String(data.llm_model);
@@ -3407,23 +3408,26 @@
                     ...getGoogleDriveConfig()
                 };
 
-                let hfSavePromise = Promise.resolve();  // HF-Waitress server changes are saved in a separate Promise to handle them first, then save the rest of the LARS config.
+                let hfSavePromise = Promise.resolve();  // Initialized as a resolved promise so non-blocking!
 
                 if (config.local_llm_server === "hf-waitress") {
-                    const hf_config = {
-                        ...getHfWaitressConfig()
-                    };
-                    console.log("handleHfWaitressChanges hf_config: ", hf_config);
-                    hfSavePromise = handleHfWaitressChanges(hf_config)
-                        .then(() => {
-                            console.log("HF-Waitress server changes saved successfully.");
-                        })
-                        .catch(error => {
-                            errorHandler("saving HF-Waitress settings", "handleSaveChanges()", String(error.message));  // Catching the error will resolve the Promise and allow the rest of the code to continue!
-                        });
+                    const hf_waitress_server_status = document.getElementById('local_llm_server_status_indicator_text').style.color;
+                    if (hf_waitress_server_status === "green") {
+                        const hf_config = {
+                            ...getHfWaitressConfig()
+                        };
+                        console.log("handleHfWaitressChanges hf_config: ", hf_config);
+                        hfSavePromise = handleHfWaitressChanges(hf_config)  // Added to the promise chain only if the conditions are met!
+                            .then(() => {
+                                console.log("HF-Waitress server changes saved successfully.");
+                            })
+                            .catch(error => {
+                                errorHandler("saving HF-Waitress settings", "handleSaveChanges()", String(error.message));  // Catching the error will resolve the Promise and allow the rest of the code to continue!
+                            });
+                    }
                 }
                 console.log("Saving LARS config: ", config);
-                Promise.all([hfSavePromise, saveConfigToServer(config)])    // Use Promise.all() to handle both promises in parallel, but wait for both to resolve before proceeding.
+                Promise.all([hfSavePromise, saveConfigToServer(config)])    // This promise will always resolve, even if hfSavePromise is not resolved, so we're not blocking the saveConfigToServer() promise. Use Promise.all() to handle both promises in parallel, but wait for both to resolve before proceeding.
                     .then(() => {
                         console.log("LARS config saved successfully, restart unnecessary.");
                     })
