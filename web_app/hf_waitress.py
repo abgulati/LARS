@@ -631,6 +631,8 @@ def initialize_model():
 @app.route('/completions', methods=['POST'])
 def completions():
 
+    print("completions route triggered")
+
     with llm_semaphore:
 
         try:
@@ -672,6 +674,8 @@ def completions():
                 output = PIPE(messages)
         except Exception as e:
             handle_api_error("Could not generate output, encountered error: ", e)
+
+        print("Completions done")
 
         return jsonify({"success": True, "response": output})
 
@@ -749,7 +753,7 @@ def completions_stream():
             global PIPE
 
             try:
-                streamer = TextStreamer(PIPE.tokenizer, skip_special_tokens=True)
+                streamer = TextStreamer(PIPE.tokenizer, skip_special_tokens=True, skip_prompt=True)
 
                 if generation_args:
                     generation_args["streamer"] = streamer
@@ -775,9 +779,9 @@ def completions_stream():
             if i == 0:
                 line = line.strip('\n')
                 i += 1
-            yield f"data: {line}\n\n"
+            yield f"data: {line}\n"
         
-        yield "event: END\ndata: null\n\n"
+        yield "event: END\ndata: null\n"
 
         print("LLM stream done, releasing semaphore")
         llm_semaphore.release()
@@ -918,15 +922,20 @@ def health():
 
 @app.route('/restart_server')
 def restart_server():
-    global PIPE
 
-    try:
-        PIPE = None
-        initialize_model()
-    except Exception as e:
-        handle_api_error("Could not restart server, encountered error: ", e)
+    with llm_semaphore:
+        with config_writer_semaphore:
+            with error_logging_semaphore:
     
-    return jsonify(success=True)
+                global PIPE
+
+                try:
+                    PIPE = None
+                    initialize_model()
+                except Exception as e:
+                    handle_api_error("Could not restart server, encountered error: ", e)
+                
+                return jsonify(success=True)
 
 
 if __name__ == '__main__':
