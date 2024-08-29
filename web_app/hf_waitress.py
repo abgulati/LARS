@@ -435,6 +435,9 @@ def parse_arguments():
 
 
 def str_to_torch_dtype(dtype_str):
+
+    print(f"\n\nstr_to_torch_dtype({dtype_str})\n\n")
+
     dtype_map = {
         "torch.float16": torch.float16,
         "torch.float32": torch.float32,
@@ -446,11 +449,14 @@ def str_to_torch_dtype(dtype_str):
         "torch.uint8": torch.uint8,
         "torch.bool": torch.bool,
         "torch.bfloat16": torch.bfloat16,
+        "auto":"auto"
     }
     return dtype_map.get(dtype_str, None)
 
 
 def initialize_model():
+
+    print("\n\ninitializing model\n\n")
 
     global PIPE
 
@@ -924,8 +930,11 @@ def health():
 def restart_server():
 
     with llm_semaphore:
+        print("\n\n/restart_server acquired llm_semaphore, proceeding...\n\n")
         with config_writer_semaphore:
+            print("\n\n/restart_server acquired config_writer_semaphore, proceeding...\n\n")
             with error_logging_semaphore:
+                print("\n\n/restart_server acquired error_logging_semaphore, proceeding...\n\n")
     
                 global PIPE
 
