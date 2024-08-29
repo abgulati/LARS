@@ -3720,7 +3720,6 @@
 
                                     async function hfwProcessChunk() {
                                         let partialHfwData = '';
-                                        let wordSpacing = 0;
 
                                         while (true) {
                                             const { done, value } = await hfwReader.read();
@@ -3729,8 +3728,6 @@
                                                 break;
                                             }
                                             
-                                            //console.log("HFW value: ", value);
-
                                             const textChunk = new TextDecoder("utf-8").decode(value);
                                             const messages = textChunk.split('\n');
                                             
