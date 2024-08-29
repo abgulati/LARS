@@ -3564,7 +3564,7 @@
                         
                         console.log("do_rag: ", do_rag);
                         console.log("stream_session_id: ", stream_session_id);
-                        console.log("formatted_user_prompt: \n", formatted_user_prompt);
+                        console.log("formatted_user_prompt: ", formatted_user_prompt);
 
                          
                         const responseWrapperID = "ResponseWrapper" + String(stream_session_id);
@@ -3593,93 +3593,204 @@
 
 
                         async function fetchEventStream() {
-                            const url = "http://localhost:8080/completion";
-                            const requestData = {
-                                prompt: formatted_user_prompt,
-                                stream: true,
-                                temperature: parseFloat(document.getElementById('tempSlider').value),
-                                top_k: parseInt(document.getElementById('topkSlider').value),
-                                top_p: parseFloat(document.getElementById('toppSlider').value),
-                                min_p: parseFloat(document.getElementById('minpSlider').value),
-                                n_keep: parseInt(document.getElementById('nkeepSlider').value)
-                            };
+                            current_llm_server = document.getElementById('local_llm_server_select_dropdown').value;
+                            
+                            if (current_llm_server == 'llama-cpp') {
 
-                            try {
+                                const url = "http://localhost:8080/completion";
 
-                                const response = await fetch(url, {
-                                    method: 'POST',
-                                    headers: {
-                                        'Content-Type': 'application/json'
-                                    },
-                                    body: JSON.stringify(requestData)
-                                });
+                                const requestData = {
+                                    prompt: formatted_user_prompt,
+                                    stream: true,
+                                    temperature: parseFloat(document.getElementById('tempSlider').value),
+                                    top_k: parseInt(document.getElementById('topkSlider').value),
+                                    top_p: parseFloat(document.getElementById('toppSlider').value),
+                                    min_p: parseFloat(document.getElementById('minpSlider').value),
+                                    n_keep: parseInt(document.getElementById('nkeepSlider').value)
+                                };
 
-                                document.getElementById('chat-area').scrollTop = document.getElementById('chat-area').scrollHeight;     //Scroll to the bottom of the page
+                                try {
 
-                                const reader = response.body.getReader();   // To handle the Fetch API's 'Response' object when involving a ReadableStream.  By calling getReader(), a 'ReadableStreamDefaultReader' object is obtained
-                                let totalContent = '';  //String to accumulate content
-                                let receivedComplete = false;
+                                    const response = await fetch(url, {
+                                        method: 'POST',
+                                        headers: {
+                                            'Content-Type': 'application/json'
+                                        },
+                                        body: JSON.stringify(requestData)
+                                    });
 
-                                // Function to process each text chunk
-                                async function processChunk() {
-                                    let partialData = '';   // Holds partially received JSON strings
+                                    document.getElementById('chat-area').scrollTop = document.getElementById('chat-area').scrollHeight;     //Scroll to the bottom of the page
 
-                                    while (true) {
-                                        const { done, value } = await reader.read();
-                                        if (done) {
-                                            console.log("Stream complete");
-                                            break;
+                                    const reader = response.body.getReader();   // To handle the Fetch API's 'Response' object when involving a ReadableStream.  By calling getReader(), a 'ReadableStreamDefaultReader' object is obtained
+                                    let totalContent = '';  //String to accumulate content
+                                    let receivedComplete = false;
+
+                                    // Function to process each text chunk
+                                    async function processChunk() {
+                                        let partialData = '';   // Holds partially received JSON strings
+
+                                        while (true) {
+                                            const { done, value } = await reader.read();
+                                            if (done) {
+                                                console.log("Stream complete");
+                                                break;
+                                            }
+
+                                            const textChunk = new TextDecoder("utf-8").decode(value);   //When reading a stream with 'ReadableStreamDefaultReader', Uint8Array binary-data objects are received. TextDecoder decodes these byte streams into human readable text strings. UTF-8 encodes all possible chars in Unicode, and is the std text encoding in most network comms, thus is used here.
+                                            const messages = textChunk.split('\n'); //one streamed data-message at a time, newlines are standard for seperating SSE-messages which may arrive bunched-up in chunks or partially
+                                            messages.forEach(message => {
+
+                                                if (message.startsWith('data: ')) {
+                                                    const jsonStr = message.slice(6);   // remove 6 chars to get rid of the 'data: ' prefix!
+                                                    try {
+                                                        const dataObj = JSON.parse(jsonStr);
+                                                        //console.log(dataObj.content);   // Log only the content
+                                                        let streamed_content = dataObj.content.replace(/\n\n/g, '<br><br>').replace(/\n/g, '<br>'); // /g - global - replace throughout string, not just the first occurance
+
+                                                        if (!['', '<|eot_id|>', '</s>', '<|im_end|>', '<|end_of_turn|>', '<|EOT|>', '|END_OF_TURN_TOKEN|>', '<|end|>'].includes(streamed_content)) {
+                                                            totalContent += streamed_content;
+                                                            let tempDiv = document.createElement('div');
+                                                            tempDiv.innerHTML = streamed_content;
+
+                                                            while (tempDiv.firstChild) {
+                                                                responseContentElement.appendChild(tempDiv.firstChild); // When 'appendChild' is used on an element already part of the DOM, a copy isn't created, rather it's moved to the new position thus removing that first child from tempDiv here!
+                                                            }
+                                                        }
+
+                                                        const scrollThreshold = 100; //100px towards the bottom
+                                                        const isNearBottom =  chat_container.scrollHeight - chat_container.clientHeight - chat_container.scrollTop < scrollThreshold;   //by calculating this way, we're finding the difference between the total height of the chat area including the invisble part that's overflown (scrollHeight), the visible height of the chat area (clientHeight), and how far down the chat area has been scrolled (scrollTop). If less than the threshold, auto-scroll engages!
+                                                        // For example: if the total height is 100px(scrollHeight), 70px is visible (clientHeight), scrollTop increases as we scroll down, so it's 0 at the top and at the very bottom, scrollTop will be equal to scrollHeight - clientHeight = 30px, so the math would equal to 0px and thus within the threshold!
+                                                        if (isNearBottom) {
+                                                            //console.log("is scrolled to bottom")
+                                                            chat_container.scrollTop = chat_container.scrollHeight;
+                                                        }
+
+                                                        if (dataObj.stop) {
+                                                            receivedComplete = true;
+                                                            llm_response = totalContent;
+                                                            //console.log("Stop received, final content: ", totalContent);
+                                                        }
+                                                    } catch (error) {
+                                                        console.error('Error parsing JSON: ', error);
+                                                    }
+                                                }
+                                            });
+
+                                            responseContentElement.innerHTML = totalContent;
+
+                                            if (receivedComplete) break;
                                         }
+                                    }
 
-                                        const textChunk = new TextDecoder("utf-8").decode(value);   //When reading a stream with 'ReadableStreamDefaultReader', Uint8Array binary-data objects are received. TextDecoder decodes these byte streams into human readable text strings. UTF-8 encodes all possible chars in Unicode, and is the std text encoding in most network comms, thus is used here.
-                                        const messages = textChunk.split('\n'); //one streamed data-message at a time, newlines are standard for seperating SSE-messages which may arrive bunched-up in chunks or partially
-                                        messages.forEach(message => {
+                                    await processChunk();   // processChunk() is an async-Fn and thus returns a promise. Here, via await, we pause execution until the promise is resolved or rejected.
+                                } catch (error) {
+                                    errorHandler("fetching event-streaming response", "localhost:8080/completions", String(error))
+                                }
+                            } else if (current_llm_server == 'hf-waitress') {
+                                const url = "http://localhost:9069/completions_stream";
 
-                                            if (message.startsWith('data: ')) {
-                                                const jsonStr = message.slice(6);   // remove 6 chars to get rid of the 'data: ' prefix!
-                                                try {
-                                                    const dataObj = JSON.parse(jsonStr);
-                                                    //console.log(dataObj.content);   // Log only the content
-                                                    let streamed_content = dataObj.content.replace(/\n\n/g, '<br><br>').replace(/\n/g, '<br>'); // /g - global - replace throughout string, not just the first occurance
+                                const hfwHeaders = new Headers();
+                                hfwHeaders.append("Content-Type", "application/json");
+                                hfwHeaders.append("X-Max-New-Tokens", document.getElementById('HfwMaxNewToks').value);
+                                hfwHeaders.append("X-Temperature", document.getElementById('HfwTempSlider').value);
+                                hfwHeaders.append("X-Top-K", document.getElementById('HfwTopkSlider').value);
+                                hfwHeaders.append("X-Top-P", document.getElementById('HfwToppSlider').value);
+                                hfwHeaders.append("X-Min-P", document.getElementById('HfwMinpSlider').value);
+                                hfwHeaders.append("X-Do-Sample", document.getElementById('HfwTempSlider').value > 0 ? "True" : "False");
+                                
+                                const rawBodyJSONObj = JSON.parse(formatted_user_prompt);                                
+                                const rawBodyJSONStringified = JSON.stringify(rawBodyJSONObj);
 
-                                                    if (!['', '<|eot_id|>', '</s>', '<|im_end|>', '<|end_of_turn|>', '<|EOT|>', '|END_OF_TURN_TOKEN|>', '<|end|>'].includes(streamed_content)) {
-                                                        totalContent += streamed_content;
+                                console.log("rawBodyJSONObj: ", rawBodyJSONObj);
+                                console.log("rawBodyJSONStringified: ", rawBodyJSONStringified);
+
+                                try {
+                                    const hfwResponse = await fetch(url, {
+                                        method: 'POST',
+                                        headers: hfwHeaders,
+                                        body: rawBodyJSONStringified,
+                                        redirect: 'follow'
+                                    });
+
+                                    document.getElementById('chat-area').scrollTop = document.getElementById('chat-area').scrollHeight;     //Scroll to the bottom of the page
+
+                                    const hfwReader = hfwResponse.body.getReader();
+                                    let hfwTotalContent = '';
+                                    let hfwReceivedComplete = false;
+
+                                    async function hfwProcessChunk() {
+                                        let partialHfwData = '';
+
+                                        while (true) {
+                                            const { done, value } = await hfwReader.read();
+                                            if (done) {
+                                                console.log("HF-Waitress Stream complete");
+                                                break;
+                                            }
+                                            
+                                            console.log("HFW value: ", value);
+
+                                            const textChunk = new TextDecoder("utf-8").decode(value);
+                                            const messages = textChunk.split('\n');
+                                            
+                                            messages.forEach(message => {
+                                                
+                                                if (message.startsWith('data: ')) {
+                                                    const jsonStr = message.slice(6);   // remove 6 chars to get rid of the 'data: ' prefix!
+
+                                                    console.log("message: ", message);
+                                                    console.log("jsonStr: ", jsonStr);
+                                                    try {
+                                                        //const dataObj = JSON.parse(jsonStr);
+                                                        let dataObj = String(jsonStr);
+                                                        if (dataObj == "null") {
+                                                            dataObj = "";
+                                                        }
+                                                        let streamed_content = dataObj.replace(/\n/g, '<br>');
+                                                        streamed_content = streamed_content.replace(/\n\n/g, '<br><br>');
+
+                                                        //let streamed_content = dataObj;
+                                                        
+                                                        hfwTotalContent += streamed_content;
                                                         let tempDiv = document.createElement('div');
+
                                                         tempDiv.innerHTML = streamed_content;
 
                                                         while (tempDiv.firstChild) {
-                                                            responseContentElement.appendChild(tempDiv.firstChild); // When 'appendChild' is used on an element already part of the DOM, a copy isn't created, rather it's moved to the new position thus removing that first child from tempDiv here!
+                                                            responseContentElement.appendChild(tempDiv.firstChild);
                                                         }
-                                                    }
 
-                                                    const scrollThreshold = 100; //100px towards the bottom
-                                                    const isNearBottom =  chat_container.scrollHeight - chat_container.clientHeight - chat_container.scrollTop < scrollThreshold;   //by calculating this way, we're finding the difference between the total height of the chat area including the invisble part that's overflown (scrollHeight), the visible height of the chat area (clientHeight), and how far down the chat area has been scrolled (scrollTop). If less than the threshold, auto-scroll engages!
-                                                    // For example: if the total height is 100px(scrollHeight), 70px is visible (clientHeight), scrollTop increases as we scroll down, so it's 0 at the top and at the very bottom, scrollTop will be equal to scrollHeight - clientHeight = 30px, so the math would equal to 0px and thus within the threshold!
-                                                    if (isNearBottom) {
-                                                        //console.log("is scrolled to bottom")
-                                                        chat_container.scrollTop = chat_container.scrollHeight;
-                                                    }
+                                                        const scrollThreshold = 100; //100px towards the bottom
+                                                        const isNearBottom =  chat_container.scrollHeight - chat_container.clientHeight - chat_container.scrollTop < scrollThreshold;   //by calculating this way, we're finding the difference between the total height of the chat area including the invisble part that's overflown (scrollHeight), the visible height of the chat area (clientHeight), and how far down the chat area has been scrolled (scrollTop). If less than the threshold, auto-scroll engages!
+                                                        // For example: if the total height is 100px(scrollHeight), 70px is visible (clientHeight), scrollTop increases as we scroll down, so it's 0 at the top and at the very bottom, scrollTop will be equal to scrollHeight - clientHeight = 30px, so the math would equal to 0px and thus within the threshold!
+                                                        if (isNearBottom) {
+                                                            //console.log("is scrolled to bottom")
+                                                            chat_container.scrollTop = chat_container.scrollHeight;
+                                                        }
 
-                                                    if (dataObj.stop) {
-                                                        receivedComplete = true;
-                                                        llm_response = totalContent;
-                                                        //console.log("Stop received, final content: ", totalContent);
+                                                    } catch (error) {
+                                                        console.error('Error parsing message: ', error);
                                                     }
-                                                } catch (error) {
-                                                    console.error('Error parsing JSON: ', error);
+                                                } else if (message.startsWith('event: END') || message.startsWith('data: null')) {
+                                                    console.log("Received null message from hf-waitress - stream complete");
+                                                    hfwReceivedComplete = true;
+                                                    llm_response = hfwTotalContent;
                                                 }
-                                            }
-                                        });
+                                            });
 
-                                        responseContentElement.innerHTML = totalContent;
+                                            responseContentElement.innerHTML = hfwTotalContent;
 
-                                        if (receivedComplete) break;
+                                            if (hfwReceivedComplete) break;
+                                        }
+                                    
                                     }
+
+                                    await hfwProcessChunk();
+                                    
+                                } catch (error) {
+                                    errorHandler("fetching HF-Waitress event-streaming response", "localhost:9069/completions_stream", String(error))
                                 }
 
-                                await processChunk();   // processChunk() is an async-Fn and thus returns a promise. Here, via await, we pause execution until the promise is resolved or rejected.
-                            } catch (error) {
-                                errorHandler("fetching event-streaming response", "localhost:8080/completions", String(error))
                             }
                         }
 

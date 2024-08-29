@@ -3114,90 +3114,12 @@ def rerank_results_ml(query, documents, top_n=5):
     return ranked_documents
 
 
-@app.route('/setup_for_llama_cpp_response', methods=['POST'])
-def setup_for_llama_cpp_response():
-
-    global QUERIES
-
-    do_rag = True
-    similarity_threshold = 0.8
-
-    stream_session_id = ""
-    key_for_vector_results = ""
-    # Generate a unique session ID using universally Unique Identifier via the uuid4() method, wherein the randomness of the result is dependent on the randomness of the underlying operating system's random number generator
-    # UUI is a standard used for creating unique strings that have a very high likelihood of being unique across all time and space, for ex: f47ac10b-58cc-4372-a567-0e02b2c3d479
-    try:
-        stream_session_id = str(uuid.uuid4())
-        key_for_vector_results = "VectorDocsforQueryID_" + stream_session_id
-    except Exception as e:
-        return handle_api_error("Error creating unique stream_session_id when attempting to setup_for_streaming_response. Error: ", e)
-    
-
-    # Determine do_rag
-    try:
-        read_return = read_config(['use_sbert_embeddings', 'use_openai_embeddings', 'use_bge_base_embeddings', 'use_bge_large_embeddings', 'force_enable_rag', 'force_disable_rag', 'local_llm_chat_template_format', 'base_template'])
-        use_sbert_embeddings = read_return['use_sbert_embeddings']
-        use_openai_embeddings = read_return['use_openai_embeddings']
-        use_bge_base_embeddings = read_return['use_bge_base_embeddings']
-        use_bge_large_embeddings = read_return['use_bge_large_embeddings']
-        force_enable_rag = read_return['force_enable_rag']
-        force_disable_rag = read_return['force_disable_rag']
-        local_llm_chat_template_format = read_return['local_llm_chat_template_format']
-        base_template = read_return['base_template']
-
-    except Exception as e:
-        return handle_api_error("Missing values in config.json when attempting to setup_for_streaming_response. Error: ", e)
-
-    try:
-        # Attempt to get query data
-        user_query = request.json['user_query']
-        chat_id = request.json['chat_id']
-
-        # Store the query associated with the ID
-        QUERIES[stream_session_id] = user_query
-    except KeyError:
-        return handle_api_error("Could not obtain and/or store user_query in setup_for_streaming_response, encountered error: ", e)
-
-    print("chat_id: ", chat_id)
-
-    # Perform similarity search on the vector DB
-    print("\n\nPerforming similarity search to determine if RAG necessary\n\n")
-    embedding_function = None
-    try:
-        if use_sbert_embeddings:
-            embedding_function=HuggingFaceEmbeddings()
-        elif use_openai_embeddings:
-            embedding_function=AZURE_OPENAI_EMBEDDINGS
-        elif use_bge_base_embeddings:
-            embedding_function=HF_BGE_EMBEDDINGS
-        elif use_bge_large_embeddings:
-            embedding_function=HF_BGE_EMBEDDINGS
-    except Exception as e:
-        handle_error_no_return("Could not set embedding_function for similarity_search when attempting to setup_for_streaming_response, encountered error: ", e)
-    
-    try:
-        # docs = VECTOR_STORE.similarity_search(user_query, embedding_fn=embedding_function)
-        # docs_with_relevance_score = VECTOR_STORE.similarity_search_with_relevance_scores(user_query, 10, embedding_fn=embedding_function)
-        docs_list_with_cosine_distance = VECTOR_STORE.similarity_search_with_score(user_query, 11, embedding_fn=embedding_function)
-        # print(f'\n\nsimple similarity search results: \n {docs}\n\n')
-        # print(f'\n\nRelevance Score similarity search results (range 0 to 1): \n {docs_with_relevance_score}\n\n')
-        # print(f'\n\nDocs list most similar to query based on cosine distance: \n {docs_list_with_cosine_distance}\n\n')
-    except Exception as e:
-        handle_error_no_return("Could not perform similarity_search to determine do_rag when attempting to setup_for_streaming_response, encountered error: ", e)
-
-    # docs = [
-    #     doc for doc, score in docs_list_with_cosine_distance
-    #     if score >= similarity_threshold
-    # ]
-
-    filtered_docs = [doc for doc, score in docs_list_with_cosine_distance]
-
-    docs = []
-    if filtered_docs:
-        docs = rerank_results_ml(user_query, filtered_docs, top_n=5)
-
+def determine_do_rag(query, docs, force_enable_rag, force_disable_rag):
 
     print("\n\nDetermining do_rag \n\n")
+
+    do_rag = False
+    
     # We do not modify the force_enable_rag or force_disable_rag flags in this method, we simply respond to them here. UI updates should handle those flags.
     if force_enable_rag:
         print("\n\nFORCE_ENABLE_RAG True, force enabling RAG and returning\n\n")
@@ -3211,67 +3133,51 @@ def setup_for_llama_cpp_response():
         do_rag = False
     else:
         try:
-            _, do_rag = filter_relevant_documents(user_query, docs)
+            _, do_rag = filter_relevant_documents(query, docs)
         except Exception as e:
             do_rag = False
             handle_error_no_return("RAG Error, disabling RAG and continuing: could not filter_relevant_documents during setup_for_streaming_response, encountered error: ", e)
-    
-    print(f'Do RAG? {do_rag}')
+
+    return do_rag
+
+
+def format_prompt_from_history(chat_id, sequence_id):
+
+    formatted_prompt = ""
 
     try:
-        write_config({'do_rag':do_rag})
+        read_return = read_config(['sqlite_history_db'])
+        sqlite_history_db = read_return['sqlite_history_db']
     except Exception as e:
-        handle_error_no_return("Could not write do_rag to config during setup_for_streaming_response, encountered error: ", e)
+        handle_error_no_return("Missing keys in config.json for method store_chat_history_to_db. Error: ", e)
 
-    
-    # Having determined do_rag, time to build the prompt template!
-    
-    if do_rag:  # add similarity search results for RAG!
-        try:
-            QUERIES[key_for_vector_results] = docs
-            user_query += f"\n\nThe following context might be helpful in answering the user query above:\n{docs}"
-            print(f"RAG formatted user_query: \n{user_query}\n")
-        except Exception as e:
-            try:
-                write_config({'do_rag':False})
-            except Exception as e:
-                handle_error_no_return("Could not write do_rag to config during setup_for_streaming_response, encountered error: ", e)
-            handle_error_no_return("RAG Error: Could not update QUERIES dict and user_query during setup_for_streaming_response, proceeding without RAG. Encountered error: ", e)
+    # Connect to or create the DB
+    try:
+        conn = sqlite3.connect(sqlite_history_db)
+        cursor = conn.cursor()
+    except Exception as e:
+        handle_error_no_return("Could not establish connection to DB for chat history storage, encountered error: ", e)
 
-    current_sequence_id = determine_sequence_id_for_chat(chat_id)
-    formatted_prompt = ""
-    print("current_sequence_id: ", current_sequence_id)
-    if current_sequence_id > 0:    # get the last prompt so we can continue the completions
+    try:
+        # Determine sequence_id
+        cursor.execute("SELECT prompt_template FROM chat_history WHERE chat_id = ? AND sequence_id = ?", (int(chat_id), int(sequence_id)))
+        # "The COALESCE function accepts two or more arguments and returns the first non-null argument."
+        # This accounts for a new chat!
+        # Note that trailing comma! Without it, the simple select query will produce an error: "parameters are of unsupported type" !!
+        # This is because the SQLite3 module can have trouble recognizing single-item tuples as tuples, so a trailing comma helps alleviate this! 
 
-        try:
-            read_return = read_config(['sqlite_history_db'])
-            sqlite_history_db = read_return['sqlite_history_db']
-        except Exception as e:
-            handle_error_no_return("Missing keys in config.json for method store_chat_history_to_db. Error: ", e)
+        result = cursor.fetchone()
+        formatted_prompt = str(result[0])
+        
+    except Exception as e:
+        handle_error_no_return("Could not determine sequence ID for storage to chat history DB, encountered error: ", e)
 
-        # Connect to or create the DB
-        try:
-            conn = sqlite3.connect(sqlite_history_db)
-            cursor = conn.cursor()
-        except Exception as e:
-            handle_error_no_return("Could not establish connection to DB for chat history storage, encountered error: ", e)
+    return formatted_prompt
 
-        try:
-            # Determine sequence_id
-            cursor.execute("SELECT prompt_template FROM chat_history WHERE chat_id = ? AND sequence_id = ?", (int(chat_id), int(current_sequence_id)))
-            # "The COALESCE function accepts two or more arguments and returns the first non-null argument."
-            # This accounts for a new chat!
-            # Note that trailing comma! Without it, the simple select query will produce an error: "parameters are of unsupported type" !!
-            # This is because the SQLite3 module can have trouble recognizing single-item tuples as tuples, so a trailing comma helps alleviate this! 
 
-            result = cursor.fetchone()
-            formatted_prompt = str(result[0])
-            
-        except Exception as e:
-            handle_error_no_return("Could not determine sequence ID for storage to chat history DB, encountered error: ", e)
-    
-    if formatted_prompt == "":  # could not be updated above
-        current_sequence_id = 0 # reset chat sequence id
+def format_prompt_for_llama_cpp(formatted_prompt, user_query, current_sequence_id, base_template, local_llm_chat_template_format):
+
+    print("\n\nFormatting prompt for llama-cpp\n\n")
 
     if local_llm_chat_template_format == 'llama3':
 
@@ -3343,6 +3249,152 @@ def setup_for_llama_cpp_response():
         else:
             formatted_prompt += f"<start_of_turn>user\n{base_template}\n{user_query}<end_of_turn>\n<start_of_turn>model\n"
 
+    return formatted_prompt
+
+
+def format_prompt_for_hf_waitress(formatted_prompt, user_query, current_sequence_id, base_template):
+
+    print("\n\nFormatting prompt for hf-waitress\n\n")
+
+    base_template += " Use only <br> tags for newlines in your response so it may be displayed correctly in the web UI. Use <br><br> for double newlines and so on. Make sure to separate list items with <br> tags."
+
+    if current_sequence_id > 0:
+        history_prompt_json = json.loads(formatted_prompt)
+        new_message = {"role":"user", "content":user_query}
+        history_prompt_json['messages'].append(new_message)
+        updated_history_prompt_json = json.dumps(history_prompt_json, indent=4)
+        formatted_prompt = str(updated_history_prompt_json)
+    else:
+        first_prompt_json = f'''
+        {{
+                "messages": [
+                    {{"role": "system", "content": {json.dumps(base_template)}}},
+                    {{"role": "user", "content": {json.dumps(user_query)}}}
+                ]
+            }}
+        '''
+
+        formatted_prompt = str(first_prompt_json)
+
+    return formatted_prompt
+
+
+@app.route('/setup_for_llama_cpp_response', methods=['POST'])
+def setup_for_llama_cpp_response():
+
+    global QUERIES
+
+    do_rag = True
+    similarity_threshold = 0.8
+
+    stream_session_id = ""
+    key_for_vector_results = ""
+    # Generate a unique session ID using universally Unique Identifier via the uuid4() method, wherein the randomness of the result is dependent on the randomness of the underlying operating system's random number generator
+    # UUI is a standard used for creating unique strings that have a very high likelihood of being unique across all time and space, for ex: f47ac10b-58cc-4372-a567-0e02b2c3d479
+    try:
+        stream_session_id = str(uuid.uuid4())
+        key_for_vector_results = "VectorDocsforQueryID_" + stream_session_id
+    except Exception as e:
+        return handle_api_error("Error creating unique stream_session_id when attempting to setup_for_streaming_response. Error: ", e)
+    
+
+    # Determine do_rag
+    try:
+        read_return = read_config(['local_llm_server', 'use_sbert_embeddings', 'use_openai_embeddings', 'use_bge_base_embeddings', 'use_bge_large_embeddings', 'force_enable_rag', 'force_disable_rag', 'local_llm_chat_template_format', 'base_template'])
+        use_sbert_embeddings = read_return['use_sbert_embeddings']
+        use_openai_embeddings = read_return['use_openai_embeddings']
+        use_bge_base_embeddings = read_return['use_bge_base_embeddings']
+        use_bge_large_embeddings = read_return['use_bge_large_embeddings']
+        force_enable_rag = read_return['force_enable_rag']
+        force_disable_rag = read_return['force_disable_rag']
+        local_llm_chat_template_format = read_return['local_llm_chat_template_format']
+        base_template = read_return['base_template']
+        local_llm_server = read_return['local_llm_server']
+
+    except Exception as e:
+        return handle_api_error("Missing values in config.json when attempting to setup_for_streaming_response. Error: ", e)
+
+    try:
+        # Attempt to get query data
+        user_query = request.json['user_query']
+        chat_id = request.json['chat_id']
+
+        # Store the query associated with the ID
+        QUERIES[stream_session_id] = user_query
+    except KeyError:
+        return handle_api_error("Could not obtain and/or store user_query in setup_for_streaming_response, encountered error: ", e)
+
+    print("chat_id: ", chat_id)
+
+    # Perform similarity search on the vector DB
+    print("\n\nPerforming similarity search to determine if RAG necessary\n\n")
+    embedding_function = None
+    try:
+        if use_sbert_embeddings:
+            embedding_function=HuggingFaceEmbeddings()
+        elif use_openai_embeddings:
+            embedding_function=AZURE_OPENAI_EMBEDDINGS
+        elif use_bge_base_embeddings:
+            embedding_function=HF_BGE_EMBEDDINGS
+        elif use_bge_large_embeddings:
+            embedding_function=HF_BGE_EMBEDDINGS
+    except Exception as e:
+        handle_error_no_return("Could not set embedding_function for similarity_search when attempting to setup_for_streaming_response, encountered error: ", e)
+    
+    try:
+        # docs = VECTOR_STORE.similarity_search(user_query, embedding_fn=embedding_function)
+        # docs_with_relevance_score = VECTOR_STORE.similarity_search_with_relevance_scores(user_query, 10, embedding_fn=embedding_function)
+        docs_list_with_cosine_distance = VECTOR_STORE.similarity_search_with_score(user_query, 11, embedding_fn=embedding_function)
+    except Exception as e:
+        handle_error_no_return("Could not perform similarity_search to determine do_rag when attempting to setup_for_streaming_response, encountered error: ", e)
+
+    filtered_docs = [doc for doc, score in docs_list_with_cosine_distance]
+
+    docs = []
+    if filtered_docs:
+        docs = rerank_results_ml(user_query, filtered_docs, top_n=5)
+        do_rag = determine_do_rag(user_query, docs, force_enable_rag, force_disable_rag)
+    
+    print(f'Do RAG? {do_rag}')
+
+    try:
+        write_config({'do_rag':do_rag})
+    except Exception as e:
+        handle_error_no_return("Could not write do_rag to config during setup_for_streaming_response, encountered error: ", e)
+
+    
+    # Having determined do_rag, time to build the prompt template!
+    
+    if do_rag:  # add similarity search results for RAG!
+        try:
+            QUERIES[key_for_vector_results] = docs
+            user_query += f"\n\nThe following context might be helpful in answering the user query above:\n{docs}"
+            print(f"RAG formatted user_query: \n{user_query}\n")
+        except Exception as e:
+            try:
+                write_config({'do_rag':False})
+            except Exception as e:
+                handle_error_no_return("Could not write do_rag to config during setup_for_streaming_response, encountered error: ", e)
+            handle_error_no_return("RAG Error: Could not update QUERIES dict and user_query during setup_for_streaming_response, proceeding without RAG. Encountered error: ", e)
+
+    current_sequence_id = determine_sequence_id_for_chat(chat_id)
+    formatted_prompt = ""
+    print("current_sequence_id: ", current_sequence_id)
+    if current_sequence_id > 0:    # get the last prompt so we can continue the completions
+        formatted_prompt = format_prompt_from_history(chat_id, current_sequence_id)
+
+    
+    if formatted_prompt == "":  # could not be updated above
+        current_sequence_id = 0 # so reset chat sequence id
+
+    
+    if local_llm_server == 'llama-cpp':
+        formatted_prompt = format_prompt_for_llama_cpp(formatted_prompt, user_query, current_sequence_id, base_template, local_llm_chat_template_format)
+    elif local_llm_server == 'hf-waitress':
+        formatted_prompt = format_prompt_for_hf_waitress(formatted_prompt, user_query, current_sequence_id, base_template)
+
+    print("Returning formatted_prompt: ", formatted_prompt)
+
     # Return a bunch of stuff
     new_sequence_id = int(current_sequence_id) + 1
     return jsonify({"success": True, "stream_session_id": stream_session_id, "do_rag": do_rag, "formatted_user_prompt": formatted_prompt, "sequence_id":new_sequence_id})
@@ -3355,7 +3407,8 @@ def get_references():
     print("\n\nGetting References\n\n")
 
     try:
-        read_return = read_config(['do_rag', 'upload_folder', 'local_llm_chat_template_format'])
+        read_return = read_config(['local_llm_server', 'do_rag', 'upload_folder', 'local_llm_chat_template_format'])
+        local_llm_server = read_return['local_llm_server']
         do_rag = read_return['do_rag']
         upload_folder = read_return['upload_folder']
         local_llm_chat_template_format = read_return['local_llm_chat_template_format']
@@ -3372,26 +3425,33 @@ def get_references():
     except Exception as e:
         return handle_api_error("Could not read request content in method get_references, encountered error: ", e)
 
-    if local_llm_chat_template_format == 'llama3':
-        formatted_user_prompt += f"{llm_response}<|eot_id|>"
-    elif local_llm_chat_template_format == 'llama2':
-        formatted_user_prompt += f"{llm_response}</s>"
-    elif local_llm_chat_template_format == 'chatml':
-        formatted_user_prompt += f"{llm_response}<|im_end|>\n"
-    elif local_llm_chat_template_format == 'phi3':
-        formatted_user_prompt += f"{llm_response}<|end|>\n"
-    elif local_llm_chat_template_format == 'command-r':
-        formatted_user_prompt += f"{llm_response}<|END_OF_TURN_TOKEN|>"
-    elif local_llm_chat_template_format == 'deepseek':
-        formatted_user_prompt += f"{llm_response}\n<|EOT|>\n"
-    elif local_llm_chat_template_format == 'deepseek-coder-v2':
-        formatted_user_prompt += f"{llm_response}<|end_of_sentence|>"
-    elif local_llm_chat_template_format == 'vicuna':
-        formatted_user_prompt += f"{llm_response} </s>\n"
-    elif local_llm_chat_template_format == 'openchat':
-        formatted_user_prompt += f"{llm_response}<|end_of_turn|>"
-    elif local_llm_chat_template_format == 'gemma2':
-        formatted_user_prompt += f"{llm_response}<end_of_turn>\n"
+    if local_llm_server == 'llama-cpp':
+        if local_llm_chat_template_format == 'llama3':
+            formatted_user_prompt += f"{llm_response}<|eot_id|>"
+        elif local_llm_chat_template_format == 'llama2':
+            formatted_user_prompt += f"{llm_response}</s>"
+        elif local_llm_chat_template_format == 'chatml':
+            formatted_user_prompt += f"{llm_response}<|im_end|>\n"
+        elif local_llm_chat_template_format == 'phi3':
+            formatted_user_prompt += f"{llm_response}<|end|>\n"
+        elif local_llm_chat_template_format == 'command-r':
+            formatted_user_prompt += f"{llm_response}<|END_OF_TURN_TOKEN|>"
+        elif local_llm_chat_template_format == 'deepseek':
+            formatted_user_prompt += f"{llm_response}\n<|EOT|>\n"
+        elif local_llm_chat_template_format == 'deepseek-coder-v2':
+            formatted_user_prompt += f"{llm_response}<|end_of_sentence|>"
+        elif local_llm_chat_template_format == 'vicuna':
+            formatted_user_prompt += f"{llm_response} </s>\n"
+        elif local_llm_chat_template_format == 'openchat':
+            formatted_user_prompt += f"{llm_response}<|end_of_turn|>"
+        elif local_llm_chat_template_format == 'gemma2':
+            formatted_user_prompt += f"{llm_response}<end_of_turn>\n"
+    elif local_llm_server == 'hf-waitress':
+        history_prompt_json = json.loads(formatted_user_prompt)
+        new_response = {"role":"assistant", "content":llm_response}
+        history_prompt_json['messages'].append(new_response)
+        updated_history_prompt_json = json.dumps(history_prompt_json, indent=4)
+        formatted_user_prompt = str(updated_history_prompt_json)
 
     if not do_rag:
         print("\n\nSkipping RAG, storing chat history and returning\n\n")
