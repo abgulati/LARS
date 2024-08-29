@@ -249,15 +249,15 @@ def read_config(keys, default_value=None, filename='config.json'):
     
     return_dict = {}
     update_config_dict = {}
-    base_directory = config.get('base_directory', '/app/storage')   # specifying default if not found
+    base_directory = config.get('base_directory', '/app/lars_storage')   # specifying default if not found
 
     for key in keys:
         if key in config:
             return_dict[key] = config[key]
         else:
             default_value = {
-                'windows_base_directory':'C:/web_app_storage',
-                'unix_and_docker_base_directory':'/app/storage',
+                'windows_base_directory':'C:/lars_storage',
+                'unix_and_docker_base_directory':'/app/lars_storage',
                 'mac_base_directory':'app',
                 'upload_folder':base_directory + '/uploaded_pdfs',
                 'vectordb_sbert_folder':base_directory + '/chroma_db_sbert_embeddings',
@@ -375,7 +375,7 @@ if platform.system() == 'Windows':
     from azure.core.exceptions import HttpResponseError
     import azure.ai.vision as sdk
     
-    #BASE_DIRECTORY = 'C:/temp_web_app_storage'
+    #BASE_DIRECTORY = 'C:/lars_storage'
     try:
         read_return = read_config(['windows_base_directory'])   #passing list of values to read
         BASE_DIRECTORY = str(read_return['windows_base_directory']) #received dict of key:values
@@ -390,7 +390,7 @@ elif platform.system() == 'Linux':
     from azure.core.exceptions import HttpResponseError
     import azure.ai.vision as sdk
     
-    #BASE_DIRECTORY = '/app/storage'
+    #BASE_DIRECTORY = '/app/lars_storage'
     try:
         read_return = read_config(['unix_and_docker_base_directory'])
         BASE_DIRECTORY = str(read_return['unix_and_docker_base_directory'])
@@ -435,13 +435,12 @@ if not os.path.exists(BASE_DIRECTORY):
         handle_local_error("Failed to create Base App Directory, encountered error: ", e)
         
 try:
-    read_return = read_config(['model_dir', 'highlighted_docs', 'upload_folder', 'ocr_pdfs', 'pdfs_to_txts', 'index_dir'])
+    read_return = read_config(['model_dir', 'highlighted_docs', 'upload_folder', 'ocr_pdfs', 'pdfs_to_txts'])
     model_dir = read_return['model_dir']
     highlighted_docs = read_return['highlighted_docs']
     upload_folder = read_return['upload_folder']
     ocr_pdfs = read_return['ocr_pdfs']
     pdfs_to_txts = read_return['pdfs_to_txts']
-    index_dir = read_return['index_dir']
 except Exception as e:
     handle_local_error("Could not read paths for app directories (model_dir, highlighted_docs, upload_folder) from config.json on boot, encountered error: ", e)
 
