@@ -3256,7 +3256,7 @@ def format_prompt_for_hf_waitress(formatted_prompt, user_query, current_sequence
 
     print("\n\nFormatting prompt for hf-waitress\n\n")
 
-    base_template += " Use only <br> tags for newlines in your response so it may be displayed correctly in the web UI. Use <br><br> for double newlines and so on. Make sure to separate list items with <br> tags."
+    # base_template += " Important: The user will be reading your responses in a web browser, so make sure to use <br> liberally to ensure the user can read your responses easily. When in doubt, add a <br> tag!"
 
     if current_sequence_id > 0:
         history_prompt_json = json.loads(formatted_prompt)
@@ -3570,7 +3570,10 @@ def get_references():
 
     if docs_have_relevant_info:
 
-        refer_pages_string = "<br><br><h6>Additional data may be found in the following documents & pages:</h6>"
+        if local_llm_server == 'llama-cpp':
+            refer_pages_string = "<br><br>"
+
+        refer_pages_string += "<h6>Additional data may be found in the following documents & pages:</h6>"
         
         for index, doc in enumerate(user_should_refer_pages_in_doc, start=1):
             pdf_iframe_id = f"stream{stream_session_id}PdfViewer{str(index)}"

@@ -3720,6 +3720,7 @@
 
                                     async function hfwProcessChunk() {
                                         let partialHfwData = '';
+                                        let wordSpacing = 0;
 
                                         while (true) {
                                             const { done, value } = await hfwReader.read();
@@ -3728,7 +3729,7 @@
                                                 break;
                                             }
                                             
-                                            console.log("HFW value: ", value);
+                                            //console.log("HFW value: ", value);
 
                                             const textChunk = new TextDecoder("utf-8").decode(value);
                                             const messages = textChunk.split('\n');
@@ -3739,17 +3740,13 @@
                                                     const jsonStr = message.slice(6);   // remove 6 chars to get rid of the 'data: ' prefix!
 
                                                     console.log("message: ", message);
-                                                    console.log("jsonStr: ", jsonStr);
                                                     try {
-                                                        //const dataObj = JSON.parse(jsonStr);
                                                         let dataObj = String(jsonStr);
                                                         if (dataObj == "null") {
                                                             dataObj = "";
                                                         }
-                                                        let streamed_content = dataObj.replace(/\n/g, '<br>');
-                                                        streamed_content = streamed_content.replace(/\n\n/g, '<br><br>');
-
-                                                        //let streamed_content = dataObj;
+                                                        let streamed_content = dataObj.replace(/(?<![A-Z]:|\/)([.?!])(?=\s|$)(?!\s*\/)/g, '$1<br><br>');
+                                                        // let streamed_content = dataObj.replace(/(?<![A-Z]:|\/)([.!?])(?=\s+[A-Z"']|$)(?!\s*\/|[^a-z]*:)/g, '$1<br><br>');
                                                         
                                                         hfwTotalContent += streamed_content;
                                                         let tempDiv = document.createElement('div');
