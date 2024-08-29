@@ -129,7 +129,7 @@ try:
     # 2 - Create a RotatingFileHandler
     # maxBytes: max file size of log file after which a new file is created; set to 1024 * 1024 * 5 for 5MB: 1024x1024 is 1MB, then a multiplyer for the number of MB
     # backupCount: number of backup files to keep specifying how many old log files to keep
-    handler = RotatingFileHandler('server_log.log', maxBytes=1024*1024*5, backupCount=2)
+    handler = RotatingFileHandler('lars_server_log.log', maxBytes=1024*1024*5, backupCount=2)
     handler.setLevel(logging.ERROR)
 
     # 3 - Create a formatter and set it for the handler
