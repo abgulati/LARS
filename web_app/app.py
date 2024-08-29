@@ -2624,6 +2624,23 @@ def fetch_file_list_for_vector_db():
     except Exception as e:
         return handle_api_error("Could not connect to sqlite_docs_loaded_db database to load file list, encountered error: ", e)
 
+    # If the database does not currently exist...
+    try:
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS document_records (
+                    id INTEGER PRIMARY KEY,
+                    document_name TEXT NOT NULL,
+                    embedding_model TEXT NOT NULL,
+                    vectordb_used TEXT,
+                    chunk_size INTEGER,
+                    chunk_overlap INTEGER
+            )
+        ''')
+
+        conn.commit()
+    except Exception as e:
+        handle_local_error("Could not create document_records DB, encountered error: ", e)
+
     try:
         c.execute("SELECT document_name, vectordb_used, chunk_size, chunk_overlap FROM document_records where vectordb_used = ?", (vdb_for_select,))
     except Exception as e:
