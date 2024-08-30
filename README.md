@@ -48,7 +48,7 @@ There are many desktop applications for running LLMs locally, and LARS aims to b
     - [A demonstration video showcasing these features](https://github.com/abgulati/LARS?tab=readme-ov-file#a-demonstration-video-showcasing-these-features-can-be-viewed-at-the-link-below)
 2. [Dependencies](https://github.com/abgulati/LARS?tab=readme-ov-file#dependencies)
 3. [Installing LARS](https://github.com/abgulati/LARS?tab=readme-ov-file#installing-lars)
-4. [First Run - Important Steps for First-Time Setup](https://github.com/abgulati/LARS?tab=readme-ov-file#usage---first-run)
+4. [Usage - First Run](https://github.com/abgulati/LARS?tab=readme-ov-file#usage---first-run)
 5. [Optional Dependencies](https://github.com/abgulati/LARS?tab=readme-ov-file#optional-dependencies)
     - [llama.cpp - Installation Instructions](https://github.com/abgulati/LARS?tab=readme-ov-file#llamacpp---installation-instructions)
         - [1. Build Tools](https://github.com/abgulati/LARS?tab=readme-ov-file#1-build-tools)
