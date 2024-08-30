@@ -52,7 +52,7 @@ There are many desktop applications for running LLMs locally, and LARS aims to b
 5. [Optional Dependencies](https://github.com/abgulati/LARS?tab=readme-ov-file#optional-dependencies)
     - [llama.cpp - Installation Instructions](https://github.com/abgulati/LARS?tab=readme-ov-file#llamacpp---installation-instructions)
         - [1. Build Tools](https://github.com/abgulati/LARS?tab=readme-ov-file#1-build-tools)
-        - [2. llama.cpp](https://github.com/abgulati/LARS?tab=readme-ov-file#3-llamacpp)
+        - [2. llama.cpp](https://github.com/abgulati/LARS?tab=readme-ov-file#2-llamacpp)
     - [Nvidia CUDA (if supported Nvidia GPU present)](https://github.com/abgulati/LARS?tab=readme-ov-file#nvidia-cuda-if-supported-nvidia-gpu-present)
     - [LibreOffice](https://github.com/abgulati/LARS?tab=readme-ov-file#libreoffice)
     - [Poppler](https://github.com/abgulati/LARS?tab=readme-ov-file#poppler)
