@@ -68,7 +68,71 @@ There are many desktop applications for running LLMs locally, and LARS aims to b
 9. [Current Development Roadmap](https://github.com/abgulati/LARS?tab=readme-ov-file#current-development-roadmap)
 10. [Support and Donations](https://github.com/abgulati/LARS?tab=readme-ov-file#support-and-donations)
 
+
 ## Dependencies
+
+### 1. Python v3.10.x or above: https://www.python.org/downloads/
+
+### 2. PyTorch:
+
+    **If you're planning to use your GPU to run LLMs, make sure to install the GPU drivers and CUDA/ROCm toolkits as appropriate for your setup, and only then proceed with PyTorch setup below**
+
+    Download and install the PyTorch version appropriate for your system: https://pytorch.org/get-started/locally/
+
+
+## Installing LARS
+
+1. Clone the repository:
+    ```
+    git clone https://github.com/abgulati/LARS
+    cd LARS
+    ```
+
+    - If prompted for GitHub authentication, use a [Personal Access Token](https://github.com/settings/tokens) as passwords are deprecated. Also accessible via:      
+        ```GitHub Settings -> Developer settings (located on the bottom left!) -> Personal access tokens```
+
+2. Install Python dependencies:
+    - Windows via PIP:
+        ```
+        pip install -r .\requirements.txt
+        ```
+    
+    - Linux via PIP:
+        ```
+        pip3 install -r ./requirements.txt
+        ```
+
+    - Note on Azure: Some required Azure libraries are NOT available on the MacOS platform! A separate requirements file is therefore included for MacOS excluding these libraries:
+
+    - MacOS:
+        ```
+        pip3 install -r ./requirements_mac.txt
+        ```
+
+[Back to Table of Contents](https://github.com/abgulati/LARS?tab=readme-ov-file#table-of-contents)
+
+
+## Usage - First Run
+
+- After installing, run LARS using:
+    ```
+    cd web_app
+    python app.py   # Use 'python3' on Linux/macOS
+    ```
+
+- Navigate to ```http://localhost:5000/``` in your browser
+
+- All application directories required by LARS will now be created on disk
+
+- The HF-Waitress server will automatically start and will download an LLM (Microsoft Phi-3-Mini-Instruct-44) on the first-run, which may take a while depending on your internet connection speed
+
+- On first-query, an embedding model (all-mpnet-base-v2) will be downloaded from HuggingFace Hub, which should take a brief time
+
+
+## Optional Dependencies
+
+
+### llama.cpp - Installation Instructions:
 
 ### 1. Build Tools:
 
@@ -102,29 +166,7 @@ There are many desktop applications for running LLMs locally, and LARS aims to b
     sudo apt-get install -y software-properties-common build-essential libffi-dev libssl-dev cmake
     ```
 
-
-### 2. Nvidia CUDA (if supported Nvidia GPU present):
-
-- Install Nvidia [GPU Drivers](https://www.nvidia.com/Download/index.aspx?lang=en-us)
-
-- Install Nvidia [CUDA Toolkit](https://developer.nvidia.com/cuda-toolkit-archive) - LARS built and tested with v12.2 and v12.4
-
-- Verify Installation via the terminal:
-    ```
-    nvcc -V
-    nvidia-smi
-    ```
-
-- CMAKE-CUDA Fix (Very Important!):
-
-    Copy all the four files from the following directory:   
-    ```C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.2\extras\visual_studio_integration\MSBuildExtensions```
-    
-    and Paste them to the following directory:   
-    ```C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\MSBuild\Microsoft\VC\v170\BuildCustomizations```
-
-
-### 3. llama.cpp:
+### 2. llama.cpp:
 
 - Download from the [Official Repo](https://github.com/ggerganov/llama.cpp):
 
@@ -168,45 +210,28 @@ There are many desktop applications for running LLMs locally, and LARS aims to b
     ```
 
 
-### 4. Python:
+### Nvidia CUDA (if supported Nvidia GPU present):
 
-- Built and tested with Python v3.11.x
+- Install Nvidia [GPU Drivers](https://www.nvidia.com/Download/index.aspx?lang=en-us)
 
-- Windows:
-
-    - Download v3.11.9 from the [Official Site](https://www.python.org/downloads/windows/)
-
-    - During installation, ensure you check "Add Python 3.11 to PATH" or manually add it later, either via:
-
-        - Advanced System Settings -> Environment Variables -> System Variables -> EDIT PATH Variable -> Add the below (change as per your installation location):    
-            ```
-            C:\Users\user_name\AppData\Local\Programs\Python\Python311\
-            ```
-        
-        - Or via PowerShell:   
-            ```
-            Set PATH=%PATH%;C:\Users\user_name\AppData\Local\Programs\Python\Python311
-            ```
-
-- Linux (Ubuntu and Debian-based):
-
-    - via deadsnakes PPA:   
-
-    ```
-    sudo add-apt-repository ppa:deadsnakes/ppa -y
-    sudo apt-get update
-    sudo apt-get install -y python3.11 python3.11-venv python3.11-dev
-    sudo python3.11 -m ensurepip
-    ```
+- Install Nvidia [CUDA Toolkit](https://developer.nvidia.com/cuda-toolkit-archive) - LARS built and tested with v12.2 and v12.4
 
 - Verify Installation via the terminal:
-
     ```
-    python3 --version
+    nvcc -V
+    nvidia-smi
     ```
 
+- CMAKE-CUDA Fix (Very Important!):
 
-### 5. LibreOffice:
+    Copy all the four files from the following directory:   
+    ```C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.2\extras\visual_studio_integration\MSBuildExtensions```
+    
+    and Paste them to the following directory:   
+    ```C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\MSBuild\Microsoft\VC\v170\BuildCustomizations```
+
+
+### LibreOffice:
 
 - This is an optional, but highly recommended dependency - Only PDFs are supported if this setup is not completed
 
@@ -253,7 +278,7 @@ There are many desktop applications for running LLMs locally, and LARS aims to b
         libreoffice --version
         ```
 
-### 6. Poppler:
+### Poppler:
 
 - LARS utilizes the pdf2image Python library to convert each page of a document into an image as required for OCR. This library is essentially a wrapper around the Poppler utility which handles the conversion process.
 
@@ -280,7 +305,7 @@ There are many desktop applications for running LLMs locally, and LARS aims to b
     sudo apt-get install -y poppler-utils wget
     ```
 
-### 7. PyTesseract (optional):
+### PyTesseract (optional):
 
 - This is an optional dependency - Tesseract-OCR is not actively used in LARS but methods to use it are present in the source code
 
@@ -303,77 +328,44 @@ There are many desktop applications for running LLMs locally, and LARS aims to b
 [Back to Table of Contents](https://github.com/abgulati/LARS?tab=readme-ov-file#table-of-contents)
 
 
-## Installing LARS
-
-1. Clone the repository:
-    ```
-    git clone https://github.com/abgulati/LARS
-    cd LARS
-    ```
-
-    - If prompted for GitHub authentication, use a [Personal Access Token](https://github.com/settings/tokens) as passwords are deprecated. Also accessible via:      
-        ```GitHub Settings -> Developer settings (located on the bottom left!) -> Personal access tokens```
-
-2. Install Python dependencies:
-    - Windows via PIP:
-        ```
-        pip install -r .\requirements.txt
-        ```
-    
-    - Linux via PIP:
-        ```
-        pip3 install -r ./requirements.txt
-        ```
-
-    - Note on Azure: Some required Azure libraries are NOT available on the MacOS platform! A separate requirements file is therefore included for MacOS excluding these libraries:
-
-    - MacOS:
-        ```
-        pip3 install -r ./requirements_mac.txt
-        ```
-
-[Back to Table of Contents](https://github.com/abgulati/LARS?tab=readme-ov-file#table-of-contents)
-
-
 ## Troubleshooting Installation Issues
 
-- If you encounter a ```CMake nmake failed``` error when attempting to build llama.cpp such as below:
+### Python Issues:
 
-<p align="center">
-<img src="https://github.com/abgulati/LARS/blob/main/documents/images_and_screenshots/cmake-nmake-error.png"  align="center">
-</p>
+- LARS has been built and tested with Python v3.11.x
 
-This typically indicates an issue with your Microsoft Visual Studio build tools, as CMake is unable to find the nmake tool, which is part of the Microsoft Visual Studio build tools. Try the below steps to resolve the issue:
+- Install Python v3.11.x on Windows:
 
-1. Ensure Visual Studio Build Tools are Installed:
+    - Download v3.11.9 from the [Official Site](https://www.python.org/downloads/windows/)
 
-    - Make sure you have the Visual Studio build tools installed, including nmake. You can install these tools through the Visual Studio Installer by selecting the ```Desktop development with C++``` workload, and the ```MSVC and C++ CMake``` Optionals  
+    - During installation, ensure you check "Add Python 3.11 to PATH" or manually add it later, either via:
 
-    - Check Step 0 of the [Dependencies](https://github.com/abgulati/LARS/tree/main?tab=readme-ov-file#dependencies) section, specifically the screenshot therein
+        - Advanced System Settings -> Environment Variables -> System Variables -> EDIT PATH Variable -> Add the below (change as per your installation location):    
+            ```
+            C:\Users\user_name\AppData\Local\Programs\Python\Python311\
+            ```
+        
+        - Or via PowerShell:   
+            ```
+            Set PATH=%PATH%;C:\Users\user_name\AppData\Local\Programs\Python\Python311
+            ```
 
-2. Check Environment Variables:
-    
-    - Ensure that the paths to the Visual Studio tools are included in your system's PATH environment variable. Typically, this includes paths like:
+- Install Python v3.11.x on Linux (Ubuntu and Debian-based):
+
+    - via deadsnakes PPA:   
+
     ```
-    C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build
-    C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\Common7\IDE
-    C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\Common7\Tools
-    ```
-
-3. Use Developer Command Prompt:
-
-    - Open a "Developer Command Prompt for Visual Studio" which sets up the necessary environment variables for you
-    
-    - You can find this prompt from the Start menu under Visual Studio
-
-4. Set CMake Generator:
-
-    - When running CMake, specify the generator explicitly to use NMake Makefiles. You can do this by adding the -G option:
-    ```
-    cmake -G "NMake Makefiles" -B build -DLLAMA_CUDA=ON
+    sudo add-apt-repository ppa:deadsnakes/ppa -y
+    sudo apt-get update
+    sudo apt-get install -y python3.11 python3.11-venv python3.11-dev
+    sudo python3.11 -m ensurepip
     ```
 
-5. If problems persist, consider opening an issue on the [LARS GitHub repository](https://github.com/abgulati/LARS/issues) for support.
+- Verify Installation via the terminal:
+
+    ```
+    python3 --version
+    ```
 
 - If you encounter errors with ```pip install```, try the following:
 
@@ -427,17 +419,48 @@ This typically indicates an issue with your Microsoft Visual Studio build tools,
 [Back to Table of Contents](https://github.com/abgulati/LARS?tab=readme-ov-file#table-of-contents)
 
 
-## First Run - Important Steps for First-Time Setup
+### Other Issues:
 
-- After installing, run LARS using:
+- If you encounter a ```CMake nmake failed``` error when attempting to build llama.cpp such as below:
+
+<p align="center">
+<img src="https://github.com/abgulati/LARS/blob/main/documents/images_and_screenshots/cmake-nmake-error.png"  align="center">
+</p>
+
+This typically indicates an issue with your Microsoft Visual Studio build tools, as CMake is unable to find the nmake tool, which is part of the Microsoft Visual Studio build tools. Try the below steps to resolve the issue:
+
+1. Ensure Visual Studio Build Tools are Installed:
+
+    - Make sure you have the Visual Studio build tools installed, including nmake. You can install these tools through the Visual Studio Installer by selecting the ```Desktop development with C++``` workload, and the ```MSVC and C++ CMake``` Optionals  
+
+    - Check Step 0 of the [Dependencies](https://github.com/abgulati/LARS/tree/main?tab=readme-ov-file#dependencies) section, specifically the screenshot therein
+
+2. Check Environment Variables:
+    
+    - Ensure that the paths to the Visual Studio tools are included in your system's PATH environment variable. Typically, this includes paths like:
     ```
-    cd web_app
-    python app.py   # Use 'python3' on Linux/macOS
+    C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build
+    C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\Common7\IDE
+    C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\Common7\Tools
     ```
 
-- Navigate to ```http://localhost:5000/``` in your browser
+3. Use Developer Command Prompt:
 
-- All application directories required by LARS will now be created on disk
+    - Open a "Developer Command Prompt for Visual Studio" which sets up the necessary environment variables for you
+    
+    - You can find this prompt from the Start menu under Visual Studio
+
+4. Set CMake Generator:
+
+    - When running CMake, specify the generator explicitly to use NMake Makefiles. You can do this by adding the -G option:
+    ```
+    cmake -G "NMake Makefiles" -B build -DLLAMA_CUDA=ON
+    ```
+
+5. If problems persist, consider opening an issue on the [LARS GitHub repository](https://github.com/abgulati/LARS/issues) for support.
+
+
+## First Run with llama.cpp
 
 - Eventually (after approximately 60 seconds) you'll see an alert on the page indicating an error:
     ```
@@ -512,19 +535,19 @@ This typically indicates an issue with your Microsoft Visual Studio build tools,
     
     - The ```Settings``` menu provides many options for the power-user to configure and change the LLM via the ```LLM Selection``` tab
 
-    - Very-Important: Select the appropriate prompt-template format for the LLM you're running
+    - Note if using llama.cpp:Very-Important: Select the appropriate prompt-template format for the LLM you're running
 
-    - LLMs trained for the following prompt-template formats are presently supported:
+        - LLMs trained for the following prompt-template formats are presently supported via llama.cpp:
 
-        - Meta Llama-3
-        - Meta Llama-2
-        - Mistral & Mixtral MoE LLMs
-        - Microsoft Phi-3
-        - OpenHermes-2.5-Mistral 
-        - Nous-Capybara 
-        - OpenChat-3.5
-        - Cohere Command-R and Command-R+
-        - DeepSeek Coder
+            - Meta Llama-3
+            - Meta Llama-2
+            - Mistral & Mixtral MoE LLMs
+            - Microsoft Phi-3
+            - OpenHermes-2.5-Mistral 
+            - Nous-Capybara 
+            - OpenChat-3.5
+            - Cohere Command-R and Command-R+
+            - DeepSeek Coder
     
     - Tweak Core-configuration settings via ```Advanced Settings``` (triggers LLM-reload and page-refresh):
         
