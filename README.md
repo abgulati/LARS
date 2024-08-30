@@ -422,8 +422,6 @@ There are many desktop applications for running LLMs locally, and LARS aims to b
 
 3. If problems persist, consider opening an issue on the [LARS GitHub repository](https://github.com/abgulati/LARS/issues) for support.
 
-[Back to Table of Contents](https://github.com/abgulati/LARS?tab=readme-ov-file#table-of-contents)
-
 
 ### Other Issues:
 
@@ -541,7 +539,7 @@ This typically indicates an issue with your Microsoft Visual Studio build tools,
     
     - The ```Settings``` menu provides many options for the power-user to configure and change the LLM via the ```LLM Selection``` tab
 
-    - Note if using llama.cpp:Very-Important: Select the appropriate prompt-template format for the LLM you're running
+    - Note if using llama.cpp: Very-Important: Select the appropriate prompt-template format for the LLM you're running
 
         - LLMs trained for the following prompt-template formats are presently supported via llama.cpp:
 
