@@ -132,6 +132,8 @@ There are many desktop applications for running LLMs locally, and LARS aims to b
 
 - On first-query, an embedding model (all-mpnet-base-v2) will be downloaded from HuggingFace Hub, which should take a brief time
 
+[Back to Table of Contents](https://github.com/abgulati/LARS?tab=readme-ov-file#table-of-contents)
+
 
 ## Optional Dependencies
 
