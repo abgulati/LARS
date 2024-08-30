@@ -71,9 +71,9 @@ There are many desktop applications for running LLMs locally, and LARS aims to b
 
 ## Dependencies
 
-### 1. Python v3.10.x or above: https://www.python.org/downloads/
+1. Python v3.10.x or above: https://www.python.org/downloads/
 
-### 2. PyTorch:
+2. PyTorch:
 
     **If you're planning to use your GPU to run LLMs, make sure to install the GPU drivers and CUDA/ROCm toolkits as appropriate for your setup, and only then proceed with PyTorch setup below**
 
