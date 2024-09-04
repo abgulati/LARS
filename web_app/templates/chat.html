@@ -706,6 +706,80 @@
                 border-top: none;
             }
 
+            .hf-waitress-llm-custom-select {
+                position: relative;
+                width: 100%;
+                font-family: Arial, sans-serif;
+            }
+
+            .hf-waitress-llm-custom-select-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 10px;
+                border: 1px solid black;
+                color: black;
+                background-color: white;
+                border-radius: 3px;
+                cursor: pointer;
+            }
+
+            .hf-waitress-llm-custom-dropdown-content {
+                display: none;
+                position: absolute;
+                background-color: #f9f9f9;
+                box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+                z-index: 1;
+                width: 100%;
+            }
+
+            .hf-waitress-llm-custom-dropdown-content.show {
+                display: block;
+            }
+
+            .hf-waitress-llm-custom-dropdown-search-and-sort-header {
+                display: flex;
+                padding: 10px;
+            }
+
+            .hf-waitress-llm-custom-dropdown-sort-btn {
+                width: 30%;
+                margin-right: 5px;
+                color: white;
+                background-color: darkslategray;
+            }
+
+            .hf-waitress-llm-custom-dropdown-search-input {
+                width: 70%;
+            }
+            
+            .hf-waitress-llm-custom-dropdown-add-btn, .hf-waitress-llm-custom-dropdown-add-input {
+                width: 100%;
+                padding: 5px;
+                margin-bottom: 5px;
+            }
+
+            .hf-waitress-llm-custom-dropdown-add-btn {
+                color: white;
+                background-color: darkslategray;
+            }
+
+            .hf-waitress-llm-custom-dropdown-item {
+                display: flex;
+                justify-content: space-between;
+                padding: 10px;
+                border-bottom: 1px solid #eee;
+                color: black;
+            }
+
+            .hf-waitress-llm-custom-dropdown-item:hover {
+                background-color: #f1f1f1;
+            }
+            
+            .hf-waitress-llm-custom-dropdown-delete-btn {
+                cursor: pointer;
+            }
+
         </style>
 
     </head>
@@ -885,12 +959,34 @@
 
                                         <div id="hf_waitress_div" style="display: none;">
                                         
-                                            <div id="localHfLlmSelection">
+                                            <!-- <div id="localHfLlmSelection">
                                                 <label style="margin-bottom: 3px;">Select a local LLM:</label>
                                                 <br>
                                                 <select class="modal-selects" name="hf_model_choice" id="hfModelDropdown">
                                                     
                                                 </select>
+                                            </div>
+
+                                            <br> -->
+
+                                            <div class="hf-waitress-llm-custom-select" id="hf-waitress-llm-custom-select">
+                                                <label style="margin-bottom: 3px;">Select a local LLM:</label>
+                                                <br>
+                                                <div class="hf-waitress-llm-custom-select-header" id="hf-waitress-llm-custom-select-header">
+                                                    <span class="hf-waitress-llm-custom-dropdown-selected-value" id="hf-waitress-llm-custom-dropdown-selected-value">Select an item</span>
+                                                    <span class="hf-waitress-llm-custom-dropdown-arrow" id="hf-waitress-llm-custom-dropdown-arrow">▼</span>
+                                                </div>
+                                                <div class="hf-waitress-llm-custom-dropdown-content" id="hf-waitress-llm-custom-dropdown-content">
+                                                    <div class="hf-waitress-llm-custom-dropdown-search-and-sort-header">
+                                                        <button class="hf-waitress-llm-custom-dropdown-sort-btn" id="hf-waitress-llm-custom-dropdown-sort-btn" onclick="reverseSortCustomDropdown()">Sort</button>
+                                                        <input type="text" class="hf-waitress-llm-custom-dropdown-search-input" id="hf-waitress-llm-custom-dropdown-search-input" placeholder="Search...">
+                                                    </div>
+                                                    <div class="hf-waitress-llm-custom-dropdown-add-item-container">
+                                                        <button class="hf-waitress-llm-custom-dropdown-add-btn" id="hf-waitress-llm-custom-dropdown-add-btn">+ Add</button>
+                                                        <input type="text" class="hf-waitress-llm-custom-dropdown-add-input" id="hf-waitress-llm-custom-dropdown-add-input" style="display: none;" placeholder="Enter new model id...">
+                                                    </div>
+                                                    <div class="hf-waitress-llm-custom-dropdown-items-list" id="hf-waitress-llm-custom-dropdown-items-list"></div>
+                                                </div>
                                             </div>
 
                                             <br>
@@ -1629,6 +1725,17 @@
                 document.getElementById('local_llm_server_status_indicator_text').style.color = status === "Online" ? "green" : "red";
             }
 
+            function attachWindowEvents() {
+                const customSelect = document.getElementById('hf-waitress-llm-custom-select');
+                const dropdownContent = document.getElementById('hf-waitress-llm-custom-dropdown-content');
+                
+                window.addEventListener('click', function(e) {
+                    if (customSelect && !customSelect.contains(e.target)) {
+                        dropdownContent.classList.remove('show');
+                    }
+                });
+            }
+
 
             function sortNavItems() {
                 
@@ -1722,16 +1829,14 @@
             }
 
 
-            async function updateHfModelList() {
-                const hfDropdown = document.getElementById('hfModelDropdown');
-                const currentModelList = hfDropdown.value.split(',');
-
-                const response = await fetch('/hf_config_writer_api', {
+            async function updateHfModelList(newModelList) {
+                console.log("Updating HF-Waitress model list");
+                const response = await fetch('http://localhost:9069/hf_config_writer_api', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ config_updates: { model_list: currentModelList } })
+                    body: JSON.stringify({ config_updates: { model_list: newModelList } })
                 })
                 .then(response => {
                     if (!response.ok) {
@@ -1808,22 +1913,6 @@
                 document.getElementById('HfwToppSliderValue').textContent = "0.95";
                 document.getElementById('HfwMinpSlider').value = "0.05";
                 document.getElementById('HfwMinpSliderValue').textContent = "0.05";
-            }
-
-
-            function addNewHfwModel() {
-                console.log("Adding new model to HF-Waitress dropdown");
-
-                const newModelId = document.getElementById('addHfwModelInput').value.trim();
-                const hfDropdown = document.getElementById('hfModelDropdown');
-                
-                if (newModelId && !currentModelList.includes(newModelId)) {
-                    const option = document.createElement('option');
-                    option.value = newModelId;
-                    option.textContent = newModelId;
-                    hfDropdown.appendChild(option);
-                }
-                updateHfModelList();    // User should be able to see the new model in the dropdown immediately and select it even if the model list is not updated on the server side!
             }
 
                         
@@ -2284,6 +2373,63 @@
                 });
             }
 
+
+            function removeModelFromCustomDropdown(model) {
+                loadCoreHfValues()
+                .then(hf_values => {
+                    let model_list = hf_values.model_list;
+                    model_list = model_list.filter(m => m.toLowerCase() !== model.toLowerCase());
+                    updateHfModelList(model_list);
+                    initializeHfWaitressCustomDropdown(model_list, hf_values.model_id);
+                })
+                .catch(error => {
+                    errorHandler("removing the model_id from the list of LLMs (likely means the HF-Waitress server is offline)", "removeModelFromCustomDropdown()", String(error.message));
+                });
+            }
+
+
+            function reverseSortCustomDropdown() {
+                loadCoreHfValues()
+                .then(hf_values => {
+                    let reversed_model_list = hf_values.model_list.reverse();
+                    updateHfModelList(reversed_model_list);
+                    initializeHfWaitressCustomDropdown(reversed_model_list, hf_values.model_id);
+                })
+                .catch(error => {
+                    errorHandler("reversing the LLM list (likely means the HF-Waitress server is offline)", "reverseSortCustomDropdown()", String(error.message));
+                });
+            }
+
+
+            function filterCustomDropdown(search_words) {
+                const customDropdownList = document.getElementById('hf-waitress-llm-custom-dropdown-items-list');
+                const items = customDropdownList.getElementsByClassName('hf-waitress-llm-custom-dropdown-item');
+
+                const searchQuery = search_words.toLowerCase();
+
+                Array.from(items).forEach(item => {
+                    const text = item.textContent.toLowerCase();
+                    if (text.includes(searchQuery)) {
+                        item.style.display = '';
+                    } else {
+                        item.style.display = 'none';
+                    }
+                })
+            }
+
+            function addNewHfwModel(model) {
+                loadCoreHfValues()
+                .then(hf_values => {
+                    let model_list = hf_values.model_list;
+                    model_list.push(model);
+                    updateHfModelList(model_list);
+                    initializeHfWaitressCustomDropdown(model_list, hf_values.model_id);
+                })
+                .catch(error => {
+                    errorHandler("adding a new model_id to the list of LLMs (likely means the HF-Waitress server is offline)", "addNewHfwModel()", String(error.message));
+                });
+            }
+
             
             ////////////////////////---------DOMContentLoaded Block Begins---------////////////////////////////
             function initializeChatLink() {
@@ -2305,6 +2451,7 @@
 
             
             function initializeUI() {
+                attachWindowEvents();
                 initializeChatLink();
                 initializeScrollDownButton();
             }
@@ -2367,7 +2514,7 @@
             }
 
 
-            function loadAndSetCoreHfValues() {
+            function loadCoreHfValues() {
                 const initKeysToRead = [
                     'model_id',
                     'model_list',
@@ -2409,23 +2556,53 @@
                     return data.values;
                 })
                 .catch(error => {
-                    errorHandler("reading hf_config.json (likely means the HF-Waitress server is offline)", "loadAndSetCoreHfValues()", String(error.message))
+                    errorHandler("reading hf_config.json (likely means the HF-Waitress server is offline)", "loadCoreHfValues()", String(error.message))
                 });
             }
 
 
-            function initializeHfModelDropdown(model_list, model_id) {
-                const hfDropdown = document.getElementById('hfModelDropdown');
-                for (let i = 0; i < model_list.length; i++) {
-                    const option = document.createElement('option');
-                    option.value = model_list[i];
-                    option.textContent = model_list[i];
+            // function initializeHfModelDropdown(model_list, model_id) {
+            //     const hfDropdown = document.getElementById('hfModelDropdown');
+            //     for (let i = 0; i < model_list.length; i++) {
+            //         const option = document.createElement('option');
+            //         option.value = model_list[i];
+            //         option.textContent = model_list[i];
 
-                    if (model_list[i].toLowerCase() == model_id.toLowerCase()) {
-                        option.selected = true;
+            //         if (model_list[i].toLowerCase() == model_id.toLowerCase()) {
+            //             option.selected = true;
+            //         }
+            //         hfDropdown.appendChild(option);
+            //     }
+            // }
+
+
+            function initializeHfWaitressCustomDropdown(model_list, model_id) {
+                const customDropdownList = document.getElementById('hf-waitress-llm-custom-dropdown-items-list');
+                customDropdownList.innerHTML = '';
+
+                const selectedValue = document.getElementById('hf-waitress-llm-custom-dropdown-selected-value');
+
+                model_list.forEach(model => {
+                    if (model.toLowerCase() == model_id.toLowerCase()) {
+                        selectedValue.textContent = model;
                     }
-                    hfDropdown.appendChild(option);
-                }
+                    const div = document.createElement('div');
+                    div.className = 'hf-waitress-llm-custom-dropdown-item';
+                    div.innerHTML = `
+                        <span>${model}</span>
+                        <span class="hf-waitress-llm-custom-dropdown-delete-btn">×</span>
+                    `;
+                    const deleteButton = div.querySelector('.hf-waitress-llm-custom-dropdown-delete-btn');
+                    deleteButton.addEventListener('click', (event) => { // instead of deleteButton.onclick = (event) => {
+                        event.stopPropagation();    //This prevents the click event from bubbling up to the parent div onclick event, which would immediately close the dropdown
+                        removeModelFromCustomDropdown(model);
+                    });
+                    div.addEventListener('click', () => {   // instead of div.onclick = () => {
+                        selectedValue.textContent = model;
+                        document.getElementById('hf-waitress-llm-custom-dropdown-content').classList.remove('show');
+                    });
+                    customDropdownList.appendChild(div);
+                });
             }
 
 
@@ -2509,9 +2686,10 @@
 
 
             function initializeHfwServerConfig() {
-                loadAndSetCoreHfValues()
+                loadCoreHfValues()
                     .then(hf_values => {
-                        initializeHfModelDropdown(hf_values.model_list, hf_values.model_id);
+                        // initializeHfModelDropdown(hf_values.model_list, hf_values.model_id);
+                        initializeHfWaitressCustomDropdown(hf_values.model_list, hf_values.model_id);
                         initializeHfSettingsDropdowns(hf_values);
                         initializeHfRadioButtons(hf_values);
                         setHfSlidersAndTextAreas(hf_values);
@@ -2684,9 +2862,6 @@
                 document.getElementById('resetLlmAdvancedDefaults').addEventListener('click', resetLlmAdvancedDefaults);    //aparently, adding parenthesis () here will cause resetLlmAdvancedDefaults to run immediately when the script executes, not on button click. Removing them allows the function to be passed as a reference correctly on click.
                 document.getElementById('resetHfLlmAdvancedDefaults').addEventListener('click', resetHfLlmAdvancedDefaults);
 
-                // Event listener for adding a new model to the HF-Waitress dropdown:
-                //document.getElementById('addHfwModelButton').addEventListener('click', addNewHfwModel);
-
                 // Initial state check:
                 toggleLocalLlmSelection();
                 toggleLlmApiForm();
@@ -2700,6 +2875,34 @@
 
                 document.getElementById('update_hf_access_token').addEventListener('change', function() {
                     document.getElementById('hf_access_token').disabled = !this.checked;   
+                });
+
+                // Event listener to toggle custom dropdown:
+                document.getElementById('hf-waitress-llm-custom-select-header').addEventListener('click', function() {
+                    document.getElementById('hf-waitress-llm-custom-dropdown-content').classList.toggle('show');
+                });
+
+                // Event listener to filter custom dropdown:
+                document.getElementById('hf-waitress-llm-custom-dropdown-search-input').addEventListener('input', function() {
+                    filterCustomDropdown(this.value);
+                });
+
+                // Event listener to add new item to custom dropdown:
+                const addInput = document.getElementById('hf-waitress-llm-custom-dropdown-add-input');
+                const addBtn = document.getElementById('hf-waitress-llm-custom-dropdown-add-btn');
+
+                addBtn.addEventListener('click', function() {
+                    addBtn.style.display = 'none';
+                    addInput.style.display = 'block';
+                });
+
+                addInput.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter' && this.value) {
+                        addNewHfwModel(this.value);
+                        addInput.value = '';
+                        addInput.style.display = 'none';
+                        addBtn.style.display = 'block';
+                    }
                 });
             }
 
@@ -2741,7 +2944,6 @@
             
             function initializeLLMTabComponents(values) {
                 initializeLocalLLMServerDropdown(values.local_llm_server);
-                
                 initializeModelDropdown(values.model_choice);   
                 initializeLLMTemplateDropdown(values.local_llm_chat_template_format);
                 initializeGPURadioButtons(values.use_gpu);
@@ -3286,7 +3488,7 @@
 
             function getHfWaitressConfig() {
                 let hf_config = {
-                    'model_id': document.getElementById('hfModelDropdown').value,
+                    'model_id': document.getElementById('hf-waitress-llm-custom-dropdown-selected-value').textContent,
                     'torch_device_map': document.getElementById('hf_waitress_torch_device_map_choice').value,
                     'torch_dtype': document.getElementById('hf_waitress_torch_dtype_choice').value,
                     'use_flash_attention_2': document.getElementById('hf_waitress_use_flash_attention_2_yes').checked,
