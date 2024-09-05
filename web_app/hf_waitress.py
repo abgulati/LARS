@@ -798,6 +798,12 @@ def completions_stream():
 
 @app.route('/health')
 def health():
+
+    def throw_health_check_error(attrib, e):
+        handle_error_no_return(f"Could not determine {attrib} while checking HF-Waitress server health. This is not a critical error and the HF-Waitress LLM server is online! More details of the issue encountered follows: ", e)
+        return True
+
+    print("\n\nHF-Waitress LLM health-check in-progress...\n\n")
     
     with reader_semaphore:
     
@@ -814,32 +820,32 @@ def health():
             try:
                 model_info["model_id"] = str(PIPE.model.config._name_or_path)
             except Exception as e:
-                handle_error_no_return("Could not determine model_id, encountered error: ", e)
+                throw_health_check_error("model_id", e)
 
             try:
                 model_info["transformers_version"] = str(PIPE.model.config.transformers_version)
             except Exception as e:
-                handle_error_no_return("Could not determine transformers_version, encountered error: ", e)
+                throw_health_check_error("transformers_version", e)
 
             try:
                 model_info["architecture"] = str(PIPE.model.config.architectures)
             except Exception as e:
-                handle_error_no_return("Could not determine model architecture, encountered error: ", e)
+                throw_health_check_error("model architecture", e)
 
             try:
                 model_info["model_type"] = str(PIPE.model.config.model_type)
             except Exception as e:
-                handle_error_no_return("Could not determine model_type, encountered error: ", e)
+                throw_health_check_error("model_type", e)
 
             try:
                 model_info["torch_dtype"] = str(PIPE.model.config.torch_dtype)
             except Exception as e:
-                handle_error_no_return("Could not determine torch_dtype, encountered error: ", e)
+                throw_health_check_error("torch_dtype", e)
 
             try:
                 model_info["device"] = str(PIPE.device)
             except Exception as e:
-                handle_error_no_return("Could not determine inference device, encountered error: ", e)
+                throw_health_check_error("inference device", e)
 
             try:
                 if hasattr(PIPE.model.config, "quantization_config"):
@@ -849,76 +855,76 @@ def health():
                 else:
                     model_info["is_quantized"] = False
             except Exception as e:
-                handle_error_no_return("Could not determine quantization status, encountered error: ", e)
+                throw_health_check_error("quantization status", e)
 
             try:
                 model_info["memory_footprint"] = str(PIPE.model.get_memory_footprint())
             except Exception as e:
-                handle_error_no_return("Could not determine memory_footprint, encountered error: ", e)
+                throw_health_check_error("memory_footprint", e)
 
             try:
                 model_info["model_vocab_size"] = str(PIPE.model.config.vocab_size)
             except Exception as e:
-                handle_error_no_return("Could not determine model_vocab_size, attempting to check length of the pipeline-tokenizer, encountered error: ", e)
+                throw_health_check_error("model_vocab_size", e)
                 try:
                     model_info["tokenizer_vocab_length"] = len(PIPE.tokenizer)
                 except Exception as e:
-                    handle_error_no_return("Could not determine length of the pipeline-tokenizer! Encountered error: ", e)
+                    throw_health_check_error("tokenizer_vocab_length", e)
             
             try:
                 model_info["tokenizer_vocab_size"] = str(PIPE.tokenizer.vocab_size)
             except Exception as e:
-                handle_error_no_return("Could not determine tokenizer_vocab_size, encountered error: ", e)
+                throw_health_check_error("tokenizer_vocab_size", e)
             
             try:
                 model_info["number_of_hidden_layers"] = str(PIPE.model.config.num_hidden_layers)
             except Exception as e:
-                handle_error_no_return("Could not determine number_of_hidden_layers, encountered error: ", e)
+                throw_health_check_error("number_of_hidden_layers", e)
             
             try:
                 model_info["number_of_attention_heads"] = str(PIPE.model.config.num_attention_heads)
             except Exception as e:
-                handle_error_no_return("Could not determine number_of_attention_heads, encountered error: ", e)
+                throw_health_check_error("number_of_attention_heads", e)
 
             try:
                 model_info["hidden_dimensions"] = str(PIPE.model.config.head_dim)
             except Exception as e:
-                handle_error_no_return("Could not determine hidden_dimensions, encountered error: ", e)
+                throw_health_check_error("hidden_dimensions", e)
 
             try:
                 model_info["number_of_key_value_heads"] = str(PIPE.model.config.num_key_value_heads)
             except Exception as e:
-                handle_error_no_return("Could not determine number_of_key_value_heads, encountered error: ", e)
+                throw_health_check_error("number_of_key_value_heads", e)
             
             try:
                 model_info["hidden_activation"] = str(PIPE.model.config.hidden_act)
             except Exception as e:
-                handle_error_no_return("Could not determine hidden_act, encountered error: ", e)
+                throw_health_check_error("hidden_activation", e)
             
             try:
                 model_info["hidden_size"] = str(PIPE.model.config.hidden_size)
             except Exception as e:
-                handle_error_no_return("Could not determine hidden_size, encountered error: ", e)
+                throw_health_check_error("hidden_size", e)
 
             try:
                 model_info["intermediate_size"] = str(PIPE.model.config.intermediate_size)
             except Exception as e:
-                handle_error_no_return("Could not determine intermediate_size, encountered error: ", e)
+                throw_health_check_error("intermediate_size", e)
 
             try:
                 model_info["max_position_embeddings"] = str(PIPE.model.config.max_position_embeddings)
             except Exception as e:
-                handle_error_no_return("Could not determine max_position_embeddings, encountered error: ", e)
+                throw_health_check_error("max_position_embeddings", e)
 
             try:
                 model_info["tokenizer"] = str(PIPE.tokenizer.name_or_path)
             except Exception as e:
-                handle_error_no_return("Could not determine the tokenizer used, encountered error: ", e)
+                throw_health_check_error("tokenizer", e)
 
             try:
                 model_info["max_seq_length"] = str(PIPE.tokenizer.model_max_length)
             except Exception as e:
-                handle_error_no_return("Could not determine the sequence length of the model's tokenizer, encountered error: ", e)
+                throw_health_check_error("max_seq_length", e)
 
             return jsonify(status="ok", model_info=model_info), 200
 
@@ -928,7 +934,7 @@ def health():
 
 @app.route('/restart_server')
 def restart_server():
-
+    
     with llm_semaphore:
         print("\n\n/restart_server acquired llm_semaphore, proceeding...\n\n")
         with config_writer_semaphore:
