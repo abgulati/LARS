@@ -1117,10 +1117,8 @@ def LoadNewDocument(input_file):
     try:
         numbered_splits = chunk_docs_with_page_numbers(input_file, chunk_sz)
 
-        print(f"\n\nnumbered_splits sample: {numbered_splits[:3]}\n\n")
-        print(f"\n\nnumbered_splits type: {type(numbered_splits[3])}\n\n")
-        # print(f"\n\nall_splits sample: {all_splits[:3]}\n\n")
-        # print(f"\n\nall_splits type: {type(all_splits[3])}\n\n")
+        # print(f"\n\nnumbered_splits sample: {numbered_splits[:3]}\n\n")
+        # print(f"\n\nnumbered_splits type: {type(numbered_splits[3])}\n\n")
         
     except Exception as e:
         handle_local_error("Failed to chunk document for storage to VectorDB, encountered error: ", e)
