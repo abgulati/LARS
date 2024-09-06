@@ -2398,8 +2398,8 @@ def hf_waitress_server_starter():
     except Exception as e:
         return handle_api_error("Could not launch HF-Waitress process, encountered error: ", e)
 
-    timeout = 10   # seconds
-    attempts = 10
+    timeout = 5   # seconds
+    attempts = 25
 
     try:
         for _ in range(attempts):
