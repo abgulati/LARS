@@ -1728,10 +1728,14 @@
             function attachWindowEvents() {
                 const customSelect = document.getElementById('hf-waitress-llm-custom-select');
                 const dropdownContent = document.getElementById('hf-waitress-llm-custom-dropdown-content');
+                const addInput = document.getElementById('hf-waitress-llm-custom-dropdown-add-input');
+                const addBtn = document.getElementById('hf-waitress-llm-custom-dropdown-add-btn');
                 
                 window.addEventListener('click', function(e) {
                     if (customSelect && !customSelect.contains(e.target)) {
                         dropdownContent.classList.remove('show');
+                        addInput.style.display = 'none';
+                        addBtn.style.display = 'block';
                     }
                 });
             }
