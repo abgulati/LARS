@@ -3903,8 +3903,8 @@
                                 const rawBodyJSONObj = JSON.parse(formatted_user_prompt);                                
                                 const rawBodyJSONStringified = JSON.stringify(rawBodyJSONObj);
 
-                                console.log("rawBodyJSONObj: ", rawBodyJSONObj);
-                                console.log("rawBodyJSONStringified: ", rawBodyJSONStringified);
+                                // console.log("rawBodyJSONObj: ", rawBodyJSONObj);
+                                // console.log("rawBodyJSONStringified: ", rawBodyJSONStringified);
 
                                 try {
                                     const hfwResponse = await fetch(url, {
@@ -3936,17 +3936,17 @@
                                             messages.forEach(message => {
                                                 
                                                 if (message.startsWith('data: ')) {
-                                                    const jsonStr = message.slice(6);   // remove 6 chars to get rid of the 'data: ' prefix!
+                                                    const jsonStr = message.slice(7, -1);   // remove first 7 and last 1 chars to get rid of the 'data: "' prefix and " suffix!
 
-                                                    console.log("message: ", message);
+                                                    //console.log("message: ", message);
                                                     try {
                                                         let dataObj = String(jsonStr);
                                                         if (dataObj == "null") {
                                                             dataObj = "";
                                                         }
-                                                        let streamed_content = dataObj.replace(/(?<![A-Z]:|\/)([.?!])(?=\s|$)(?!\s*\/)/g, '$1<br><br>');
-                                                        // let streamed_content = dataObj.replace(/(?<![A-Z]:|\/)([.!?])(?=\s+[A-Z"']|$)(?!\s*\/|[^a-z]*:)/g, '$1<br><br>');
-                                                        
+                                                        // console.log("dataObj: ", dataObj);
+                                                        let streamed_content = dataObj.replace(/\\n\\n/g, '<br><br>').replace(/\\n/g, '<br>'); // /g - global - replace throughout string, not just the first occurance
+
                                                         hfwTotalContent += streamed_content;
                                                         let tempDiv = document.createElement('div');
 
@@ -4484,7 +4484,7 @@
                         let sequence_id = starContainer.getAttribute('rating-sequence-id');
 
                         for(let i = 0; i < rate; i++) {
-                            console.log("filling star")
+                            console.log("filling star-rating")
                             starContainer.children[i].classList.remove('far');
                             starContainer.children[i].classList.add('fas'); // This fills the star
                         }
