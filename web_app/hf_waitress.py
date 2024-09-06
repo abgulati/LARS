@@ -568,7 +568,8 @@ def initialize_model():
                 quantization_config  = QuantoConfig(weights="int4")
                 model_params["quantization_config"] = quantization_config
         elif quantize == "hqq":
-            print("HQQ-Quantizing")
+            print("HQQ-Quantizing - Force-setting torch_dtype to torch.bfloat16")
+            model_params["torch_dtype"] = torch.bfloat16
             quant_level = quant_level.lower().strip()
 
             if quant_level == "int8":
