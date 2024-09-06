@@ -1,4 +1,4 @@
-from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline, TextStreamer, BitsAndBytesConfig, QuantoConfig, HqqConfig
+from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline, TextStreamer, BitsAndBytesConfig, QuantoConfig, HqqConfig, TextIteratorStreamer
 from huggingface_hub import login
 import torch
 
@@ -17,7 +17,7 @@ import io
 
 from functools import wraps
 from logging.handlers import RotatingFileHandler
-from flask import Flask, request, jsonify, Response
+from flask import Flask, request, jsonify, Response, stream_with_context
 from flask_cors import CORS
 
 from waitress import serve
@@ -760,7 +760,7 @@ def completions_stream():
 
             try:
                 streamer = TextStreamer(PIPE.tokenizer, skip_special_tokens=True, skip_prompt=True)
-
+                
                 if generation_args:
                     generation_args["streamer"] = streamer
                     output = PIPE(messages, **generation_args)
@@ -768,26 +768,21 @@ def completions_stream():
                     output = PIPE(messages, streamer=streamer)
             finally:
                 sys.stdout = original_stdout
-
                 data_queue.put(None)
                 stop_thread.set()
         
         thread = threading.Thread(target=llm_task)
         thread.start()
 
-        i = 0
         while True:
             line = data_queue.get()
             if line is None:
                 print("None read, breaking and stopping thread")
                 thread.join()
                 break
-            if i == 0:
-                line = line.strip('\n')
-                i += 1
-            yield f"data: {line}\n"
+            yield f"data: {json.dumps(line)}\n\n"
         
-        yield "event: END\ndata: null\n"
+        yield f"event: END\ndata: \"null\"\n\n"
 
         print("LLM stream done, releasing semaphore")
         llm_semaphore.release()
@@ -926,6 +921,7 @@ def health():
             except Exception as e:
                 throw_health_check_error("max_seq_length", e)
 
+            print(f"HF-Waitress LLM-server health-check completed successfully, returning.\n")
             return jsonify(status="ok", model_info=model_info), 200
 
         except Exception as e:
