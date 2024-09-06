@@ -3584,10 +3584,7 @@ def get_references():
 
     if docs_have_relevant_info:
 
-        if local_llm_server == 'llama-cpp':
-            refer_pages_string = "<br><br>"
-
-        refer_pages_string += "<h6>Additional data may be found in the following documents & pages:</h6>"
+        refer_pages_string = "<br><h6>Additional data may be found in the following documents & pages:</h6>"
         
         for index, doc in enumerate(user_should_refer_pages_in_doc, start=1):
             pdf_iframe_id = f"stream{stream_session_id}PdfViewer{str(index)}"
