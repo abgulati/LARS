@@ -117,7 +117,6 @@
                 overflow-y: auto; /* Add a scrollbar if content overflows */
                 padding: 1rem;
                 border-bottom: 1px solid #383d3f;
-                /* font-family: 'Roboto', sans-serif; Use Roboto font */
                 font-size: 16px; /* Adjust as needed */
                 color: #333; /* Dark gray color for better readability */
                 margin-top: 30px;
@@ -259,7 +258,6 @@
             }
 
             .pdf-viewer {
-                /* width: 50%; */
                 flex: 1;
                 padding: 10px;
                 padding-top: 0px;
@@ -306,12 +304,21 @@
                 height: 5vh;
             }
 
+            .header-right {
+                display: flex;
+                align-items: center;
+            }
+
             .header-text {
                 display: flex;
                 flex-direction: column; /* Stack h3 and h4 vertically */
                 align-items: center;    /* Center the text horizontally */
                 flex-grow: 1;           /* Allow the container to take up available space */
                 display: none;
+            }
+
+            .info-container {
+                margin-right: 15px;
             }
 
             .info-container .info-box {
@@ -714,7 +721,6 @@
             .hf-waitress-llm-custom-select {
                 position: relative;
                 width: 100%;
-                /* font-family: Arial, sans-serif; */
             }
 
             .hf-waitress-llm-custom-select-header {
@@ -792,11 +798,6 @@
             }
 
             .app-title {
-                /* position: absolute;
-                top: 50%;
-                left: 50%;
-                cursor: default;
-                transform: translate(-50%, -50%); */
                 margin-left: 11px;
                 color: white;
                 font-size: 31px;
@@ -815,11 +816,6 @@
             .app-title:hover span {
                 animation: bounce 0.6s;
             }
-
-            /* .app-title span:nth-child(1) { color: #ff6b6b; }
-            .app-title span:nth-child(2) { color: #4ecdc4; }
-            .app-title span:nth-child(3) { color: #45b7d1; }
-            .app-title span:nth-child(4) { color: #f7fff7; } */
 
             @keyframes bounce {
                 0%, 100% { transform: translateY(0); }
@@ -844,32 +840,17 @@
                 </div>
             </div>
 
-            <!-- <span style="font-size:30px; cursor:pointer; color: #D1CDC7;" onclick="openNav()">&#9776;</span> -->
-
-            <div class="header-logo">
-                <!-- <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; font-size: 33px; font-weight: 700; font-style: italic;">
-                    LARS
-                </div> -->
-                <!-- <div class="app-title">
-                    <span>L</span><span>A</span><span>R</span><span>S</span>
-                </div> -->
-                <!-- <img id="main_logo" src="{{ url_for('static', filename='images/LARS_Logo_3.png') }}" alt="LARS Logo" style="visibility: hidden;"> -->
+            <div class="header-right">
+                <div class="info-container" style="cursor: pointer; position: relative; font-size: 30px; color: #D1CDC7;">
+                    <i class="fa-solid fa-circle-info info-icon" onclick="toggleInfo()"></i>
+                    <div class="info-box glassmorphism" id="info_box" style="display: none;">
+                        <h3 style="display: none;" id="model_header" class="fa-solid fa-brain"></h3>
+                        <h4 style="display: none;" id="old_model_header" class="fa-solid fa-brain"></h4>
+                    </div>
+                </div>
+                <span style="font-size:30px; cursor:pointer; color: #D1CDC7;" id="settings_gear" data-bs-toggle="modal" data-bs-target="#settingsModal"><i class="fa-solid fa-gear"></i></span>    
             </div>
             
-            <div class="header-text">
-                <!-- <h3 style="display: none;" id="model_header" class="fa-solid fa-brain"></h3>
-                <h4 style="display: none;" id="old_model_header" class="fa-solid fa-brain"></h4> -->
-            </div>
-
-            <div class="info-container" style="cursor: pointer; position: relative; font-size: 30px; padding-right: 10px; color: #D1CDC7;">
-                <i class="fa-solid fa-circle-info info-icon" onclick="toggleInfo()"></i>
-                <div class="info-box glassmorphism" id="info_box" style="display: none;">
-                    <h3 style="display: none;" id="model_header" class="fa-solid fa-brain"></h3>
-                    <h4 style="display: none;" id="old_model_header" class="fa-solid fa-brain"></h4>
-                </div>
-            </div>
-
-            <span style="font-size:30px; cursor:pointer; color: #D1CDC7;" id="settings_gear" data-bs-toggle="modal" data-bs-target="#settingsModal"><i class="fa-solid fa-gear"></i></span>
         </div>
         <!--
             NOTES ON ABOVE:
