@@ -2605,6 +2605,9 @@ def fetch_file_list_for_vector_db():
             read_return = read_config(['vectordb_openai_folder'])
             vdb_for_select = read_return['vectordb_openai_folder']
 
+        vdb_for_select = '%' + os.path.basename(vdb_for_select)
+        print(f'vdb_for_select: {vdb_for_select}')
+
     except Exception as e:
         return handle_api_error("Could not create new VectorDB in reset_vector_db_on_disk, encountered error: ", e)
 
@@ -2640,7 +2643,7 @@ def fetch_file_list_for_vector_db():
         handle_local_error("Could not create document_records DB, encountered error: ", e)
 
     try:
-        c.execute("SELECT document_name, vectordb_used, chunk_size, chunk_overlap FROM document_records where vectordb_used = ?", (vdb_for_select,))
+        c.execute("SELECT document_name, vectordb_used, chunk_size, chunk_overlap FROM document_records where vectordb_used LIKE ?", (vdb_for_select,))
     except Exception as e:
         return handle_api_error("Could not get document list from document_records db, encountered error: ", e)
     
