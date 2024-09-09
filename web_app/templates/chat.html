@@ -9,19 +9,23 @@
         <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
         <link rel="preconnect" href="https://fonts.googleapis.com">
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-        <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
-        <link href='https://fonts.googleapis.com/css?family=Lato&subset=latin,latin-ext' rel='stylesheet' type='text/css'>
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;700&display=swap" rel="stylesheet">
         <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
 
 
         <!--CSS Goes Here-->
         <style>
 
-            @font-face {
-                font-family: Boeing Meso;
-                font-weight: 400;
-                font-style: normal;
-                src: url(/assets/BoeingMeso-Regular-5934ec84.woff) format("woff")
+            body {
+                font-family: 'Inter', sans-serif;
+            }
+
+            .glassmorphism {
+                background: rgba(255, 255, 255, 0.2);
+                backdrop-filter: blur(8px);
+                border-radius: 10px;
+                border: 1px solid rgba(255, 255, 255, 0.18);
+                box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
             }
 
             .sidenav {
@@ -30,12 +34,14 @@
                 position: fixed;
                 z-index: 1;
                 top: 0;
-                left: 0;
+                left: -2px;
                 background-color: #111;
                 transition: 0.5s;
                 overflow-x: hidden;
                 overflow-y: auto;
                 padding-top: 10px;
+                border-radius: 10px;
+                margin-top: 5px;
             }
 
             .nav-item {
@@ -111,7 +117,7 @@
                 overflow-y: auto; /* Add a scrollbar if content overflows */
                 padding: 1rem;
                 border-bottom: 1px solid #383d3f;
-                font-family: 'Roboto', sans-serif; /* Use Roboto font */
+                /* font-family: 'Roboto', sans-serif; Use Roboto font */
                 font-size: 16px; /* Adjust as needed */
                 color: #333; /* Dark gray color for better readability */
                 margin-top: 30px;
@@ -296,8 +302,7 @@
                 display: flex;
                 justify-content: space-between;
                 align-items: center;
-                position: relative;
-                padding: 0 15px;
+                padding: 10px 15px;
                 height: 5vh;
             }
 
@@ -316,13 +321,13 @@
                 top: 0;
                 width: max-content;
                 max-width: 345px;
-                background-color: #171A1B;
+                background-color: rgba(23, 26, 27, 0.7); /*Alpha adjusted for transparency*/
                 color: #D1CDC7;
-                box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
-                border: 1px solid #3A3E41;
+                box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37); /*Match the glassmorphism box shadow*/
                 z-index: 100;
                 padding: 10px;
-                border-radius: 4px;
+                border-radius: 10px; /*Match the glassmorphism border radius*/
+                border: 1px solid rgba(255, 255, 255, 0.18); /*Match the glassmorphism border*/
             }
 
             .info-container .info-box::before {
@@ -612,8 +617,8 @@
             /*SCROLLBAR STYLING - For Firefox:*/
             /* The syntax is scrollbar-color: <thumb color> <track color>; */
             body {
-            scrollbar-color: #464A4D #212324; 
-            /*scrollbar-width: thin; /* Can be "auto", "thin", or "none" */
+                scrollbar-color: #464A4D #212324; 
+                /*scrollbar-width: thin; /* Can be "auto", "thin", or "none" */
             }
 
             .thumbnail-icon {
@@ -709,7 +714,7 @@
             .hf-waitress-llm-custom-select {
                 position: relative;
                 width: 100%;
-                font-family: Arial, sans-serif;
+                /* font-family: Arial, sans-serif; */
             }
 
             .hf-waitress-llm-custom-select-header {
@@ -780,6 +785,47 @@
                 cursor: pointer;
             }
 
+            .nav-toggle {
+                display: flex;
+                align-items: center;
+                cursor: pointer;
+            }
+
+            .app-title {
+                /* position: absolute;
+                top: 50%;
+                left: 50%;
+                cursor: default;
+                transform: translate(-50%, -50%); */
+                margin-left: 11px;
+                color: white;
+                font-size: 31px;
+                font-weight: 700;
+                font-style: italic;
+                text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+                letter-spacing: 5px;
+                user-select: none;
+            }
+
+            .app-title span {
+                display: inline-block;
+                transition: transform 0.3s ease;
+            }
+
+            .app-title:hover span {
+                animation: bounce 0.6s;
+            }
+
+            /* .app-title span:nth-child(1) { color: #ff6b6b; }
+            .app-title span:nth-child(2) { color: #4ecdc4; }
+            .app-title span:nth-child(3) { color: #45b7d1; }
+            .app-title span:nth-child(4) { color: #f7fff7; } */
+
+            @keyframes bounce {
+                0%, 100% { transform: translateY(0); }
+                50% { transform: translateY(-10px); }
+            }
+
         </style>
 
     </head>
@@ -790,10 +836,24 @@
         <span style="font-size:30px; cursor:pointer; position:absolute; top:3px; right:15px;" onclick=""><i class="fa-solid fa-gear"></i></span> -->
         
         <div class="header-container">
-            <span style="font-size:30px; cursor:pointer; color: #D1CDC7;" onclick="openNav()">&#9776;</span>
+            
+            <div class="nav-toggle" onclick="openNav()">
+                <span style="font-size:30px; cursor:pointer; color: #D1CDC7;">&#9776;</span>
+                <div class="app-title">
+                    <span>L</span><span>A</span><span>R</span><span>S</span>
+                </div>
+            </div>
+
+            <!-- <span style="font-size:30px; cursor:pointer; color: #D1CDC7;" onclick="openNav()">&#9776;</span> -->
 
             <div class="header-logo">
-                <img id="main_logo" src="{{ url_for('static', filename='images/LARS_Logo_3.png') }}" alt="LARS Logo" style="visibility: hidden;">
+                <!-- <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; font-size: 33px; font-weight: 700; font-style: italic;">
+                    LARS
+                </div> -->
+                <!-- <div class="app-title">
+                    <span>L</span><span>A</span><span>R</span><span>S</span>
+                </div> -->
+                <!-- <img id="main_logo" src="{{ url_for('static', filename='images/LARS_Logo_3.png') }}" alt="LARS Logo" style="visibility: hidden;"> -->
             </div>
             
             <div class="header-text">
@@ -803,7 +863,7 @@
 
             <div class="info-container" style="cursor: pointer; position: relative; font-size: 30px; padding-right: 10px; color: #D1CDC7;">
                 <i class="fa-solid fa-circle-info info-icon" onclick="toggleInfo()"></i>
-                <div class="info-box" id="info_box" style="display: none;">
+                <div class="info-box glassmorphism" id="info_box" style="display: none;">
                     <h3 style="display: none;" id="model_header" class="fa-solid fa-brain"></h3>
                     <h4 style="display: none;" id="old_model_header" class="fa-solid fa-brain"></h4>
                 </div>
@@ -826,7 +886,7 @@
         
 
 
-        <div class="sidenav" id="sidenav">
+        <div class="sidenav glassmorphism" id="sidenav">
             <a href="javascript:void(0)" class="closebtn" onclick="closeNav()">&times;</a>
             <a href="javascript:void(0)" class="sortbtn" onclick="sortNavItems()">&#8597;</a>
             <div class="sidenav-content" id="sidenav-content">
@@ -859,13 +919,13 @@
         </div>
 
         <div class="loader2" id="overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgb(250,250,250,0.5); z-index: 1000;">
-            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: black; font-size: 24px; font-family: 'Roboto', sans-serif; font-weight: 500;">
+            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: black; font-size: 24px; font-weight: 500;">
                 Processing New Document...
             </div>
         </div>
 
         <div id="UploadingLlmOverlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgb(250,250,250,0.5); z-index: 1000;">
-            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: black; font-size: 24px; font-family: 'Roboto', sans-serif; font-weight: 500;">
+            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: black; font-size: 24px; font-weight: 500;">
                 Uploading LLM to 'models' directory...
                 <div id="uploadProgress" style="display: none;">
                     <p>Upload Progress: <span id="progressPercentage">0%</span></p>
@@ -874,19 +934,19 @@
         </div>
 
         <div id="ModelAndDBLoading" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgb(250,250,250,0.5); z-index: 1000;">
-            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: black; font-size: 24px; font-family: 'Roboto', sans-serif; font-weight: 500;">
-                Loading Model and Vector Database...
+            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: black; font-size: 24px; font-weight: 500;">
+                Loading Core Backend...
             </div>
         </div>
 
         <div id="ReadyToChat" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgb(250,250,250,0.5); z-index: 1000;">
-            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: black; font-size: 24px; font-family: 'Roboto', sans-serif; font-weight: 500;">
+            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: black; font-size: 24px; font-weight: 500;">
                 All loaded up & ready to chat!
             </div>
         </div>
 
         <div id="SavingHfWaitressSettings" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgb(250,250,250,0.5); z-index: 1000;">
-            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: black; font-size: 24px; font-family: 'Roboto', sans-serif; font-weight: 500;">
+            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: black; font-size: 24px; font-weight: 500;">
                 Saving HF-Waitress Server Settings...
             </div>
         </div>
@@ -1714,10 +1774,12 @@
             
             function openNav() {
                 document.getElementById("sidenav").style.width = "250px";
+                document.getElementById("sidenav").style.left = "0";
             }
 
             function closeNav() {
                 document.getElementById("sidenav").style.width = "0";
+                document.getElementById("sidenav").style.left = "-2px";
             }
 
             function setServerStatusIndicator(status) {
