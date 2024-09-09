@@ -259,7 +259,7 @@ def hf_config_writer_api():
 
     try:
         config_updates = request.json['config_updates']
-        print(f"config_updates for hf_config_writer_api: {config_updates}")
+        # print(f"config_updates for hf_config_writer_api: {config_updates}")
     except Exception as e:
         handle_api_error("Server-side error - could not read values for hf_config_writer_api request. Encountered error: ", e)
     
