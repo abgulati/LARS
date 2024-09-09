@@ -827,9 +827,6 @@
     </head>
 
     <body style="background-color: #181a1b;">
-
-        <!-- <span style="font-size:30px; cursor:pointer; position:absolute; top:3px; left:15px;" onclick="openNav()">&#9776;</span>
-        <span style="font-size:30px; cursor:pointer; position:absolute; top:3px; right:15px;" onclick=""><i class="fa-solid fa-gear"></i></span> -->
         
         <div class="header-container">
             
@@ -864,15 +861,12 @@
                 The # symbol in #settingsModal indicates that it's an ID selector. In other words, this attribute is pointing to an element with the id="settingsModal" in the HTML. 
                 It means that somewhere in your HTML, there should be a modal with the ID of settingsModal that will be opened when this trigger is clicked.
         -->
-        
 
 
         <div class="sidenav glassmorphism" id="sidenav">
             <a href="javascript:void(0)" class="closebtn" onclick="closeNav()">&times;</a>
             <a href="javascript:void(0)" class="sortbtn" onclick="sortNavItems()">&#8597;</a>
             <div class="sidenav-content" id="sidenav-content">
-                <!-- <a href="http://localhost:5000/chat" class="fas fa-plus" style="font-size: 18px;"> New Chat</a> -->
-                <!-- <div class="nav-item">Menu Item 1</div> -->
                 <a href="#" id="dynamicChatLink" class="fas fa-plus" style="font-size: 18px;"> New Chat</a>
             </div>
         </div>
@@ -890,7 +884,6 @@
             <h3 id="processingQnS" style="display: none;"></h3>
             
             <div class="input-area d-flex justify-content-center align-items-center" id="input-area" style="background-color: #1e2021;">
-                <!-- <input type="text" class="form-control" id="user-input" onclick="closeNav()" placeholder="Type your prompts here..."> -->
                 <textarea rows="1" cols="50" class="form-control" id="user-input" onclick="closeNav()" placeholder="Type your prompts here..."></textarea>
                 <input type="file" name="file" id="fileInput" style="display:none;">
                 <button type="button" id="fileInputButton" class="btn btn-primary upload-file-btn" onclick="closeNav(); document.getElementById('fileInput').click();"><i class="fas fa-paperclip"></i></button>
