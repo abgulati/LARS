@@ -259,7 +259,7 @@ def hf_config_writer_api():
 
     try:
         config_updates = request.json['config_updates']
-        # print(f"config_updates for hf_config_writer_api: {config_updates}")
+        print(f"\n\nconfig_updates for hf_config_writer_api:\n{config_updates}\n\n")
     except Exception as e:
         handle_api_error("Server-side error - could not read values for hf_config_writer_api request. Encountered error: ", e)
     
@@ -638,9 +638,11 @@ def initialize_model():
 @app.route('/completions', methods=['POST'])
 def completions():
 
-    print("completions route triggered")
+    print("\n\ncompletions route triggered - attempting to acquire LLM semaphore\n\n")
 
     with llm_semaphore:
+
+        print("\n\nLLM semaphore acquired by /completions\n\n")
 
         try:
             data = request.json
@@ -682,31 +684,35 @@ def completions():
         except Exception as e:
             handle_api_error("Could not generate output, encountered error: ", e)
 
-        print("Completions done")
+        print("\n\nCompletions done - releasing LLM semaphore\n\n")
 
         return jsonify({"success": True, "response": output})
 
 
 
-class CustomStream(io.StringIO):
-    def __init__(self, callback=None):
-        super().__init__()
-        self.callback = callback
+class CustomTextStreamer(TextStreamer):
+    def __init__(self, tokenizer, skip_special_tokens=True, skip_prompt=True, **kwargs):
+        super().__init__(tokenizer, skip_special_tokens=skip_special_tokens, skip_prompt=skip_prompt, **kwargs)
+        self.callback = None
+        self.buffer = io.StringIO()
 
-    def write(self, data):
-        # If we have a callback, call it
+    def on_finalized_text(self, text: str, stream_end: bool = False):
         if self.callback:
-            self.callback(data)
-
-        return super().write(data)
+            self.callback(text)
+        return self.buffer.write(text)
+    
+    def flush(self):
+        self.buffer.flush()
 
 
 @app.route('/completions_stream', methods=['POST'])
 def completions_stream():
 
+    print("\n\ncompletions_stream route triggered - attempting to acquire LLM semaphore\n\n")
+
     llm_semaphore.acquire()
 
-    print("completions_stream route triggered")
+    print("\n\nLLM semaphore acquired by /completions_stream\n\n")
 
     try:
         data = request.json
@@ -743,34 +749,31 @@ def completions_stream():
 
     stop_thread = threading.Event()
 
-    def generate():
+    data_queue = queue.Queue()
 
-        data_queue = queue.Queue()
+    def callback(data):
+        data_queue.put(data)
 
-        def callback(data):
-            data_queue.put(data)
+    custom_streamer = CustomTextStreamer(PIPE.tokenizer, skip_special_tokens=True, skip_prompt=True)
+    custom_streamer.callback = callback
 
-        custom_stream = CustomStream(callback=callback)
+    def llm_task():
 
-        original_stdout = sys.stdout
-        sys.stdout = custom_stream
+        global PIPE
 
-        def llm_task():
+        try:                
+            if generation_args:
+                generation_args["streamer"] = custom_streamer
+                output = PIPE(messages, **generation_args)
+            else:
+                output = PIPE(messages, streamer=custom_streamer)
+        finally:
+            data_queue.put(None)
+            print("\n\nLLM stream done, releasing semaphore\n\n")
+            llm_semaphore.release()
+            stop_thread.set()
 
-            global PIPE
-
-            try:
-                streamer = TextStreamer(PIPE.tokenizer, skip_special_tokens=True, skip_prompt=True)
-                
-                if generation_args:
-                    generation_args["streamer"] = streamer
-                    output = PIPE(messages, **generation_args)
-                else:
-                    output = PIPE(messages, streamer=streamer)
-            finally:
-                sys.stdout = original_stdout
-                data_queue.put(None)
-                stop_thread.set()
+    def generate():        
         
         thread = threading.Thread(target=llm_task)
         thread.start()
@@ -778,16 +781,13 @@ def completions_stream():
         while True:
             line = data_queue.get()
             if line is None:
-                print("None read, breaking and stopping thread")
+                print("\n\nNone read, breaking and stopping thread\n\n")
                 thread.join()
                 break
             yield f"data: {json.dumps(line)}\n\n"
         
         yield f"event: END\ndata: \"null\"\n\n"
-
-        print("LLM stream done, releasing semaphore")
-        llm_semaphore.release()
-
+            
     print("\n\nInferencing Begins!\n\n")
     return Response(generate(), content_type='text/event-stream')
 
