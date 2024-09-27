@@ -2267,12 +2267,13 @@ def llama_cpp_server_starter():
         try:
             terminate_local_llm_server_process(LLAMA_CPP_PROCESS)
             LLAMA_CPP_PROCESS = None
+            LLM_CHANGE_RELOAD_TRIGGER_SET = False
         except Exception as e:
             LLM_LOADED_UP = True  # We know the llama.cpp server is running but there was an error terminating it, so we set LLM_LOADED_UP to True while leaving LLM_CHANGE_RELOAD_TRIGGER_SET to True as we know the server needs to be re-loaded.
             handle_error_no_return("Failed to terminate running llama.cpp process, server was likely launched by a previous session. Returning with the currently loaded LLM. To change, shutdown the previously launched server manually and reload this page. Technical error-details follow: ", e)
             return jsonify({'success': True, 'llm_model': 'undefined', 'other_server_running': other_server_running})   # We still return success:True as we've at least determined llama.cpp is running and loaded with a model, even if we cannot reload it.
                  
-    elif LLM_CHANGE_RELOAD_TRIGGER_SET:
+    elif LLM_CHANGE_RELOAD_TRIGGER_SET: # llama.cpp is not running, set flags to false and new settings will be loaded on next llama.cpp launch
         print("\n\nResetting the LLM_CHANGE_RELOAD_TRIGGER_SET flag and attemping to launch the server with the currently selected LLM.\n\n")
         LLM_CHANGE_RELOAD_TRIGGER_SET = False
         LLM_LOADED_UP = False
@@ -2365,6 +2366,7 @@ def hf_waitress_server_starter():
         with open('hf_config.json', 'r') as file:
             hf_config = json.load(file)
             is_awq = hf_config['awq']
+            use_flash_attention_2 = hf_config['use_flash_attention_2']
             model_choice = hf_config['model_id']
     except Exception as e:
         handle_error_no_return("Could not read hf_config.json in method hf_waitress_server_starter, encountered error: ", e)
@@ -2381,19 +2383,23 @@ def hf_waitress_server_starter():
     
     print("\n\nProceeding to launch HF-Waitress server\n\n")
 
+    launch_args = ' '
+    if is_awq:
+        launch_args += '--awq '
+    if use_flash_attention_2:
+        launch_args += '--use_flash_attention_2 '
+    
+    launch_args = launch_args.strip()
+    base_command = 'python' if platform.system() == 'Windows' else 'python3'
+    full_command = f"{base_command} hf_waitress.py {launch_args}"
+
     try:
         if platform.system() == 'Windows':
-            if not is_awq:
-                HF_WAITRESS_PROCESS = subprocess.Popen(['python', 'hf_waitress.py'], creationflags=subprocess.CREATE_NEW_CONSOLE)   #Popen is non-blocking, so the server will keep running in the background
-            else:
-                HF_WAITRESS_PROCESS = subprocess.Popen(['python', 'hf_waitress.py', '--awq'], creationflags=subprocess.CREATE_NEW_CONSOLE)
+            HF_WAITRESS_PROCESS = subprocess.Popen(full_command, creationflags=subprocess.CREATE_NEW_CONSOLE)   #Popen is non-blocking, so the server will keep running in the background
         else:
             # Platform & container agnostic:
             with open('hf_waitress_output_log.txt', 'w') as f:
-                if not is_awq:
-                    HF_WAITRESS_PROCESS = subprocess.Popen(['python3', 'hf_waitress.py'], stdout=f, stderr=subprocess.STDOUT, text=True)
-                else:
-                    HF_WAITRESS_PROCESS = subprocess.Popen(['python3', 'hf_waitress.py', '--awq'], stdout=f, stderr=subprocess.STDOUT, text=True)
+                HF_WAITRESS_PROCESS = subprocess.Popen(full_command, stdout=f, stderr=subprocess.STDOUT, text=True)
 
     except Exception as e:
         return handle_api_error("Could not launch HF-Waitress process, encountered error: ", e)
