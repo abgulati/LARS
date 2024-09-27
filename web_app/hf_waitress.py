@@ -635,6 +635,19 @@ def initialize_model():
     return True
 
 
+def empty_cuda_cache():
+    print("\n\nEmptying CUDA cache\n\n")
+    # check if torch.cuda is available
+    if torch.cuda.is_available():
+        try:
+            torch.cuda.empty_cache()
+        except Exception as e:
+            handle_error_no_return("Could not empty cuda cache, encountered error: ", e)
+    else:
+        print("\n\nCUDA is not available, skipping cache-emptying\n\n")
+        return
+
+
 @app.route('/completions', methods=['POST'])
 def completions():
 
@@ -685,6 +698,11 @@ def completions():
             handle_api_error("Could not generate output, encountered error: ", e)
 
         print("\n\nCompletions done - releasing LLM semaphore\n\n")
+
+        try:
+            empty_cuda_cache()
+        except Exception as e:
+            handle_error_no_return("Could not empty cuda cache, encountered error: ", e)
 
         return jsonify({"success": True, "response": output})
 
@@ -787,6 +805,11 @@ def completions_stream():
             yield f"data: {json.dumps(line)}\n\n"
         
         yield f"event: END\ndata: \"null\"\n\n"
+
+        try:
+            empty_cuda_cache()
+        except Exception as e:
+            handle_error_no_return("Could not empty cuda cache, encountered error: ", e)
             
     print("\n\nInferencing Begins!\n\n")
     return Response(generate(), content_type='text/event-stream')
