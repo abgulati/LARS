@@ -2362,6 +2362,7 @@ def hf_waitress_server_starter():
 
     is_awq = False
     model_choice = 'microsoft/Phi-3-mini-4k-instruct'   # match default in hf_waitress.py as this will only be used in the very first run, as the hf_config.json file is created in the first run!
+    use_flash_attention_2 = False
     try:
         with open('hf_config.json', 'r') as file:
             hf_config = json.load(file)
@@ -2369,7 +2370,7 @@ def hf_waitress_server_starter():
             use_flash_attention_2 = hf_config['use_flash_attention_2']
             model_choice = hf_config['model_id']
     except Exception as e:
-        handle_error_no_return("Could not read hf_config.json in method hf_waitress_server_starter, encountered error: ", e)
+        handle_error_no_return("Could not read hf_config.json in method hf_waitress_server_starter. Continuing with defaults. encountered error: ", e)
 
     if is_local_server_online('hf-waitress')['server_available']:
         print("\n\nHF-Waitress server already running. Resetting LLM_CHANGE_RELOAD_TRIGGER_SET and simply returning!\n\n")
