@@ -162,6 +162,7 @@ opentelemetry-proto==1.19.0
 opentelemetry-sdk==1.19.0
 opentelemetry-semantic-conventions==0.40b0
 opentelemetry-util-http==0.40b0
+optimum-quanto==0.2.5
 orjson==3.9.10
 overrides==7.4.0
 packaging==23.2
@@ -218,7 +219,6 @@ python-multipart==0.0.6
 pytz==2024.1
 pywin32==306
 PyYAML==6.0.1
-quanto==0.2.0
 rapidfuzz==3.9.6
 red-black-tree-mod==1.20
 regex==2023.8.8
